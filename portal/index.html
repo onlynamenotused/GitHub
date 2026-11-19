@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Highway Service Desk · Highway Digital</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#000000">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="styles.css?v=19">
+<script src="config.js?v=19"></script>
+<script type="module" src="app.js?v=19"></script>
+</head>
+<body>
+<header class="top">
+  <div class="wrap bar">
+    <a class="brand" href="./" aria-label="Highway Service Desk"><img class="logoimg" src="logo.png?v=19" alt="Highway Digital" width="600" height="104"><small>Highway Service Desk</small></a>
+    <span class="spacer"></span>
+    <span id="who" class="muted small"></span>
+    <button id="signout" class="btn ghost" hidden>Sign out</button>
+  </div>
+  <nav class="wrap tabs" id="tabs" hidden>
+    <a href="#machines" data-tab="machines" id="tabMachines">My machines</a>
+    <a href="#kb" data-tab="kb" id="tabKb" hidden>Intranet Knowledge</a>
+    <a href="/kb/" id="tabKbPage" hidden>Knowledge Base</a>
+    <a href="/catalogue/" id="tabCat" hidden>Parts Catalogue</a>
+    <a href="#contact" data-tab="contact">Contact &amp; booking</a>
+    <a href="#customers" data-tab="customers" id="tabCustomers" hidden>Customers (staff)</a>
+  </nav>
+</header>
+
+<main class="wrap" id="app">
+  <section id="loading" class="card center"><span class="spin"></span> Loading…</section>
+
+  <section id="login" class="card login" hidden>
+    <h1>Sign in</h1>
+    <!-- TEMPORARY: beta notice. Remove this block when the portal leaves beta. -->
+    <div class="beta" role="note"><span class="betatag">Beta</span> This Service Desk is currently in development. We encourage you to try it out and tell us what you think at <a href="mailto:hello@highwaydigital.com.au">hello@highwaydigital.com.au</a>.</div>
+    <p class="muted">Enter the email address you use with Highway Digital. We'll email you a secure sign-in link. No password needed.</p>
+    <form id="loginForm">
+      <label for="email">Email</label>
+      <input id="email" type="email" required autocomplete="email" placeholder="you@yourcompany.com.au">
+      <button class="btn primary" type="submit">Email me a sign-in link</button>
+    </form>
+    <p id="loginMsg" class="msg" role="status"></p>
+  </section>
+
+  <section id="view-machines" hidden>
+    <div class="head">
+      <h1 id="clientTitle">My machines</h1>
+      <input id="machineSearch" class="field" type="search" placeholder="Search model, serial or site">
+    </div>
+    <div id="stats" class="stats"></div>
+    <div id="machineList" class="grid"></div>
+  </section>
+
+  <section id="view-machine" hidden></section>
+
+  <section id="view-kb" hidden>
+    <div class="head">
+      <h1>Intranet Knowledge</h1>
+      <input id="kbSearch" class="field" type="search" placeholder="Search a fault, e.g. ink dripping, blank print">
+    </div>
+    <p class="muted small">Internal only: faults and fixes from our service work. Visible to hello@highwaydigital.com.au and no one else.</p>
+    <div id="kbList" class="stack"></div>
+  </section>
+
+  <section id="view-customers" hidden>
+    <div class="head">
+      <h1>Customers</h1>
+      <input id="custSearch" class="field" type="search" placeholder="Search customer name">
+    </div>
+    <form id="addCustForm" class="inline addcust">
+      <input id="newCustName" class="field" placeholder="New customer name" aria-label="New customer name" required>
+      <button class="btn primary" type="submit">Add customer</button>
+      <span id="addCustMsg" class="saved"></span>
+    </form>
+    <p class="muted small">Tick <b>Knowledge Base</b> to give that customer's logins the Knowledge Base, and <b>Parts Catalogue</b> for the catalogue with prices. New customers start with both unticked. Changes save straight away. Sub-contractor logins always get the Knowledge Base and never the catalogue.</p>
+    <div class="card" style="padding:0;overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Customer</th><th>Machines</th><th>Portal logins</th><th>Knowledge Base</th><th>Parts Catalogue</th></tr></thead>
+        <tbody id="custRows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="view-contact" class="contact" hidden>
+    <h1 class="ctitle">Contact Us</h1>
+    <div class="cgrid">
+      <div>
+        <p class="lead">HIGHWAYDIGITAL specialises in repairs to Mimaki, Brother, Mutoh and Epilog products. We also provide I.T services for residential and small business. Contact us for more info.</p>
+        <form id="contactForm" class="cform">
+          <select id="cfMachine" aria-label="Choose one of your machines"><option value="">Choose one of your machines (optional)</option></select>
+          <input id="cfCompany" placeholder="Company Name" aria-label="Company name">
+          <input id="cfName" placeholder="Contact Name*" aria-label="Contact name" required>
+          <input id="cfPhone" type="tel" placeholder="Phone" aria-label="Phone">
+          <input id="cfEmail" type="email" placeholder="Email*" aria-label="Email" required>
+          <input id="cfModel" placeholder="Equipment Model" aria-label="Equipment model">
+          <input id="cfSerial" placeholder="Serial Number" aria-label="Serial number">
+          <input id="cfFault" placeholder="Fault Description" aria-label="Fault description">
+          <input id="cfAddress" placeholder="Customer Address" aria-label="Customer address">
+          <textarea id="cfMessage" rows="6" placeholder="Message*" aria-label="Message" required></textarea>
+          <button class="btn primary send" type="submit">Send</button>
+          <p class="fine">Send opens your email app with these details addressed to us, ready to send.</p>
+        </form>
+      </div>
+      <div class="cinfo">
+        <p class="fine">We are based in Perth. If you require regional support please contact us for more info.</p>
+        <h3>Trading as HIGHWAYDIGITAL</h3>
+        <p class="fine">Western Australia, Australia</p>
+        <dl class="ckv">
+          <dt>Email:</dt><dd><a id="contactEmail" href="#"></a></dd>
+          <dt>LinkedIn:</dt><dd><a href="https://www.linkedin.com/company/highwaydigital" target="_blank" rel="noopener">www.linkedin.com/company/highwaydigital</a></dd>
+          <dt>Website:</dt><dd><a href="https://www.highwaydigital.com.au" target="_blank" rel="noopener">www.highwaydigital.com.au</a></dd>
+          <dt>Phone:</dt><dd><a href="tel:1300880815">1300 880 815</a></dd>
+          <dt>ABN:</dt><dd>85387583538</dd>
+        </dl>
+        <h3>Hours (WST)</h3>
+        <p class="fine">Open <span class="w">08:00 am – 04:00 pm</span></p>
+        <p style="margin-top:22px"><a id="bookingLink" class="btn primary send" href="#" target="_blank" rel="noopener">Book a service</a></p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="wrap foot muted small">
+  © Highway Digital · Perth, WA · <a id="siteLink" href="#">highwaydigital.com.au</a>
+  <span id="viewCount" class="views" hidden></span>
+</footer>
+</body>
+</html>
