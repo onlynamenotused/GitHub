@@ -1,0 +1,5 @@
+-- Applied via the Supabase connector as migrations "fb_invoices_estimates" and
+-- "fb_dummy_safe_and_seandev_samples". Summary-only copies of FreshBooks invoices and
+-- estimates (date, number, reference, status) for the customer portal.
+-- Rows with negative ids are sample data for the SeanDev test account; the sync never deletes them.
+-- See the Supabase migration history for the full SQL.

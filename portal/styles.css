@@ -162,3 +162,25 @@ select.field{color:var(--fg);background:var(--surface)}
 .picked{margin:0;font-weight:600;color:var(--accent)}
 .bkitem{display:flex;flex-direction:column;gap:4px;padding-bottom:10px;border-bottom:1px solid var(--line)}
 .bkitem .pill{align-self:flex-start}
+
+/* parameter files */
+.fhead{font-size:14px;margin:6px 0 4px}
+ul.files{list-style:none;margin:0;padding:0}
+ul.files li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-top:1px solid rgba(0,0,0,.08)}
+ul.files li:first-child{border-top:0}
+.fname{min-width:0;overflow-wrap:anywhere}
+.btn.small{padding:5px 10px;font-size:13px}
+/* invoices & estimates */
+.billgrid{display:grid;gap:14px;margin-top:18px}
+.bhead{display:flex;align-items:center;gap:10px;justify-content:space-between}
+table.billing{width:100%;border-collapse:collapse;font-size:14px;margin:6px 0 8px}
+table.billing th{text-align:left;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.03em;opacity:.65;padding:6px 8px;border-bottom:1px solid rgba(0,0,0,.12)}
+table.billing td{padding:8px;border-bottom:1px solid rgba(0,0,0,.06);vertical-align:middle}
+table.billing td.act{text-align:right;white-space:nowrap}
+@media (max-width:640px){
+  table.billing thead{display:none}
+  table.billing tr{display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;padding:8px 0;border-bottom:1px solid rgba(0,0,0,.08)}
+  table.billing td{border:0;padding:2px 0}
+  table.billing td[data-l]::before{content:attr(data-l);display:block;font-size:11px;opacity:.6;text-transform:uppercase}
+  table.billing td.act{grid-column:1/-1;text-align:left}
+}

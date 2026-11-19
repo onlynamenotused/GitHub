@@ -88,20 +88,25 @@ sb.auth.onAuthStateChange((evt, session) => {
 
 // ---------- data ----------
 async function loadCore() {
-  const [c, m, k, s, g, it] = await Promise.all([
+  const [c, m, k, s, g, it, ...rest] = await Promise.all([
     sb.from("clients").select("id,name,kb_access,catalogue_access").order("name"),
     sb.from("machines").select("*").eq("status", "active").order("brand").order("model"),
     sb.rpc("has_kb_access"),
     sb.rpc("is_staff"),
     sb.rpc("has_catalogue_access"),
-    sb.rpc("is_intranet")
+    sb.rpc("is_intranet"),
+    sb.from("machine_files").select("id,kind,name,machine_id,param_date,modified,size,fw").order("param_date", { ascending: false }),
+    sb.from("fb_invoices").select("*").order("issued", { ascending: false }).limit(60),
+    sb.from("fb_estimates").select("*").order("issued", { ascending: false }).limit(60)
   ]);
+  const [mf, inv, est] = rest;
   if (c.error) throw c.error;
   if (m.error) throw m.error;
   state.clients = c.data; state.machines = m.data;
   state.kbAccess = k.data === true; state.staff = s.data === true;
   state.catAccess = g.data === true;
   state.intranet = it.data === true;
+  state.files = mf.data || []; state.invoices = inv.data || []; state.estimates = est.data || [];
   drawNav();
 }
 async function loadKb() {
@@ -165,15 +170,89 @@ function renderMachines() {
     return;
   }
   if (!list.length) { box.replaceChildren(el("div", { class: "empty" }, "No machines match that search.")); return; }
+  renderBilling();
   box.replaceChildren(...list.map((m) => {
     const s = pmStatus(m);
     return el("button", { class: "mcard", onclick: () => (location.hash = "#machine/" + encodeURIComponent(m.id)) },
       el("span", { class: "model" }, machineName(m)),
       el("span", { class: "muted small" }, [m.sub_category || m.category, m.serial && "SN " + m.serial].filter(Boolean).join(" · ")),
       el("span", { class: "muted small" }, m.location || m.site || ""),
-      el("span", { class: "pill " + s.cls }, s.label + (m.pm_next_due ? " · " + fmtDate(m.pm_next_due) : ""))
+      el("span", { class: "pill " + s.cls }, s.label + (m.pm_next_due ? " · " + fmtDate(m.pm_next_due) : "")),
+      filesFor(m).length ? el("span", { class: "muted small" }, "📄 " + filesFor(m).length + " parameter/log file" + (filesFor(m).length > 1 ? "s" : "")) : null
     );
   }));
+}
+
+// ---------- parameter & log files ----------
+function filesFor(m) { return (state.files || []).filter((f) => f.machine_id === m.id); }
+function fmtSize(n) { return !n ? "" : n < 1024 ? n + " B" : n < 1048576 ? (n / 1024).toFixed(0) + " KB" : (n / 1048576).toFixed(1) + " MB"; }
+async function downloadFile(f, btn) {
+  btn.disabled = true; const was = btn.textContent; btn.textContent = "Preparing…";
+  try {
+    const { data, error } = await sb.from("machine_files").select("content").eq("id", f.id).single();
+    if (error || !data) throw error || new Error("missing");
+    const url = URL.createObjectURL(new Blob([data.content || ""], { type: "text/csv" }));
+    const a = el("a", { href: url, download: f.name || "parameters.csv" }); document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    btn.textContent = was;
+  } catch (e) { btn.textContent = "Download failed"; }
+  btn.disabled = false;
+}
+function filesCard(m) {
+  const files = filesFor(m);
+  const group = (kind, title) => {
+    const fs = files.filter((f) => (kind === "log" ? f.kind === "log" : f.kind !== "log"));
+    if (!fs.length) return null;
+    return el("div", {}, el("h3", { class: "fhead" }, title),
+      el("ul", { class: "files" }, ...fs.map((f) => {
+        const b = el("button", { class: "btn small", onclick: () => downloadFile(f, b) }, "Download");
+        return el("li", {},
+          el("span", { class: "fname" }, el("b", {}, fmtDate(f.param_date || f.modified)), " ", el("span", { class: "muted small" }, [f.fw && "FW " + f.fw, fmtSize(f.size)].filter(Boolean).join(" · ")),
+            el("br"), el("span", { class: "muted small" }, f.name)),
+          b);
+      })));
+  };
+  return el("div", { class: "card", style: "margin-top:14px" }, el("h2", {}, "Parameter & log files"),
+    files.length ? el("div", { class: "stack" }, group("parameter", "Parameter backups"), group("log", "Logs"))
+      : el("p", { class: "muted small" }, "No parameter or log files saved for this machine yet. We save a copy at each service."));
+}
+
+// ---------- invoices & estimates ----------
+const INV_LABEL = { paid: "Paid", unpaid: "Unpaid", partial: "Part paid", overdue: "Overdue", disputed: "Disputed" };
+const INV_CLS = { paid: "ok", unpaid: "soon", partial: "soon", overdue: "over", disputed: "over" };
+const EST_LABEL = { sent: "Sent", viewed: "Viewed", replied: "Replied", accepted: "Accepted", invoiced: "Invoiced", declined: "Declined" };
+const EST_CLS = { sent: "soon", viewed: "soon", replied: "soon", accepted: "ok", invoiced: "ok", declined: "over" };
+function clientName(id) { return state.clients.find((c) => c.id === id)?.name || ""; }
+function billingTable(rows, kind) {
+  const isInv = kind === "inv", portal = cfg.freshbooksPortal || "https://my.freshbooks.com/";
+  const multi = state.staff || state.clients.length > 1;
+  return el("table", { class: "billing" },
+    el("thead", {}, el("tr", {}, el("th", {}, "Date"), el("th", {}, isInv ? "Invoice" : "Estimate"), multi ? el("th", {}, "Customer") : null, el("th", {}, "Reference"), el("th", {}, "Status"), el("th", {}, ""))),
+    el("tbody", {}, ...rows.map((r) => {
+      const st = r.status, open = isInv ? st !== "paid" : ["sent", "viewed", "replied"].includes(st);
+      return el("tr", {},
+        el("td", { "data-l": "Date" }, fmtDate(r.issued)),
+        el("td", { "data-l": isInv ? "Invoice" : "Estimate" }, el("b", {}, r.number)),
+        multi ? el("td", { "data-l": "Customer" }, clientName(r.client_id)) : null,
+        el("td", { "data-l": "Reference" }, r.reference || "—"),
+        el("td", { "data-l": "Status" }, el("span", { class: "pill " + ((isInv ? INV_CLS : EST_CLS)[st] || "") }, (isInv ? INV_LABEL : EST_LABEL)[st] || st)),
+        el("td", { class: "act" }, el("a", { class: "btn small" + (open && isInv ? " primary" : ""), href: portal, target: "_blank", rel: "noopener" },
+          isInv ? (open ? "Pay now" : "View") : (open ? "Review & accept" : "View"))));
+    })));
+}
+function renderBilling() {
+  const box = $("#billing"); if (!box) return;
+  const inv = (state.invoices || []).slice(0, 12), est = (state.estimates || []).slice(0, 12);
+  const owing = (state.invoices || []).filter((r) => r.status !== "paid").length;
+  box.replaceChildren(
+    el("div", { class: "card" },
+      el("div", { class: "bhead" }, el("h2", {}, "Recent invoices"), owing ? el("span", { class: "pill over" }, owing + " outstanding") : null),
+      inv.length ? billingTable(inv, "inv") : el("p", { class: "muted small" }, "No invoices yet."),
+      el("p", { class: "muted small" }, "Pay now and View open your FreshBooks client area. Sign in there with this email address to see the full invoice and pay by card.")),
+    el("div", { class: "card" },
+      el("h2", {}, "Estimates"),
+      est.length ? billingTable(est, "est") : el("p", { class: "muted small" }, "No estimates have been sent to you yet."))
+  );
 }
 
 async function renderMachine(id) {
@@ -206,6 +285,7 @@ async function renderMachine(id) {
       ),
       el("div", { class: "card" }, el("h2", {}, "Manuals, drivers & software"), relRes)
     ),
+    filesCard(m),
     ...(state.intranet ? [el("div", { class: "card", style: "margin-top:14px" }, el("h2", {}, "Intranet Knowledge for this machine"), relKb)] : [])
   );
 

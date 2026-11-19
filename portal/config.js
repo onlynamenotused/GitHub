@@ -5,5 +5,6 @@ window.PORTAL_CONFIG = {
   supabaseAnonKey: "sb_publishable_uu0N60ZMVjJ1kl14FW1NBA_v-cm_U3_",
   contactEmail: "hello@highwaydigital.com.au",
   websiteUrl: "https://www.highwaydigital.com.au",
-  bookingUrl: "https://highwaydigital.com.au/book"
+  bookingUrl: "https://highwaydigital.com.au/book",
+  freshbooksPortal: "https://my.freshbooks.com/"
 };
