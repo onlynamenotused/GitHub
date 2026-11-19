@@ -56,7 +56,7 @@ export default {
       : new Response(notAvailable(g.name), { headers: { "content-type": "text/html; charset=utf-8" } });
 
     const out = new HTMLRewriter()
-      .on("head", { element(e) { e.append(`<link rel="stylesheet" href="/nav.css?v=${V}">`, { html: true }); } })
+      .on("head", { element(e) { e.append(`<link rel="stylesheet" href="/nav.css?v=${V}">` + (key === "catalogue" ? `<link rel="stylesheet" href="/xmas.css?v=${V}">` : ""), { html: true }); } })
       .on("body", { element(e) { e.prepend(navBlock(f, key), { html: true }); } })
       // the pages' own links back to the portal / to each other: the shared menu replaces them
       .on("header.band .meta > div:nth-child(2)", { element(e) { e.remove(); } })
