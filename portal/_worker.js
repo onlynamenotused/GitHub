@@ -61,6 +61,8 @@ export default {
       // the pages' own links back to the portal / to each other: the shared menu replaces them
       .on("header.band .meta > div:nth-child(2)", { element(e) { e.remove(); } })
       .on("header.band a.kblink", { element(e) { e.remove(); } })
+      .on("header.band .plate small a", { element(e) { e.remove(); } })   // "← Highway Service Desk ·" on the catalogue
+      .on("header.band .plate small", { text(t) { if (/^\s*·\s*/.test(t.text)) t.replace(t.text.replace(/^\s*·\s*/, "")); } })
       .transform(page);
     const h = new Headers(out.headers);
     h.set("Cache-Control", "private, no-store");
