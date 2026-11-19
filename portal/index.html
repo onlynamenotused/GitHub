@@ -8,27 +8,15 @@
 <meta name="theme-color" content="#000000">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="styles.css?v=19">
-<script src="config.js?v=19"></script>
-<script type="module" src="app.js?v=19"></script>
+<link rel="stylesheet" href="styles.css?v=20">
+<link rel="stylesheet" href="nav.css?v=20">
+<link rel="icon" href="favicon.ico">
+<script src="config.js?v=20"></script>
+<script src="nav.js?v=20"></script>
+<script type="module" src="app.js?v=20"></script>
 </head>
 <body>
-<header class="top">
-  <div class="wrap bar">
-    <a class="brand" href="./" aria-label="Highway Service Desk"><img class="logoimg" src="logo.png?v=19" alt="Highway Digital" width="600" height="104"><small>Highway Service Desk</small></a>
-    <span class="spacer"></span>
-    <span id="who" class="muted small"></span>
-    <button id="signout" class="btn ghost" hidden>Sign out</button>
-  </div>
-  <nav class="wrap tabs" id="tabs" hidden>
-    <a href="#machines" data-tab="machines" id="tabMachines">My machines</a>
-    <a href="#kb" data-tab="kb" id="tabKb" hidden>Intranet Knowledge</a>
-    <a href="/kb/" id="tabKbPage" hidden>Knowledge Base</a>
-    <a href="/catalogue/" id="tabCat" hidden>Parts Catalogue</a>
-    <a href="#contact" data-tab="contact">Contact &amp; booking</a>
-    <a href="#customers" data-tab="customers" id="tabCustomers" hidden>Customers (staff)</a>
-  </nav>
-</header>
+<div id="hd-nav"></div>
 
 <main class="wrap" id="app">
   <section id="loading" class="card center"><span class="spin"></span> Loading…</section>
@@ -82,6 +70,36 @@
         <thead><tr><th>Customer</th><th>Machines</th><th>Portal logins</th><th>Knowledge Base</th><th>Parts Catalogue</th></tr></thead>
         <tbody id="custRows"></tbody>
       </table>
+    </div>
+  </section>
+
+  <section id="view-book" hidden>
+    <div class="head"><h1>Book a service</h1></div>
+    <div class="bookgrid">
+      <form id="bookForm" class="card bookform" novalidate>
+        <label class="f"><span>Machine</span><select id="bkMachine" class="field" required></select></label>
+        <fieldset class="kinds">
+          <legend>What do you need?</legend>
+          <label><input type="radio" name="bkKind" value="service" checked> Scheduled service <span class="muted small">about 4½ hours</span></label>
+          <label><input type="radio" name="bkKind" value="fault"> Fault or repair <span class="muted small">about 2 hours</span></label>
+          <label><input type="radio" name="bkKind" value="install"> Installation <span class="muted small">about 4½ hours</span></label>
+        </fieldset>
+        <label class="f"><span>What's happening? (error codes, symptoms, anything we should bring)</span><textarea id="bkDesc" class="field" rows="4"></textarea></label>
+        <div class="row2">
+          <label class="f"><span>Contact name*</span><input id="bkName" class="field" required autocomplete="name"></label>
+          <label class="f"><span>Phone*</span><input id="bkPhone" class="field" type="tel" required autocomplete="tel"></label>
+        </div>
+        <h3>Choose a time <span class="muted small">(Perth time)</span></h3>
+        <div id="bkSlots" class="slots"><p class="muted small">Loading available times…</p></div>
+        <p id="bkPicked" class="picked" hidden></p>
+        <button id="bkSubmit" class="btn primary send" type="submit" disabled>Book this time</button>
+        <p id="bkMsg" class="msg" role="status"></p>
+      </form>
+      <aside class="card">
+        <h2>Your bookings</h2>
+        <div id="bkList" class="stack"><p class="muted small">Loading…</p></div>
+        <p class="muted small" style="margin-top:14px">Times shown are free in our calendar right now. We confirm each booking and it gets a job number here. If nothing suits, call <a href="tel:1300880815">1300 880 815</a> or email <a href="mailto:hello@highwaydigital.com.au">hello@highwaydigital.com.au</a>.</p>
+      </aside>
     </div>
   </section>
 

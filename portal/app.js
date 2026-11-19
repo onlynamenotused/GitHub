@@ -6,7 +6,7 @@ const sb = createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, {
 });
 
 const $ = (s) => document.querySelector(s);
-const views = ["loading", "login", "view-machines", "view-machine", "view-kb", "view-contact", "view-customers"];
+const views = ["loading", "login", "view-machines", "view-machine", "view-kb", "view-contact", "view-customers", "view-book"];
 const state = { user: null, clients: [], machines: [], kb: null, resources: null, kbAccess: false, intranet: false, staff: false, access: null };
 
 // ---------- helpers ----------
@@ -54,7 +54,15 @@ $("#loginForm").addEventListener("submit", async (e) => {
   msg.className = "msg ok";
   msg.textContent = "Check your inbox for a sign-in link from Highway Digital. It can take a minute to arrive.";
 });
-$("#signout").addEventListener("click", async () => { await sb.auth.signOut(); setAccessCookie(null); location.hash = ""; location.reload(); });
+async function signOut() { await sb.auth.signOut(); setAccessCookie(null); history.replaceState(null, "", location.pathname); location.reload(); }
+
+// ---------- shared menu (nav.js) ----------
+const navHost = () => $("#hd-nav");
+function drawNav(active) {
+  window.HDNav?.render(navHost(), state.user
+    ? { signedIn: true, email: state.user.email, staff: state.staff, intranet: state.intranet, kb: state.kbAccess, cat: state.catAccess, active }
+    : { signedIn: false });
+}
 
 // The KB and catalogue pages are checked by the server (_worker.js) using this cookie.
 function setAccessCookie(session) {
@@ -94,11 +102,7 @@ async function loadCore() {
   state.kbAccess = k.data === true; state.staff = s.data === true;
   state.catAccess = g.data === true;
   state.intranet = it.data === true;
-  $("#tabKb").hidden = !state.intranet;
-  $("#tabKbPage").hidden = !state.kbAccess;
-  $("#tabCat").hidden = !state.catAccess;
-  $("#tabCustomers").hidden = !state.staff;
-  $("#tabMachines").textContent = state.staff ? "Customer Assets" : "My machines";
+  drawNav();
 }
 async function loadKb() {
   if (state.kb) return state.kb;
@@ -198,7 +202,7 @@ async function renderMachine(id) {
           m.pm_interval_months && el("dt", {}, "Service interval"), m.pm_interval_months && el("dd", {}, "Every " + m.pm_interval_months + " months"),
           m.warranty_end && el("dt", {}, "Warranty until"), m.warranty_end && el("dd", {}, fmtDate(m.warranty_end))
         ),
-        el("p", { style: "display:flex;gap:8px;flex-wrap:wrap" }, el("a", { class: "btn primary", href: cfg.bookingUrl, target: "_blank", rel: "noopener" }, "Book a service"), el("a", { class: "btn", href: mailtoFor(m) }, "Email us about this machine"))
+        el("p", { style: "display:flex;gap:8px;flex-wrap:wrap" }, el("a", { class: "btn primary", href: state.staff ? cfg.bookingUrl : "#book/" + encodeURIComponent(m.id), target: state.staff ? "_blank" : null, rel: state.staff ? "noopener" : null }, "Book a service"), el("a", { class: "btn", href: mailtoFor(m) }, "Email us about this machine"))
       ),
       el("div", { class: "card" }, el("h2", {}, "Manuals, drivers & software"), relRes)
     ),
@@ -423,6 +427,9 @@ $("#addCustForm").addEventListener("submit", async (e) => {
 });
 
 function renderContact() {
+  const bl = $("#bookingLink");
+  if (state.staff) { bl.href = cfg.bookingUrl; bl.target = "_blank"; }
+  else { bl.href = "#book"; bl.removeAttribute("target"); }
   const sel = $("#cfMachine");
   if (!sel.dataset.ready) {
     for (const m of state.machines) sel.append(el("option", { value: m.id }, machineName(m) + (m.serial ? " · SN " + m.serial : "") + (m.site ? " · " + m.site : "")));
@@ -453,15 +460,101 @@ $("#contactForm").addEventListener("submit", (e) => {
   location.href = `mailto:${cfg.contactEmail}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
 });
 
+
+// ---------- book a service: pick a real free time; the service desk turns it into a job ----------
+const KIND_HOURS = { service: 4.5, install: 4.5, fault: 2 };
+const KIND_LABEL = { service: "Scheduled service", install: "Installation", fault: "Fault or repair" };
+const PERTH = "Australia/Perth";
+const fmtWhen = (iso, o) => new Date(iso).toLocaleString("en-AU", { timeZone: PERTH, ...o });
+const dayKey = (iso) => fmtWhen(iso, { year: "numeric", month: "2-digit", day: "2-digit" });
+const timeLbl = (iso) => fmtWhen(iso, { hour: "numeric", minute: "2-digit" }).replace(" ", "").toLowerCase();
+const bk = { slot: null, ready: false };
+
+async function renderBook(machineId) {
+  const sel = $("#bkMachine");
+  if (state.staff) {
+    $("#bookForm").replaceChildren(el("p", {}, "Bookings are made by customer logins. Use the service desk to book jobs, or ",
+      el("a", { href: cfg.bookingUrl, target: "_blank", rel: "noopener" }, "the website booking page"), "."));
+  }
+  if (!bk.ready && !state.staff) {
+    sel.replaceChildren(...state.machines.map((m) => el("option", { value: m.id }, machineName(m) + (m.serial ? " · SN " + m.serial : "") + (m.site ? " · " + m.site : ""))));
+    for (const r of document.querySelectorAll('input[name="bkKind"]')) r.addEventListener("change", loadSlots);
+    sel.addEventListener("change", () => {});
+    bk.ready = true;
+  }
+  if (!state.staff) {
+    if (machineId && state.machines.some((m) => m.id === machineId)) sel.value = machineId;
+    if (!state.machines.length) { $("#bkMsg").className = "msg err"; $("#bkMsg").textContent = "There are no machines on your account yet, so online booking isn't available. Please call 1300 880 815."; }
+    loadSlots();
+  }
+  loadBookings();
+}
+const bkKind = () => (document.querySelector('input[name="bkKind"]:checked') || {}).value || "service";
+async function loadSlots() {
+  const box = $("#bkSlots");
+  bk.slot = null; $("#bkSubmit").disabled = true; $("#bkPicked").hidden = true;
+  box.replaceChildren(el("p", { class: "muted small" }, "Loading available times…"));
+  const since = new Date(Date.now() + 12 * 3600e3).toISOString();
+  const { data, error } = await sb.from("portal_slots").select("slot_start,slot_end").eq("hours", KIND_HOURS[bkKind()]).gt("slot_start", since).order("slot_start").limit(40);
+  if (error) { box.replaceChildren(el("p", { class: "msg err" }, "Couldn't load available times. Please try again shortly.")); return; }
+  if (!data.length) {
+    box.replaceChildren(el("p", { class: "muted" }, "No online times are available right now. Please call ", el("a", { href: "tel:1300880815" }, "1300 880 815"),
+      " or email ", el("a", { href: "mailto:" + cfg.contactEmail }, cfg.contactEmail), " and we'll find a time."));
+    return;
+  }
+  const days = new Map();
+  for (const s of data) { const k = dayKey(s.slot_start); if (!days.has(k)) days.set(k, []); days.get(k).push(s); }
+  box.replaceChildren(...[...days.values()].map((list) => el("div", { class: "sday" },
+    el("div", { class: "sdate" }, fmtWhen(list[0].slot_start, { weekday: "short", day: "numeric", month: "short" })),
+    el("div", { class: "stimes" }, ...list.map((s) => el("button", { type: "button", class: "slot", "aria-pressed": "false", onclick: (e) => {
+      for (const b of box.querySelectorAll(".slot")) b.setAttribute("aria-pressed", "false");
+      e.currentTarget.setAttribute("aria-pressed", "true");
+      bk.slot = s; $("#bkSubmit").disabled = false;
+      const p = $("#bkPicked"); p.hidden = false;
+      p.textContent = "Selected: " + fmtWhen(s.slot_start, { weekday: "long", day: "numeric", month: "long" }) + ", " + timeLbl(s.slot_start) + " to " + timeLbl(s.slot_end);
+    } }, timeLbl(s.slot_start)))))));
+}
+async function loadBookings() {
+  const box = $("#bkList");
+  const { data, error } = await sb.from("portal_bookings").select("id,kind,slot_start,slot_end,status,ticket_num,note,machine_id,created_at").order("created_at", { ascending: false }).limit(10);
+  if (error) { box.replaceChildren(el("p", { class: "msg err" }, "Couldn't load your bookings.")); return; }
+  if (!data.length) { box.replaceChildren(el("p", { class: "muted small" }, "No bookings yet.")); return; }
+  const lbl = { pending: ["Waiting for confirmation", "soon"], booked: ["Confirmed", "ok"], clash: ["We'll contact you to arrange a time", "over"], cancelled: ["Cancelled", "none"] };
+  box.replaceChildren(...data.map((b) => {
+    const m = state.machines.find((x) => x.id === b.machine_id);
+    const [t, cls] = lbl[b.status] || [b.status, "none"];
+    return el("div", { class: "bkitem" },
+      el("b", {}, fmtWhen(b.slot_start, { weekday: "short", day: "numeric", month: "short" }) + ", " + timeLbl(b.slot_start)),
+      el("div", { class: "muted small" }, [KIND_LABEL[b.kind], m && machineName(m)].filter(Boolean).join(" · ")),
+      el("span", { class: "pill " + cls }, t + (b.ticket_num && b.status === "booked" ? " · job " + b.ticket_num : "")));
+  }));
+}
+$("#bookForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const msg = $("#bkMsg"), btn = $("#bkSubmit");
+  const name = $("#bkName").value.trim(), phone = $("#bkPhone").value.trim();
+  if (!bk.slot) { msg.className = "msg err"; msg.textContent = "Pick a time first."; return; }
+  if (!name || !phone) { msg.className = "msg err"; msg.textContent = "Please add a contact name and phone number."; return; }
+  btn.disabled = true; msg.className = "msg"; msg.textContent = "Booking…";
+  const { error } = await sb.rpc("book_slot", { p_machine: $("#bkMachine").value, p_slot: bk.slot.slot_start, p_kind: bkKind(),
+    p_desc: $("#bkDesc").value.trim(), p_name: name, p_phone: phone });
+  if (error) { msg.className = "msg err"; msg.textContent = error.message || "Couldn't book that time."; btn.disabled = false; loadSlots(); return; }
+  msg.className = "msg ok";
+  msg.textContent = "Thanks, your booking for " + fmtWhen(bk.slot.slot_start, { weekday: "long", day: "numeric", month: "long" }) + " at " + timeLbl(bk.slot.slot_start) +
+    " is in. We'll confirm it shortly and it will show a job number under Your bookings.";
+  $("#bkDesc").value = "";
+  loadSlots(); loadBookings();
+});
+
 // ---------- routing ----------
 function route() {
   if (!state.user) return;
   const h = location.hash.replace(/^#/, "") || "machines";
-  for (const a of document.querySelectorAll("#tabs a")) {
-    if (a.dataset.tab === h.split("/")[0] || (h.startsWith("machine/") && a.dataset.tab === "machines")) a.setAttribute("aria-current", "page");
-    else a.removeAttribute("aria-current");
-  }
-  if (h.startsWith("machine/")) { show("view-machine"); renderMachine(decodeURIComponent(h.slice(8))); }
+  if (h === "signout") { signOut(); return; }
+  const top = h.split("/")[0];
+  window.HDNav?.setActive(navHost(), top === "machine" ? "machines" : top === "kb" ? "intranet" : top === "book" ? "contact" : top);
+  if (h === "book" || h.startsWith("book/")) { show("view-book"); renderBook(decodeURIComponent(h.slice(5))); }
+  else if (h.startsWith("machine/")) { show("view-machine"); renderMachine(decodeURIComponent(h.slice(8))); }
   else if (h === "kb" && state.intranet) { show("view-kb"); renderKb(); }
   else if (h === "customers" && state.staff) { show("view-customers"); renderCustomers(); }
   else if (h === "contact") { show("view-contact"); renderContact(); }
@@ -492,12 +585,10 @@ async function boot() {
     state.user = data.session?.user || null;
   }
   if (!state.user) {
-    $("#tabs").hidden = true; $("#signout").hidden = true; $("#who").textContent = "";
-    show("login"); return;
+    if (location.hash === "#signout") history.replaceState(null, "", location.pathname);
+    drawNav(); show("login"); return;
   }
-  $("#who").textContent = state.user.email;
-  $("#signout").hidden = false; $("#tabs").hidden = false;
-  show("loading");
+  drawNav(); show("loading");
   try {
     await loadCore();
     const { data: sd } = await sb.auth.getSession();
