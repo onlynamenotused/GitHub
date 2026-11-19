@@ -129,7 +129,7 @@ begin
         pm_last_done=excluded.pm_last_done, pm_next_due=excluded.pm_next_due, last_visit=excluded.last_visit;
 
     elsif p_collection = 'tickets' then
-      cid := desk_client_id(v->>'clientId', nullif(v->>'newClientId',''), v->>'customer');
+      cid := desk_ticket_client(v);
       insert into tickets(num, client_id, customer_name, machine_id, type, subtype, status, summary, model, created,
                           sched_date, sched_time, sched_hours, assigned_email, sample, updated_at)
       values ((d->>'id')::int, cid, v->>'customer',
