@@ -1,33 +1,37 @@
 # Connecting the Highway Service Desk to the portal
 
 ## Decision (19 Nov 2026)
-One database: Supabase project **highway-portal** (Sydney) holds customers, machines, tickets,
-knowledge base and parts. The customer portal (portal.highwaydigital.com.au, Cloudflare) reads it;
-the service desk writes it.
+One database: Supabase project **highway-portal** (`sfuuzcgwbbhdjqzrchvv`, Sydney).
+The portal (Stage 1 schema: `clients`, `machines`, `kb_articles`, `portal_access`, `staff`,
+`machine_resources`) reads it; the service desk writes it.
 
 ## How the service desk reaches Supabase
-The service desk is a Claude artifact. Artifact pages can't make network calls to other sites,
-but they can call the viewer's Claude connectors. So the service desk uses the **Supabase
-connector** (same way it already uses FreshBooks and Microsoft 365):
+Artifact pages can't call other websites, but they can call the viewer's Claude connectors, so the
+service desk uses the **Supabase connector** (`execute_sql`), as it already does for FreshBooks and M365.
 
-1. **Initial copy** – a one-off "Copy everything to the portal" button sends every collection,
-   in batches, to `public.desk_upsert(collection, docs)`.
-2. **Live sync** – every save/delete in the service desk also calls `desk_upsert` / `desk_delete`,
-   so the portal is always current. Failed calls queue in the service desk and retry.
+- Watches `newclients`, `assets`, `tickets`, `kb`, `inventory`.
+- Changed records (hash differs from last sent) go in batches of 40 to `public.desk_sync(collection, docs)`;
+  deletions go to `public.desk_remove`.
+- Last-sent hashes are kept in service desk doc `meta/portalsync`; first open after release = full copy.
+- Failures retry with back-off (max every 5 min). Header chip: *Portal: synced / N to send / not synced*;
+  click to resend everything.
+- Sync only runs while the service desk is open in a browser signed in to Claude.
+- Code: `docs/service-desk-portal-sync.js`.
 
-Collections map to tables: `tickets → tickets`, `assets → machines` (+ customers),
-`newclients` / FreshBooks clients → `customers`, `kb → kb_articles`, `inventory → parts`,
-everything else → `desk_docs`.
+## Mapping
+| Service desk | Supabase |
+|---|---|
+| `newclients` | `clients` (ids 9,000,000+, `desk_ref` = NC-… id) |
+| `assets` | `machines` (same ids); customer by FreshBooks id, else by name |
+| `tickets` | `tickets` (portal-safe columns) + `ticket_private.data` (full record, staff only) |
+| `kb` | `kb_articles` (`public` flag untouched) |
+| `inventory`, other | `desk_docs` (staff only) |
+
+A service-desk-only customer later created in FreshBooks is merged into the FreshBooks record.
 
 ## Privacy
-- RLS: customers see only their own customer row, machines and (non-sample) tickets;
-  sub-contractors see only tickets assigned to them; staff see everything.
-- Column grants: `data` jsonb (invoice numbers, notes, buy prices) is never readable by
-  customer or sub-contractor sessions.
-- KB and catalogue are off per customer until staff tick `kb_access` / `catalogue_access`.
-  KB articles default to `intranet` (staff only).
-- `portal_enabled` must be ticked before a customer can see anything; no customer emails are sent
-  until Sean says so.
+Customers: own non-sample tickets only. Sub-contractors: tickets whose `assigned_email` is their login.
+Notes, billing lines, invoice refs: `ticket_private`, staff only. Sync functions not callable by portal users.
 
 ## Migrations
-`supabase/migrations/` – applied in the SQL editor or with `supabase db push`.
+Stage 1 schema was created in the dashboard before this repo; files here are additions since.
