@@ -4,7 +4,7 @@
 // shared portal menu (nav.js + nav.css) added at the top, with their old cross-links removed.
 const SB_URL = "https://sfuuzcgwbbhdjqzrchvv.supabase.co";
 const SB_KEY = "sb_publishable_uu0N60ZMVjJ1kl14FW1NBA_v-cm_U3_"; // publishable key: safe, RLS protects data
-const V = "25";
+const V = "26";
 const GATED = {
   kb: { page: "/_p/kb/", flag: "kb", name: "Knowledge Base" },
   catalogue: { page: "/_p/catalogue/", flag: "cat", name: "Parts Catalogue" },
@@ -23,6 +23,24 @@ async function menuFlags(token) {
   });
   if (!r.ok) return null;
   return r.json();
+}
+// Parts Catalogue brand groups. The catalogue's DATA list uses finer brand names; map them to the groups staff tick.
+const CAT_ALL = ["Mimaki", "Mutoh", "Brother", "Epilog", "Others"];
+const catGroup = (b) => ({ Mimaki: "Mimaki", Mutoh: "Mutoh", Brother: "Brother", Epilog: "Epilog", "Laser accessories": "Epilog" })[b] || "Others";
+function catKeep(brand, allow) {
+  if (brand === "Cleaning swabs") return allow.has("Mimaki") || allow.has("Mutoh") || allow.has("Others");
+  return allow.has(catGroup(brand));
+}
+// Removes catalogue sections for brand groups this viewer isn't allowed, before the page leaves the server.
+function filterCatalogue(html, allow) {
+  const start = html.indexOf("const DATA=[");
+  if (start < 0) return null;
+  const bodyStart = start + "const DATA=[".length, end = html.indexOf("\n];", bodyStart);
+  if (end < 0) return null;
+  const parts = html.slice(bodyStart, end).split("\n{brand:\"");
+  const kept = [parts[0]];
+  for (const p of parts.slice(1)) { const b = p.slice(0, p.indexOf("\"")); if (catKeep(b, allow)) kept.push(p); }
+  return html.slice(0, bodyStart) + kept.join("\n{brand:\"") + html.slice(end);
 }
 const attr = (s) => String(s).replace(/&/g, "&amp;").replace(/'/g, "&#39;").replace(/</g, "&lt;");
 function navBlock(f, active) {
@@ -52,9 +70,17 @@ export default {
     if (!f || !f.email) return Response.redirect(url.origin + "/?next=" + encodeURIComponent("/" + key + "/"), 302);
 
     const g = GATED[key];
-    const page = (!g.flag || f[g.flag])
+    let page = (!g.flag || f[g.flag])
       ? await env.ASSETS.fetch(new Request(new URL(g.page, url.origin), { headers: req.headers }))
       : new Response(notAvailable(g.name), { headers: { "content-type": "text/html; charset=utf-8" } });
+    if (key === "catalogue" && f.cat && !f.staff && page.ok) {
+      const allow = new Set(Array.isArray(f.cat_brands) && f.cat_brands.length ? f.cat_brands : CAT_ALL);
+      if (CAT_ALL.some((b) => !allow.has(b))) {
+        const t = filterCatalogue(await page.text(), allow);
+        const hd = new Headers(page.headers); hd.delete("Content-Length"); hd.delete("ETag");
+        page = t ? new Response(t, { status: 200, headers: hd }) : new Response(notAvailable(g.name), { headers: { "content-type": "text/html; charset=utf-8" } });
+      }
+    }
 
     const out = new HTMLRewriter()
       .on("head", { element(e) { e.append(`<link rel="stylesheet" href="/nav.css?v=${V}">`, { html: true }); } })

@@ -242,3 +242,8 @@ table.billing td.act{text-align:right;white-space:nowrap}
 .xhd{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:8px 10px 4px}
 .xopt{all:unset;cursor:pointer;padding:8px 10px;border-radius:6px;font-size:14px}
 .xopt:hover,.xopt:focus-visible{background:var(--sunk);color:var(--accent)}
+
+/* Parts Catalogue brand picker (staff) */
+.catpick{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;font-size:12.5px}
+.catpick label{display:inline-flex;gap:4px;align-items:center;white-space:nowrap;cursor:pointer}
+.catpick input{accent-color:var(--accent,#e8b923)}

@@ -89,7 +89,7 @@ sb.auth.onAuthStateChange((evt, session) => {
 // ---------- data ----------
 async function loadCore() {
   const [c, m, k, s, g, it, ...rest] = await Promise.all([
-    sb.from("clients").select("id,name,kb_access,catalogue_access").order("name"),
+    sb.from("clients").select("id,name,kb_access,catalogue_access,catalogue_brands").order("name"),
     sb.from("machines").select("*").eq("status", "active").order("brand").order("model"),
     sb.rpc("has_kb_access"),
     sb.rpc("is_staff"),
@@ -381,7 +381,7 @@ async function renderCustomers() {
       el("td", {}, mcount[c.id] || 0),
       el("td", {}, acount[c.id] || 0),
       tick("kb_access", "Knowledge Base"),
-      tick("catalogue_access", "Parts Catalogue")));
+      el("td", {}, catPicker(c, "clients", c.name))));
     if (open) {
       const cell = el("td", { colspan: "5", class: "panelcell" }, el("p", { class: "muted small" }, "Loading…"));
       rows.push(el("tr", { class: "panelrow" }, cell));
@@ -389,6 +389,29 @@ async function renderCustomers() {
     }
   }
   body.replaceChildren(...rows);
+}
+
+// ---------- staff: Parts Catalogue access by brand group ----------
+const CAT_GROUPS = ["Mimaki", "Mutoh", "Brother", "Epilog", "Others"];
+const CAT_HINT = { Epilog: "includes laser accessories", Others: "Kyocera, PC sales, network gear" };
+function catPicker(row, table, label, onSaved) {
+  const note = el("span", { class: "saved" });
+  const boxes = CAT_GROUPS.map((g) => {
+    const b = el("input", { type: "checkbox", "aria-label": g + " catalogue for " + label });
+    b.checked = (row.catalogue_brands || []).includes(g);
+    b.addEventListener("change", async () => {
+      const want = CAT_GROUPS.filter((x, i) => boxes[i].checked);
+      boxes.forEach((x) => (x.disabled = true)); note.textContent = "";
+      const { data, error } = await sb.from(table).update({ catalogue_brands: want }).eq("id", row.id).select("catalogue_access,catalogue_brands").single();
+      boxes.forEach((x) => (x.disabled = false));
+      if (error) { b.checked = !b.checked; note.className = "saved msg err"; note.textContent = "Not saved"; return; }
+      row.catalogue_brands = data.catalogue_brands; row.catalogue_access = data.catalogue_access;
+      note.className = "saved"; note.textContent = "Saved"; setTimeout(() => (note.textContent = ""), 2000);
+      if (onSaved) onSaved(row);
+    });
+    return b;
+  });
+  return el("div", { class: "catpick" }, ...CAT_GROUPS.map((g, i) => el("label", { title: CAT_HINT[g] || g }, boxes[i], el("span", {}, g))), note);
 }
 
 // ---------- staff: manage a customer's logins and machines ----------
@@ -516,7 +539,7 @@ $("#addCustForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const name = $("#newCustName").value.trim(); if (!name) return;
   const msg = $("#addCustMsg");
-  const { data, error } = await sb.from("clients").insert({ name }).select("id,name,kb_access,catalogue_access").single();
+  const { data, error } = await sb.from("clients").insert({ name }).select("id,name,kb_access,catalogue_access,catalogue_brands").single();
   if (error) return flash(msg, "Customer not added", false);
   state.clients.push(data); state.clients.sort((x, y) => x.name.localeCompare(y.name));
   $("#newCustName").value = ""; $("#custSearch").value = name; state.openClient = data.id;
@@ -1109,15 +1132,9 @@ async function renderSupervisorsAdmin(host) {
     return el("div", { class: "card", style: "margin-top:12px" },
       el("div", { class: "bhead" }, el("h3", {}, sup.name), el("span", { class: "muted small" }, "Bill to: " + (sup.bill_to || "—") + (sup.last_sync ? " · history updated " + new Date(sup.last_sync).toLocaleString("en-AU") : ""))),
       el("p", { class: "muted small" }, "Supervisor logins see every machine, job and service record for these customers, can log jobs and add machines for them, and get Fleet reports. Adding a login sends nothing."),
-      el("label", { class: "check", style: "display:flex;gap:8px;align-items:flex-start;margin:4px 0 10px" },
-        el("input", { type: "checkbox", checked: !!sup.catalogue_access, onchange: async (e) => {
-          const on = e.target.checked; e.target.disabled = true;
-          const { error } = await sb.from("supervisors").update({ catalogue_access: on }).eq("id", sup.id);
-          e.target.disabled = false;
-          if (error) { e.target.checked = !on; return flash(note, "Catalogue access not changed", false); }
-          sup.catalogue_access = on; flash(note, on ? "Parts catalogue turned on for " + sup.name + " logins" : "Parts catalogue turned off for " + sup.name + " logins", true);
-        } }),
-        el("span", {}, "Parts catalogue access", el("br"), el("span", { class: "muted small" }, "Lets every " + sup.name + " login open the Parts Catalogue (prices ex/inc GST)."))),
+      el("h3", {}, "Parts Catalogue access"),
+      el("p", { class: "muted small" }, "Brands every " + sup.name + " login can see in the Parts Catalogue. Untick them all to remove access."),
+      catPicker(sup, "supervisors", sup.name),
       el("h3", {}, "Logins"),
       el("ul", { class: "links" }, ...logins.map((u) => el("li", {}, u.email + (u.full_name ? " (" + u.full_name + ")" : ""), " ",
         el("button", { class: "btn ghost small", type: "button", onclick: async () => { await sb.from("supervisor_access").delete().eq("supervisor_id", sup.id).eq("email", u.email); renderSupervisorsAdmin(host); } }, "Remove")))),
