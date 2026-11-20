@@ -36,6 +36,15 @@ Code in the service desk: `docs/service-desk-portal-bookings.js`.
 - The service desk (portal booking check, every 2 min) reads `desk_pending_machines()` → creates the asset with
   the same id and marks it seen, and `desk_pending_jobs()` → creates an unscheduled ticket and `desk_job_done()`.
 
+## Vendor supervisors (Avery Dennison)
+- `supervisors`, `supervisor_access` (logins), `supervisor_clients` (customers + words that identify them on invoices);
+  `machines.supervisor_id` puts a single machine under a supervisor. Supervisors read those customers' machines, jobs,
+  files and bookings (extra RLS policies), log jobs and add machines for them, and get **Fleet reports** (`#reports`).
+- Service history: `service_records`, read from the supervisor's FreshBooks client by the bridge op `sync_invoices`
+  (`desk_sync_supervisors()` from the service desk every 6 h, or the staff button under Customers), then matched to
+  customer and machine (serial number first, then name) by `service_records_link()`.
+- Open jobs: `supervisor_jobs()` (selected ticket fields only; `ticket_private` stays staff-only).
+
 ## Deploying
 Pages direct upload: assets are keyed by blake3(base64(content)+ext)[:32]; manifest maps paths to keys;
 `_worker.js` goes as a form field. The deploy on 19 Nov 2026 was done from the Cloudflare dashboard
