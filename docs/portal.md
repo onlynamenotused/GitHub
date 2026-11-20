@@ -27,7 +27,18 @@ content hash). To change them, publish the new HTML as `/_p/kb/index.html` / `/_
    If the time now clashes, the ticket is created unscheduled and the booking shows "we'll contact you".
 Code in the service desk: `docs/service-desk-portal-bookings.js`.
 
+## Customers adding machines and logging jobs
+- **+ Add a machine** on My machines (customer logins only): scan the serial plate (photo → barcode reader
+  where the browser has one + Tesseract.js OCR in the browser → brand/model/serial filled in for the customer to
+  check), machine details, their own service schedule (interval, last service, next due) and optionally a job.
+- `portal_add_machine(p)` adds the machine (`added_via='portal'`, `desk_seen=false`), `portal_set_schedule()` lets
+  them change the schedule on machines they added, `portal_log_job()` logs a job without a time (`portal_jobs`).
+- The service desk (portal booking check, every 2 min) reads `desk_pending_machines()` → creates the asset with
+  the same id and marks it seen, and `desk_pending_jobs()` → creates an unscheduled ticket and `desk_job_done()`.
+
 ## Deploying
 Pages direct upload: assets are keyed by blake3(base64(content)+ext)[:32]; manifest maps paths to keys;
 `_worker.js` goes as a form field. The deploy on 19 Nov 2026 was done from the Cloudflare dashboard
 session in Chrome. Previous production deployment before this change: `d28a0314` (rollback point).
+The deployment's manifest (path → key) is in `GET …/pages/projects/highway-portal/deployments/{id}` → `result.files`;
+reuse it so the /_p/ pages carry over. 20 Nov 2026: `df7972e0` (add machine, plate scan, jobs; rollback `965eaf16`).
