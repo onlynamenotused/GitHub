@@ -65,6 +65,13 @@
   .tips ul{margin:6px 0 0;padding-left:18px}
   .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#15181d;color:#fff;padding:10px 16px;border-radius:8px;font-size:14px;opacity:0;transition:.2s;pointer-events:none}
   .toast.show{opacity:1}
+  .tbtns{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px}
+  .tbtns button{padding:8px 4px;border:1px solid var(--line);background:#fff;border-radius:8px;cursor:pointer;font:inherit;font-size:13px;color:var(--ink)}
+  .tbtns button[aria-pressed=true]{border-color:var(--accent);color:var(--accent);font-weight:600}
+  .sizerow{display:grid;grid-template-columns:1fr auto 1fr 72px;gap:6px;align-items:center}
+  .sizerow input,.sizerow select{width:100%;min-width:0;padding:7px 8px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);font:inherit;font-size:13px}
+  .sizerow .x{font-size:13px;color:var(--muted)}
+  .linkbtn{all:unset;cursor:pointer;color:var(--accent);font-size:12px;text-decoration:underline}
 
   /* Highway Service Desk portal theme */
   :root{ --bg:#0b0b0c; --card:rgba(18,18,20,.82); --ink:#f7f7f7; --muted:#b4b4b4; --line:rgba(255,255,255,.14);
@@ -75,7 +82,9 @@
   .card{backdrop-filter:blur(6px)}
   .drop{background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.28)}
   .drop:hover,.drop.over{background:rgba(232,185,35,.10)}
-  .presets button,.btn{background:rgba(255,255,255,.06);color:var(--ink)}
+  .presets button,.btn,.tbtns button{background:rgba(255,255,255,.06);color:var(--ink)}
+  .sizerow input,.sizerow select{background:rgba(255,255,255,.06);color:var(--ink)}
+  .sizerow select option{background:#111}
   .presets button.on{background:rgba(232,185,35,.16);color:var(--accent)}
   .btn.primary{color:var(--accent-ink)}
   .pane{background:transparent}
@@ -141,6 +150,29 @@
       <label class="check"><input type="checkbox" id="upscale" checked>
         <span>Enhance small images<small>Upscales before tracing for smoother edges</small></span></label>
 
+      <h2 style="margin-top:16px">Rotate &amp; size</h2>
+      <div class="tbtns">
+        <button type="button" id="rotL" title="Rotate 90° left">⟲ 90°</button>
+        <button type="button" id="rotR" title="Rotate 90° right">⟳ 90°</button>
+        <button type="button" id="flipH" aria-pressed="false" title="Mirror left to right">⇋ Flip</button>
+        <button type="button" id="flipV" aria-pressed="false" title="Flip upside down">⇵ Flip</button>
+      </div>
+      <div class="row">
+        <label for="angle">Straighten <output id="angleOut"></output></label>
+        <input type="range" id="angle" min="-45" max="45" step="0.5" value="0">
+        <div class="hint">Fine rotation for photos or scans taken at an angle. <button type="button" class="linkbtn" id="rotReset">Reset rotation</button></div>
+      </div>
+      <div class="row">
+        <label>Output size <output id="sizeOut"></output></label>
+        <div class="sizerow">
+          <input type="number" id="outW" min="0" step="any" placeholder="Width" aria-label="Output width">
+          <span class="x">×</span>
+          <input type="number" id="outH" min="0" step="any" placeholder="Height" aria-label="Output height">
+          <select id="outU" aria-label="Units"><option value="mm">mm</option><option value="cm">cm</option><option value="in">in</option><option value="px">px</option></select>
+        </div>
+        <label class="check" style="margin:6px 0 0;justify-content:flex-start;font-weight:400"><input type="checkbox" id="outLock" checked><span>Keep proportions</span></label>
+        <div class="hint">Sets the printed size in the SVG. Vectors scale without losing quality. Leave blank to keep the image's own size.</div>
+      </div>
       <div class="actions">
         <button class="btn primary" id="dl" disabled>Download SVG</button>
         <button class="btn" id="copy" disabled>Copy SVG code</button>
@@ -639,7 +671,7 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
     detailed:     { colors:16, detail:8, speck:4,  blur:0, removeBg:false, cutout:false,  bw:false },
     illustration: { colors:32, detail:6, speck:6,  blur:1, removeBg:false, cutout:false,  bw:false }
   };
-  var state = { preset:"logo", bw:false, img:null, name:"vector", svg:"", timer:null, jobId:0 };
+  var state = { preset:"logo", bw:false, img:null, src:null, srcUrl:"", rot:0, flipH:false, flipV:false, name:"vector", svg:"", raw:"", vw:0, vh:0, timer:null, jobId:0 };
 
   // ---- downloads: Claude artifact capability when available, plain browser download otherwise
   var dlCap = null;
@@ -693,10 +725,10 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
     state.name = (file.name||"vector").replace(/\.[^.]+$/,"").replace(/[^\w\- ]+/g,"").trim() || "vector";
     var url=URL.createObjectURL(file), img=new Image();
     img.onload=function(){
-      state.img=img;
-      var st=$("origStage"); st.innerHTML=""; var shown=new Image(); shown.src=url; shown.style.transform="scale("+$("zoom").value+")"; st.appendChild(shown);
-      $("origInfo").textContent=img.naturalWidth+" × "+img.naturalHeight+" px";
-      status(""); schedule(0);
+      if(state.srcUrl) URL.revokeObjectURL(state.srcUrl);
+      state.src=img; state.srcUrl=url; state.rot=0; state.flipH=false; state.flipV=false; $("angle").value=0;
+      $("outW").value=""; $("outH").value="";
+      status(""); applyTransform();
     };
     img.onerror=function(){ status("Couldn't read that image. Try saving it as PNG or JPG first.","err"); };
     img.src=url;
@@ -712,7 +744,7 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
     var cw=Math.max(1,Math.round(w*s)), ch=Math.max(1,Math.round(h*s));
     var c=document.createElement("canvas"); c.width=cw; c.height=ch;
     var x=c.getContext("2d"); x.imageSmoothingEnabled=true; x.imageSmoothingQuality="high";
-    x.drawImage(img,0,0,cw,ch);
+    x.drawImage(img.el||img,0,0,cw,ch);
     return {canvas:c, ctx:x, w:cw, h:ch, scale:s};
   }
 
@@ -888,7 +920,10 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
         if(vt){ try{ svg=traceVT(imgd, o); }catch(e){ console.warn("VTracer failed, falling back", e); vt=null; } }
         if(!svg) svg=traceIT(imgd, o, pal);
         svg='<?xml version="1.0" encoding="UTF-8"?>\n<!-- Converted with Highway Digital Image to Vector -->\n'+svg;
-        state.svg=svg;
+        var vb=svg.match(/viewBox="\s*[-\d.]+\s+[-\d.]+\s+([\d.]+)\s+([\d.]+)"/);
+        state.vw = vb ? +vb[1] : prep.w; state.vh = vb ? +vb[2] : prep.h;
+        if(!vb) svg=svg.replace(/<svg /, '<svg viewBox="0 0 '+state.vw+' '+state.vh+'" ');
+        state.raw=svg; svg=sizedSvg(); state.svg=svg;
 
         var paths=(svg.match(/<path /g)||[]).length, kb=(svg.length/1024);
         var blob=new Blob([svg],{type:"image/svg+xml"}), url=URL.createObjectURL(blob);
@@ -910,6 +945,68 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
       }
     }, 30);
   }
+  // ---- rotate / flip (applied to the image before tracing)
+  function applyTransform(){
+    var src=state.src; if(!src) return;
+    var a=((state.rot + (+$("angle").value)) % 360 + 360) % 360, rad=a*Math.PI/180;
+    var w=src.naturalWidth, h=src.naturalHeight;
+    if(a===0 && !state.flipH && !state.flipV){ state.img=src; }
+    else {
+      var cos=Math.abs(Math.cos(rad)), sin=Math.abs(Math.sin(rad));
+      var cw=Math.max(1,Math.round(w*cos+h*sin)), ch=Math.max(1,Math.round(w*sin+h*cos));
+      var c=document.createElement("canvas"); c.width=cw; c.height=ch;
+      var x=c.getContext("2d"); x.imageSmoothingEnabled=true; x.imageSmoothingQuality="high";
+      x.translate(cw/2,ch/2); x.rotate(rad); x.scale(state.flipH?-1:1, state.flipV?-1:1); x.drawImage(src,-w/2,-h/2);
+      state.img={el:c, naturalWidth:cw, naturalHeight:ch};
+    }
+    $("angleOut").textContent=(state.rot? state.rot+"° + ":"")+(+$("angle").value)+"°";
+    $("flipH").setAttribute("aria-pressed", String(state.flipH)); $("flipV").setAttribute("aria-pressed", String(state.flipV));
+    var st=$("origStage"), shown=st.querySelector("img");
+    if(!shown){ st.innerHTML=""; shown=new Image(); st.appendChild(shown); }
+    if(state.img===src) shown.src=state.srcUrl;
+    else { try{ shown.src=state.img.el.toDataURL("image/png"); }catch(e){} }
+    shown.style.transform="scale("+$("zoom").value+")";
+    $("origInfo").textContent=state.img.naturalWidth+" × "+state.img.naturalHeight+" px";
+    schedule(150);
+  }
+  $("rotL").addEventListener("click",function(){ state.rot=(state.rot+270)%360; swapSize(); applyTransform(); });
+  $("rotR").addEventListener("click",function(){ state.rot=(state.rot+90)%360; swapSize(); applyTransform(); });
+  $("flipH").addEventListener("click",function(){ state.flipH=!state.flipH; applyTransform(); });
+  $("flipV").addEventListener("click",function(){ state.flipV=!state.flipV; applyTransform(); });
+  $("angle").addEventListener("input",function(){ $("angleOut").textContent=(state.rot? state.rot+"° + ":"")+(+$("angle").value)+"°"; clearTimeout(state.atimer); state.atimer=setTimeout(applyTransform,250); });
+  $("rotReset").addEventListener("click",function(){ state.rot=0; state.flipH=false; state.flipV=false; $("angle").value=0; applyTransform(); });
+  function swapSize(){ var w=$("outW").value, h=$("outH").value; if(w||h){ $("outW").value=h; $("outH").value=w; } }
+
+  // ---- output size (written into the SVG, no re-trace)
+  function sizedSvg(){
+    if(!state.raw) return "";
+    var u=$("outU").value, W=parseFloat($("outW").value), H=parseFloat($("outH").value), r=state.vh/state.vw;
+    if(!(W>0) && !(H>0)){ $("sizeOut").textContent="original ("+Math.round(state.vw)+" × "+Math.round(state.vh)+" px)"; return state.raw; }
+    if(!(W>0)) W=H/r; if(!(H>0)) H=W*r;
+    var f=function(n){ return (Math.round(n*100)/100)+(u==="px"?"":u); };
+    $("sizeOut").textContent=f(W)+" × "+f(H);
+    return state.raw.replace(/<svg ([^>]*?)>/, function(m, attrs){
+      attrs=attrs.replace(/\s*\bwidth="[^"]*"/,"").replace(/\s*\bheight="[^"]*"/,"");
+      if(!/preserveAspectRatio=/.test(attrs) && !$("outLock").checked) attrs+=' preserveAspectRatio="none"';
+      return '<svg width="'+f(W)+'" height="'+f(H)+'" '+attrs.trim()+'>';
+    });
+  }
+  function resize(which){
+    var r=state.vh&&state.vw ? state.vh/state.vw : 0;
+    if($("outLock").checked && r){
+      var W=parseFloat($("outW").value), H=parseFloat($("outH").value), dp=$("outU").value==="px"?0:2;
+      var rd=function(n){ var k=Math.pow(10,dp); return Math.round(n*k)/k; };
+      if(which==="w") $("outH").value = W>0 ? rd(W*r) : "";
+      else $("outW").value = H>0 ? rd(H/r) : "";
+    }
+    if(state.raw){ state.svg=sizedSvg(); }
+    else $("sizeOut").textContent="";
+  }
+  $("outW").addEventListener("input",function(){ resize("w"); });
+  $("outH").addEventListener("input",function(){ resize("h"); });
+  $("outU").addEventListener("change",function(){ resize("w"); });
+  $("outLock").addEventListener("change",function(){ resize("w"); });
+
   // ---- export
   $("dl").addEventListener("click",function(){
     if(!state.svg) return;
@@ -945,6 +1042,7 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
     }
   });
 
+  $("angleOut").textContent="0°";
   applyPreset("logo");
 })();
 </script>
