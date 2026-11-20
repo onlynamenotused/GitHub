@@ -94,6 +94,9 @@
 
   /* ---- Print & Cut studio */
   .studio [hidden]{display:none!important}
+  .btn.undo{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:30;background:#161616;color:#fff;border:1px solid var(--accent);box-shadow:0 6px 20px rgba(0,0,0,.45);padding:10px 16px}
+  .btn.undo:not(:disabled):hover{background:var(--accent);color:#111}
+  .btn.undo[hidden]{display:none}
   .studio{margin-top:16px}
   .studio h2{font:500 22px/1.2 "League Spartan",arial,sans-serif;text-transform:uppercase;letter-spacing:.02em;margin:0}
   .sthead{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justify-content:space-between;margin-bottom:12px}
@@ -905,7 +908,7 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
       if(state.srcUrl) URL.revokeObjectURL(state.srcUrl);
       state.src=img; state.srcUrl=url; state.rot=0; state.flipH=false; state.flipV=false; $("angle").value=0;
       $("outW").value=""; $("outH").value="";
-      status(""); applyTransform();
+      status(""); try{ window.dispatchEvent(new Event("vc:newimage")); }catch(ev){} applyTransform();
     };
     img.onerror=function(){ status("Couldn't read that image. Try saving it as PNG or JPG first.","err"); };
     img.src=url;
@@ -1222,6 +1225,17 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
 
   $("angleOut").textContent="0°";
   applyPreset("logo");
+  // for the Back (undo) button
+  window.__vcConv = {
+    hasImage: function(){ return !!state.src; },
+    snap: function(){ return { preset:state.preset, bw:state.bw, rot:state.rot, flipH:state.flipH, flipV:state.flipV }; },
+    restore: function(o, retrace){
+      state.preset=o.preset; state.bw=o.bw; state.rot=o.rot; state.flipH=o.flipH; state.flipV=o.flipV;
+      [].forEach.call(document.querySelectorAll("#presets button"),function(b){ b.classList.toggle("on", b.dataset.p===o.preset); });
+      syncLabels();
+      if(retrace) applyTransform(); else if(state.raw) state.svg=sizedSvg();
+    }
+  };
 })();
 </script>
 <script>
@@ -2070,8 +2084,76 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
     if(S.contour.on) buildContour();
   });
   window.__vcStudio=S; // for support/debugging
+  window.__vcStudioApi = {
+    snap: function(){ return { colors:JSON.parse(JSON.stringify(S.colors)), objs:JSON.parse(JSON.stringify(S.objs)), sel:S.sel, brand:S.brand, under:S.under, over:S.over, contour:{ on:S.contour.on, type:S.contour.type }, view:S.view }; },
+    restore: function(o){
+      if(!o) return;
+      S.order.forEach(function(h){ if(o.colors[h]) S.colors[h]=o.colors[h]; });
+      S.objs=o.objs; S.sel=o.sel; S.brand=o.brand; S.under=o.under; S.over=o.over; S.view=o.view;
+      S.nextId=Math.max(S.nextId, 1+S.objs.reduce(function(m,x){ return Math.max(m,x.id||0); },0));
+      $("stContourOpts").hidden=!o.contour.on;
+      var cOn=S.contour.on!==o.contour.on || S.contour.type!==o.contour.type;
+      S.contour.on=o.contour.on; S.contour.type=o.contour.type;
+      buildColors(); buildObjs(); buildNames(); syncLayoutFields(); syncTabs(); render();
+      if(S.contour.on) buildContour(); else { S.contour.ops=[]; render(); }
+    }
+  };
 })();
 </script>
 
+
+<button type="button" class="btn undo" id="undoBtn" hidden title="Undo the last change (Ctrl+Z)">↶ Back</button>
+<script>
+/* Back button: steps back through changes (converter settings, rotate/size, colours, cut lines, shapes, text, layout). */
+(function(){
+  "use strict";
+  var IDS=["colors","thresh","detail","speck","blur","removeBg","cutout","upscale","angle","outW","outH","outU","outLock",
+    "stBrand","stUnder","stOver","stContour","stCType","stOffset","stBridge","stPage","stPW","stPH","stMode","stQty","stLen","stGap","stMargin","stRotate","stGtx254","stDpi"];
+  var TRACE=["colors","thresh","detail","speck","blur","removeBg","cutout","upscale","angle"];
+  var stack=[], last=null, busy=false, timer=null, pending=null, btn=document.getElementById("undoBtn");
+  function domSnap(){ var o={}; IDS.forEach(function(id){ var e=document.getElementById(id); if(e) o[id]=e.type==="checkbox"?e.checked:e.value; }); return o; }
+  function snap(){ return { dom:domSnap(), conv:window.__vcConv.snap(), st:window.__vcStudioApi && window.__vcStudio && window.__vcStudio.ready ? window.__vcStudioApi.snap() : null }; }
+  function ui(){ var has=window.__vcConv && window.__vcConv.hasImage(); btn.hidden=!has; btn.disabled=!stack.length; btn.textContent="↶ Back"+(stack.length?" ("+stack.length+")":""); }
+  function record(){
+    if(busy || !window.__vcConv || !window.__vcConv.hasImage()) return;
+    var s=snap(), j=JSON.stringify(s);
+    if(last && j!==last.j){ stack.push(last.s); if(stack.length>80) stack.shift(); }
+    last={s:s, j:j}; ui();
+  }
+  function soon(){ clearTimeout(timer); timer=setTimeout(record, 450); }
+  ["input","change","click","pointerup"].forEach(function(ev){ document.addEventListener(ev, function(e){ if(e.target===btn) return; soon(); }, true); });
+  window.addEventListener("vc:newimage", function(){ stack=[]; last=null; pending=null; busy=false; ui(); });
+  window.addEventListener("vc:traced", function(){
+    setTimeout(function(){
+      if(pending){ var p=pending; pending=null; if(p.st) window.__vcStudioApi.restore(p.st); setTimeout(function(){ busy=false; last={s:snap(), j:JSON.stringify(snap())}; ui(); }, 60); }
+      else if(!last) record();
+    }, 0);
+  });
+  function setDom(o){ IDS.forEach(function(id){ var e=document.getElementById(id); if(!e || !(id in o)) return; if(e.type==="checkbox") e.checked=o[id]; else e.value=o[id]; }); }
+  function undo(){
+    if(!stack.length || busy) return;
+    clearTimeout(timer);
+    var prev=stack.pop(), cur=snap(), retrace=JSON.stringify(prev.conv)!==JSON.stringify(cur.conv) || TRACE.some(function(id){ return prev.dom[id]!==cur.dom[id]; });
+    busy=true; setDom(prev.dom);
+    if(retrace){ pending={st:prev.st}; window.__vcConv.restore(prev.conv, true); }
+    else {
+      window.__vcConv.restore(prev.conv, false);
+      if(prev.st && window.__vcStudioApi) window.__vcStudioApi.restore(prev.st);
+      busy=false; last={s:snap(), j:JSON.stringify(snap())};
+    }
+    ui();
+    var t=document.getElementById("toast"); if(t){ t.textContent="Undone"; t.classList.add("show"); clearTimeout(t._h); t._h=setTimeout(function(){ t.classList.remove("show"); }, 1400); }
+  }
+  btn.addEventListener("click", undo);
+  document.addEventListener("keydown", function(e){
+    if((e.ctrlKey||e.metaKey) && !e.shiftKey && (e.key==="z"||e.key==="Z")){
+      var t=e.target, tag=(t.tagName||"").toLowerCase();
+      if((tag==="input" && /^(text|search|email|number)$/i.test(t.type)) || tag==="textarea" || t.isContentEditable) return;
+      e.preventDefault(); undo();
+    }
+  });
+  ui();
+})();
+</script>
 </body>
 </html>
