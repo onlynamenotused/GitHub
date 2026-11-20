@@ -280,6 +280,7 @@
           <option value="mimaki">Mimaki · RasterLink</option>
           <option value="mutoh">Mutoh · VerteLith</option>
           <option value="brother">Brother · GTX (DTG)</option>
+          <option value="epilog">Epilog · laser (cuts by line width)</option>
         </select>
       </label>
     </div>
@@ -416,6 +417,17 @@
             <button type="button" class="btn dim" id="stDxf">Download DXF</button>
           </div>
           <div class="hint">DXF in millimetres for cutters, lasers and CAD: cut lines on layers named after the spot colours for the brand picked above, the printed artwork as outlines on PRINT_ layers, and crop marks. Curves are converted to fine straight segments.</div>
+        </div>
+        <div class="sendbox" id="stSendLaser" hidden>
+          <div class="sendlbl">Files for the Epilog laser</div>
+          <div class="sendbtns">
+            <button type="button" class="btn primary" data-laser="adobe" data-fmt="pdf">PDF for Illustrator (0.001 in lines)</button>
+            <button type="button" class="btn primary" data-laser="corel" data-fmt="pdf">PDF for CorelDRAW (hairline)</button>
+            <button type="button" class="btn dim" data-laser="adobe" data-fmt="eps">EPS for Illustrator (0.001 in lines)</button>
+            <button type="button" class="btn dim" data-laser="corel" data-fmt="eps">EPS for CorelDRAW (hairline)</button>
+            <button type="button" class="btn dim" data-laser="dxf" data-fmt="dxf">DXF (cut lines + outlines)</button>
+          </div>
+          <div class="hint">The Epilog driver vector-cuts lines that are thin enough and raster-engraves everything else. Red lines are cuts and blue lines a second vector pass, so each can have its own speed, power and frequency in Color Mapping. Open the file in Illustrator or CorelDRAW and print to the Epilog driver.</div>
         </div>
         <div class="sendbox" id="stSendGtx" hidden>
           <div class="sendlbl">Brother GTX output</div>
@@ -1355,8 +1367,16 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
     mutoh:   { name:"Mutoh VerteLith", rip:"VerteLith",
                spots:{ cut:"CutContour", perf:"CutThrough", white:"Spot_White", gloss:"Spot_Varnish" },
                glossLabel:"Varnish" },
-    brother: { name:"Brother GTX", rip:"GTX Graphics Lab", spots:{}, glossLabel:"" }
+    brother: { name:"Brother GTX", rip:"GTX Graphics Lab", spots:{}, glossLabel:"" },
+    // Epilog lasers don't read spot colour names: the driver vector-cuts any very thin line and raster-engraves the rest.
+    // Lines: 0.001 in (0.072 pt) for Adobe Illustrator, "hairline" for CorelDRAW (0.003 in / 0.076 mm, 0.216 pt).
+    // Cut = red, second pass (e.g. perforate / score) = blue, so they can get different speed/power with Color Mapping.
+    epilog:  { name:"Epilog laser", rip:"Epilog", spots:{}, glossLabel:"", laser:true }
   };
+  var LASER = { cut:{ rgb:[1,0,0], hex:"#ff0000", name:"Vector cut (red)" }, perf:{ rgb:[0,0,1], hex:"#0000ff", name:"Second vector pass (blue)" },
+                widths:{ adobe:{ pt:0.072, label:"Illustrator (0.001 in lines)", file:"Illustrator" }, corel:{ pt:0.216, label:"CorelDRAW (hairline)", file:"CorelDRAW" } } };
+  function isLaser(brand){ return !!(BRANDS[brand] && BRANDS[brand].laser); }
+  function scr(role){ return isLaser(S.brand) && LASER[role] ? LASER[role].hex : SCREEN[role]; }
   // preview / PDF alternate colours (cut and perforated cut both use the Roland/Mimaki CutContour magenta) for each role (CMYK 0..1) and screen colours
   var ALT = { cut:[0,1,0,0], perf:[0,1,0,0], white:[0.15,0,0,0], gloss:[0,0,0.12,0], primer:[0,0.1,0.1,0], silver:[0,0,0,0.3] };
   var SCREEN = { cut:"#ff2bd6", perf:"#ff2bd6", white:"#ffffff", gloss:"#ffe58a", primer:"#e7c0a8", silver:"#c0c4c8" };
@@ -1760,6 +1780,7 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
   // ---- role handling
   function rolesFor(brand){
     if(brand==="brother") return [["normal","Print as is"],["w254","White ink (RGB 254)"],["noink","No ink – shirt shows (RGB 255)"],["hide","Don't print"]];
+    if(isLaser(brand)) return [["normal","Engrave (raster)"],["hide","Don't engrave"]];
     var r=[["normal","Print in colour (CMYK)"]];
     ["white","gloss","primer","silver"].forEach(function(k){ if(brandHas(brand,k)) r.push([k, (k==="gloss"?BRANDS[brand].glossLabel:ROLE_LABEL[k])+" · "+spotName(brand,k)]); });
     r.push(["hide","Don't print"]);
@@ -1790,18 +1811,20 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
     $("stOverRow").hidden = S.brand==="brother" || !brandHas(S.brand,"gloss");
     $("stUnderRow").hidden = S.brand==="brother" || !brandHas(S.brand,"white");
     $("stOverName").textContent = b.glossLabel || "Gloss";
-    $("stRoleHint").textContent = S.brand==="brother" ? "On the GTX, RGB 255 white prints no ink; RGB 254 prints white ink." : "Special inks are sent as named spot colours the RIP recognises.";
+    $("stRoleHint").textContent = S.brand==="brother" ? "On the GTX, RGB 255 white prints no ink; RGB 254 prints white ink." : isLaser(S.brand) ? "The Epilog driver raster-engraves filled artwork and vector-cuts the thin red and blue lines." : "Special inks are sent as named spot colours the RIP recognises.";
     $("stCutSec").hidden = S.brand==="brother";
     $("stMarkSec").hidden = S.brand==="brother";
     sfxSync();
     $("stLaySec").hidden = S.brand==="brother";
-    $("stSendRip").hidden = S.brand==="brother";
+    $("stSendRip").hidden = S.brand==="brother" || isLaser(S.brand);
+    $("stSendLaser").hidden = !isLaser(S.brand);
     $("stSendGtx").hidden = S.brand!=="brother";
     [].forEach.call(document.querySelectorAll("[data-rip]"),function(btn){ btn.classList.toggle("dim", btn.dataset.rip!==S.brand); });
   }
   function fillOpts(brand, cur, withCut){
     var o=[];
-    if(withCut && brand!=="brother"){ o.push(["cut","Cut line · "+spotName(brand,"cut")],["perf","Perforated cut · "+spotName(brand,"perf")]); }
+    if(withCut && isLaser(brand)){ o.push(["cut",LASER.cut.name],["perf",LASER.perf.name]); }
+    else if(withCut && brand!=="brother"){ o.push(["cut","Cut line · "+spotName(brand,"cut")],["perf","Perforated cut · "+spotName(brand,"perf")]); }
     else if(withCut){ o.push(["cut","Cut line (not printed on GTX)"],["perf","Perforated cut (not printed on GTX)"]); }
     o.push(["fill","Filled shape"]);
     return o.map(function(x){ return '<option value="'+x[0]+'"'+(x[0]===cur?" selected":"")+'>'+esc(x[1])+'</option>'; }).join("");
@@ -1860,6 +1883,7 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
   function buildNames(){
     var box=$("stNames"); box.innerHTML="";
     var b=BRANDS[S.brand];
+    if(isLaser(S.brand)){ box.innerHTML='<span style="grid-column:1/-1;color:var(--muted)">Epilog lasers don\'t use spot colour names. Lines are vector cut when they\'re thin enough: 0.001 in for Adobe Illustrator, hairline for CorelDRAW. Cut lines are red and second-pass lines blue, so each can have its own speed and power in the Epilog driver\'s Color Mapping.</span>'; return; }
     if(S.brand==="brother"){ box.innerHTML='<span style="grid-column:1/-1;color:var(--muted)">Brother GTX doesn\'t use spot colour names. White ink is controlled by colour: RGB 254,254,254 prints white, RGB 255,255,255 prints nothing.</span>'; return; }
     Object.keys(b.spots).forEach(function(role){
       var lab=document.createElement("span"); lab.textContent=role==="gloss"?b.glossLabel:ROLE_LABEL[role];
@@ -1877,7 +1901,10 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
   // ---- preview
   function legend(){
     var L=[];
-    if(S.brand!=="brother"){
+    if(isLaser(S.brand)){
+      L.push('<span><i style="border-color:'+LASER.cut.hex+'"></i>'+LASER.cut.name+'</span>');
+      L.push('<span><i style="border-color:'+LASER.perf.hex+';border-top-style:dashed"></i>'+LASER.perf.name+'</span>');
+    } else if(S.brand!=="brother"){
       L.push('<span><i style="border-color:'+SCREEN.cut+'"></i>'+esc(spotName(S.brand,"cut"))+'</span>');
       L.push('<span><i style="border-color:'+SCREEN.perf+';border-top-style:dashed"></i>'+esc(spotName(S.brand,"perf"))+'</span>');
       ["white","gloss","primer","silver"].forEach(function(k){ if(brandHas(S.brand,k)) L.push('<span><i class="sw" style="background:'+SCREEN[k]+'"></i>'+esc(spotName(S.brand,k))+'</span>'); });
@@ -1905,7 +1932,7 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
     });
     if(wantOver){ parts.push('<g fill="url(#ptG)">'+ART.filter(function(p){ var r=S.colors[p.hex].role; return r!=="hide"&&r!=="noink"; }).map(function(p){ return '<path d="'+opsToD(p.ops)+'"/>'; }).join("")+'</g>'); }
     var cutParts=[];   // cut lines are drawn last, on top of the artwork
-    function cutAttrs(role, active, sel){ return ' stroke="'+SCREEN[role]+'" stroke-width="'+n3(sel?sw*1.8:sw)+'"'+(active?(role==="perf"?' stroke-dasharray="'+n3(sw*4)+' '+n3(sw*2)+'"':''):' opacity="0.3" stroke-dasharray="'+n3(sw*1.5)+'"'); }
+    function cutAttrs(role, active, sel){ return ' stroke="'+scr(role)+'" stroke-width="'+n3(sel?sw*1.8:sw)+'"'+(active?(role==="perf"?' stroke-dasharray="'+n3(sw*4)+' '+n3(sw*2)+'"':''):' opacity="0.3" stroke-dasharray="'+n3(sw*1.5)+'"'); }
     S.objs.forEach(function(o, idx){
       var attrs=forTile?'':' data-oi="'+idx+'"', sel=(!forTile && idx===S.sel), line=isLineObj(o), xc=extraCut(o), act=lineActive(o);
       if(S.brand==="brother" && line && !sel) return;
@@ -1929,7 +1956,7 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
       }
     });
     if(S.contour.on && S.contour.ops.length && S.brand!=="brother" && (cutsOn() || !forTile)){
-      var t=S.contour.type; cutParts.push('<path d="'+opsToD(S.contour.ops)+'" fill="none" stroke="'+SCREEN[t]+'" stroke-width="'+n3(sw)+'"'+(!cutsOn()?' opacity="0.3" stroke-dasharray="'+n3(sw*1.5)+'"':(t==="perf"?' stroke-dasharray="'+n3(sw*4)+' '+n3(sw*2)+'"':''))+' pointer-events="none"/>');
+      var t=S.contour.type; cutParts.push('<path d="'+opsToD(S.contour.ops)+'" fill="none" stroke="'+scr(t)+'" stroke-width="'+n3(sw)+'"'+(!cutsOn()?' opacity="0.3" stroke-dasharray="'+n3(sw*1.5)+'"':(t==="perf"?' stroke-dasharray="'+n3(sw*4)+' '+n3(sw*2)+'"':''))+' pointer-events="none"/>');
     }
     var mc=mk(); if(mc.on && mc.scope==="each") parts.push(marksSvg(marksFor(contentBox(), mc)));
     return parts.join("")+cutParts.join("");
@@ -2100,7 +2127,7 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
     return new Uint8Array(await new Response(cs).arrayBuffer());
   }
   // Content stream for one copy of the design, PDF operators, in points with the top-left of `box` at the origin.
-  async function designContent(brand, box){
+  async function designContent(brand, box, opt){
     var TH=box.h*MM2PT;
     var spots={}, spotList=[];
     function spotCS(role, sfx){ var name=(role==="cut"||role==="perf")?cutName(brand,role,sfx):spotName(brand,role); if(!name) return null; if(!spots[name]){ spots[name]="/CS"+spotList.length; spotList.push({role:role,name:name}); } return spots[name]; }
@@ -2122,8 +2149,10 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
     });
     if(S.over && brandHas(brand,"gloss")){ c.push("q"); setFill("gloss"); printable.forEach(function(p){ c.push(opsToPdf(p.ops)); }); c.push("f Q"); }
     var cuts=[];   // cut lines go last so they sit on top of everything (they're easy to lose under artwork, e.g. with a negative offset)
-    function cutStroke(role, sfx, ops){ cuts.push("q /GSop gs "+spotCS(role,sfx)+" CS 1 SCN 0.25 w "+opsToPdf(ops)+"\nS Q"); }
-    function cutText(role, sfx, o){ cuts.push("q /GSop gs "+spotCS(role,sfx)+" CS 1 SCN 0.25 w 1 Tr 1 0 0 -1 "+n3(o.x*MM2PT)+" "+n3(o.y*MM2PT)+" cm BT "+fontRes(o)+" "+n3(o.pt)+" Tf 0 0 Td "+pdfStr(o.text||"")+" Tj ET Q"); }
+    var laserW = isLaser(brand) ? ((opt && LASER.widths[opt.width]) || LASER.widths.adobe).pt : 0;
+    function strokeHead(role, sfx){ return laserW ? "q "+LASER[role].rgb.join(" ")+" RG "+n3(laserW)+" w 0 J 0 j" : "q /GSop gs "+spotCS(role,sfx)+" CS 1 SCN 0.25 w"; }
+    function cutStroke(role, sfx, ops){ cuts.push(strokeHead(role,sfx)+" "+opsToPdf(ops)+"\nS Q"); }
+    function cutText(role, sfx, o){ cuts.push(strokeHead(role,sfx)+" 1 Tr 1 0 0 -1 "+n3(o.x*MM2PT)+" "+n3(o.y*MM2PT)+" cm BT "+fontRes(o)+" "+n3(o.pt)+" Tf 0 0 Td "+pdfStr(o.text||"")+" Tj ET Q"); }
     S.objs.forEach(function(o){
       var isLine = isLineObj(o), xc = extraCut(o, brand);
       if(isLine){
@@ -2150,10 +2179,10 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
     c.push("Q");
     return { content:c.join("\n"), spotList:spotList, fontList:fontList, fallback:fallback };
   }
-  async function buildPdf(brand){
+  async function buildPdf(brand, opt){
     var L=layout(); if(!L.fits || !L.pages.length) throw new Error("nofit");
     var box=L.box, TW=box.w*MM2PT, TH=box.h*MM2PT;
-    var D=await designContent(brand, box), spotList=D.spotList, fontList=D.fontList, fallback=D.fallback, formContent=D.content;
+    var D=await designContent(brand, box, opt), spotList=D.spotList, fontList=D.fontList, fallback=D.fallback, formContent=D.content;
 
     // objects
     var objs=[]; function add(s){ objs.push(s); return objs.length; }
@@ -2231,6 +2260,8 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
         case "f*": emit("eofill"); break;
         case "S": emit("stroke"); break;
         case "w": emit(st[0]+" setlinewidth"); break;
+        case "J": emit(st[0]+" setlinecap"); break;
+        case "j": emit(st[0]+" setlinejoin"); break;
         case "rg": case "RG": emit(st.join(" ")+" setrgbcolor"); break;
         case "k": case "K": emit(st.join(" ")+" setcmykcolor"); break;
         case "gs": emit("true setoverprint"); break;
@@ -2278,9 +2309,9 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
     h.push("restore end","showpage","%%Trailer","%%EOF","");
     return h.join("\n");
   }
-  async function buildEps(brand){
+  async function buildEps(brand, opt){
     var box=designBox(); if(!(box.w>0 && box.h>0)) throw new Error("empty");
-    var D=await designContent(brand, box);
+    var D=await designContent(brand, box, opt);
     var txt=epsDoc({W:box.w*MM2PT, H:box.h*MM2PT, body:D.content, spots:D.spotList, fonts:D.fontList, title:S.name});
     return { blob:new Blob([txt],{type:"application/postscript"}), text:txt, spots:D.spotList.map(function(x){ return x.name; }), fallback:[...new Set(D.fallback)] };
   }
@@ -2357,7 +2388,9 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
     var dx=-box.x, dy=-box.y, tol=0.02, layers={}, order=[], skipped=[];
     function layer(key, name, aci){ if(!layers[key]){ layers[key]={name:dxfLayerName(name), aci:aci, paths:[]}; order.push(key); } return layers[key]; }
     function add(L, ops){ L.paths=L.paths.concat(flattenOps(shiftOps(ops,dx,dy), tol)); }
-    function cutLayer(role, sfx){ var n=cutName(brand,role,sfx)||(role==="perf"?"PerfCut":"CutContour"); return layer("cut:"+n, n, 6); }
+    function cutLayer(role, sfx){
+      if(isLaser(brand)) return role==="perf" ? layer("cut:VECTOR_BLUE","VECTOR_BLUE",5) : layer("cut:VECTOR_RED","VECTOR_RED",1);
+      var n=cutName(brand,role,sfx)||(role==="perf"?"PerfCut":"CutContour"); return layer("cut:"+n, n, 6); }
     var OUT={};
     for(var ti=0; ti<S.objs.length; ti++){ var to=S.objs[ti]; if(to.kind!=="text") continue; var ol=await textOutline(to); if(ol) OUT[to.id]=ol; }
     if(contourActive()) add(cutLayer(S.contour.type, $("stCSuffix").value), S.contour.ops);
@@ -2431,16 +2464,16 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
 
   // ---- saving
   function saveBlob(blob, fname){
-    try{ var ext=(String(fname).split(".").pop()||"file").toLowerCase(), rip=(String(fname).match(/-(VersaWorks|RasterLink|VerteLith|GTX)\./)||[])[1]; window.hdLog && window.hdLog("studio-"+ext+(rip?"-"+rip.toLowerCase():"")); }catch(e){}
+    try{ var ext=(String(fname).split(".").pop()||"file").toLowerCase(), rip=(String(fname).match(/-(VersaWorks|RasterLink|VerteLith|GTX|Epilog-Illustrator|Epilog-CorelDRAW)\./)||[])[1]; window.hdLog && window.hdLog("studio-"+ext+(rip?"-"+rip.toLowerCase():"")); }catch(e){}
     var a=document.createElement("a"), url=URL.createObjectURL(blob);
     a.href=url; a.download=fname; a.style.display="none"; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function(){ URL.revokeObjectURL(url); }, 5000);
     toast("Downloading "+fname);
   }
-  async function makePdf(brand){
+  async function makePdf(brand, opt){
     try{
       if(S.objs.some(function(o){ return o.kind==="text"; }) && window.queryLocalFonts && !LF.list) await loadLocalFonts();   // asks once, during the click
-      stStatus("Building the PDF…"); var r=await buildPdf(brand);
+      stStatus("Building the PDF…"); var r=await buildPdf(brand, opt);
       stStatus("PDF ready: "+r.copies+" cop"+(r.copies===1?"y":"ies")+", "+r.pages+" page"+(r.pages===1?"":"s")+(r.spots.length?". Spot colours: "+r.spots.join(", "):"")+"."+
         (r.fallback.length?" Text in "+r.fallback.join(", ")+" uses a standard PDF font because the font file couldn't be read here (Chrome or Edge on the computer with the font installed converts it to outlines).":(S.objs.some(function(o){ return o.kind==="text"; })?" Text is converted to outlines.":""))+(!cutsOn()?" Cut lines are off.":""), r.fallback.length?"err":"ok");
       return r; }
@@ -2455,6 +2488,20 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
       saveBlob(new Blob([r.text],{type:"application/dxf"}), (S.name||"design")+".dxf");
       stStatus("DXF ready. Layers: "+r.layers.join(", ")+"."+(r.skipped.length?" Text \""+r.skipped.join("\", \"")+"\" was left out because its font file couldn't be read here (use Chrome or Edge on the computer with the font installed).":"")+(!cutsOn()?" Cut lines are off.":""), r.skipped.length?"err":"ok");
     }catch(e){ console.error(e); stStatus(e.message==="empty"?"Nothing to export yet.":"Couldn't build the DXF.","err"); }
+  });
+  [].forEach.call(document.querySelectorAll("[data-laser]"),function(btn){
+    btn.addEventListener("click", async function(){
+      var w=btn.dataset.laser, fmt=btn.dataset.fmt;
+      if(fmt==="dxf"){ $("stDxf").click(); return; }
+      var tag=LASER.widths[w].file;
+      if(fmt==="pdf"){ var r=await makePdf("epilog",{width:w}); if(r) saveBlob(r.blob, (S.name||"design")+"-Epilog-"+tag+".pdf"); return; }
+      try{
+        if(S.objs.some(function(o){ return o.kind==="text"; }) && window.queryLocalFonts && !LF.list) await loadLocalFonts();
+        stStatus("Building the EPS…"); var e=await buildEps("epilog",{width:w});
+        saveBlob(e.blob, (S.name||"design")+"-Epilog-"+tag+".eps");
+        stStatus("EPS ready for "+LASER.widths[w].label+"."+(e.fallback.length?" Text in "+e.fallback.join(", ")+" uses a standard PostScript font because the font file couldn't be read here.":"")+(!cutsOn()?" Cut lines are off.":""), e.fallback.length?"err":"ok");
+      }catch(err){ console.error(err); stStatus(err.message==="empty"?"Nothing to export yet.":"Couldn't build the EPS.","err"); }
+    });
   });
   [].forEach.call(document.querySelectorAll("[data-eps]"),function(btn){
     btn.addEventListener("click", async function(){
