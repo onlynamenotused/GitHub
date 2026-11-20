@@ -236,6 +236,7 @@
       <div class="actions">
         <button class="btn primary" id="dl" disabled>Download SVG</button>
         <button class="btn" id="dlEps" disabled>Download EPS</button>
+        <button class="btn" id="dlDxf" disabled>Download DXF</button>
         <button class="btn" id="copy" disabled>Copy SVG code</button>
       </div>
       <div class="status" id="status"></div>
@@ -301,7 +302,7 @@
           <div id="stContourOpts" hidden>
             <div class="row2">
               <label>Line<select id="stCType"><option value="cut">Cut through</option><option value="perf">Perforated cut</option></select></label>
-              <label>Offset (mm)<input type="number" id="stOffset" value="2" min="-20" max="50" step="0.5"></label>
+              <label>Offset (mm)<input type="number" id="stOffset" value="-1" min="-20" max="50" step="0.5"></label>
               <label>Join gaps (mm)<input type="number" id="stBridge" value="0" min="0" max="50" step="0.5"></label>
             </div>
             <div class="row2 sfxrow" id="stCSfxRow" hidden>
@@ -410,6 +411,11 @@
             <button type="button" class="btn dim" data-eps="mutoh">EPS for VerteLith</button>
           </div>
           <div class="hint">EPS holds one copy of the design with its spot colours, cut lines and crop marks, for Illustrator, CorelDRAW, FlexiSign or the RIP's own layout. Copies and sheet layout are in the PDF.</div>
+          <div class="sendlbl">DXF (one copy)</div>
+          <div class="sendbtns">
+            <button type="button" class="btn dim" id="stDxf">Download DXF</button>
+          </div>
+          <div class="hint">DXF in millimetres for cutters, lasers and CAD: cut lines on layers named after the spot colours for the brand picked above, the printed artwork as outlines on PRINT_ layers, and crop marks. Curves are converted to fine straight segments.</div>
         </div>
         <div class="sendbox" id="stSendGtx" hidden>
           <div class="sendlbl">Brother GTX output</div>
@@ -1134,7 +1140,7 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
 
   function run(){
     var job=++state.jobId;
-    $("busy").classList.add("show"); $("dl").disabled=true; $("dlEps").disabled=true; $("copy").disabled=true;
+    $("busy").classList.add("show"); $("dl").disabled=true; $("dlEps").disabled=true; $("dlDxf").disabled=true; $("copy").disabled=true;
     status("Tracing…");
     setTimeout(function(){
       try{
@@ -1178,7 +1184,7 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
         st.insertBefore(im, $("busy"));
         var empty=st.querySelector(".empty"); if(empty) empty.remove();
         $("vecInfo").textContent=paths+" shapes · "+(kb>1024?(kb/1024).toFixed(1)+" MB":Math.round(kb)+" KB");
-        $("dl").disabled=!paths; $("dlEps").disabled=!paths; $("copy").disabled=!paths;
+        $("dl").disabled=!paths; $("dlEps").disabled=!paths; $("dlDxf").disabled=!paths; $("copy").disabled=!paths;
         var secs=((performance.now()-t0)/1000).toFixed(1);
         if(!paths) status("Nothing left to trace. Try lowering “Remove specks” or turning off background removal.","err");
         else if($("removeBg").checked && !bgColor && !bw) status("Done in "+secs+" s. No solid background found to remove.","ok");
@@ -1275,6 +1281,17 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
     }
     browserDownload(fname, eps, "application/postscript");
   });
+  $("dlDxf").addEventListener("click",function(){
+    var api=window.__vcStudioApi, dxf=api && api.dxf && api.dxf();
+    if(!dxf){ status("Couldn't make the DXF.","err"); return; }
+    var fname=state.name+".dxf";
+    if(dlCap){
+      dlCap.save({filename:fname, data:dxf}).then(function(){ toast("Saved "+fname); })
+        .catch(function(e){ if(e && e.code==="declined") return; browserDownload(fname, dxf, "application/dxf"); });
+      return;
+    }
+    browserDownload(fname, dxf, "application/dxf");
+  });
   function browserDownload(fname, data, type){
     try{
       // GoDaddy's HTML section runs in a sandboxed frame without download rights; save through the host page when allowed
@@ -1359,7 +1376,7 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
     order:[],            // hex order
     brand:"roland",
     under:false, over:false,
-    contour:{ on:false, type:"cut", offset:2, bridge:0, ops:[] },
+    contour:{ on:false, type:"cut", offset:-1, bridge:0, ops:[] },
     objs:[], sel:-1, nextId:1,
     view:"design"
   };
@@ -1632,6 +1649,8 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
   function marksSvg(list){ return list.map(function(m){ return '<path d="'+opsToD(m.ops)+'" fill="#000"'+(m.eo?' fill-rule="evenodd"':'')+' pointer-events="none"/>'; }).join(""); }
   function marksBox(b, c){ var bx=opsBox(marksFor(b,c).map(function(m){ return m.ops; })); return bx; }
   function isLineObj(o){ return o.role==="cut"||o.role==="perf"; }
+  // A filled shape or text can also carry a cut line (print it and cut round it): o.alsoCut = "cut" | "perf"
+  function extraCut(o, brand){ return o.role==="fill" && (brand||S.brand)!=="brother" && (o.alsoCut==="cut"||o.alsoCut==="perf") ? o.alsoCut : ""; }
   function cutsOn(){ return $("stCutsOn").checked; }
   function lineActive(o){ return cutsOn() && !o.cutOff; }
   function contourActive(){ return S.contour.on && S.contour.ops.length && cutsOn(); }
@@ -1808,11 +1827,18 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
          (isLineObj(o)&&S.brand!=="brother"?'<label class="check inl"><input type="checkbox" data-k="cutOn"'+(o.cutOff?'':' checked')+'><span>Cut on</span></label>':'')+'</div>'+
          (isLineObj(o)&&sfxOk(S.brand)?'<div class="row2"><label>Cut pass suffix<input type="text" data-k="suffix" list="sfxList" maxlength="12" placeholder="none" spellcheck="false" value="'+esc(o.suffix||"")+'"></label><span class="hint" style="flex:2 1 160px;margin:0" data-sfxname>Spot colour: <b>'+esc(cutName(S.brand,o.role,o.suffix))+'</b></span></div>':'');
       if(o.role==="fill") h+='<div class="row2"><label style="flex:0 0 40px">Colour<input type="color" data-k="color" value="'+o.color+'"></label><label>Print<select data-k="ink">'+inkOpts(S.brand,o.ink)+'</select></label></div>';
+      if(o.role==="fill" && S.brand!=="brother"){
+        var xc=o.alsoCut||"";
+        h+='<div class="row2"><label>Also cut around it<select data-k="alsoCut"><option value=""'+(xc?'':' selected')+'>No cut line</option><option value="cut"'+(xc==="cut"?' selected':'')+'>Cut line · '+esc(spotName(S.brand,"cut"))+'</option><option value="perf"'+(xc==="perf"?' selected':'')+'>Perforated cut · '+esc(spotName(S.brand,"perf"))+'</option></select></label>'+
+           (xc?'<label class="check inl"><input type="checkbox" data-k="cutOn"'+(o.cutOff?'':' checked')+'><span>Cut on</span></label>':'')+'</div>'+
+           (xc&&sfxOk(S.brand)?'<div class="row2"><label>Cut pass suffix<input type="text" data-k="suffix" list="sfxList" maxlength="12" placeholder="none" spellcheck="false" value="'+esc(o.suffix||"")+'"></label><span class="hint" style="flex:2 1 160px;margin:0" data-sfxname>Spot colour: <b>'+esc(cutName(S.brand,xc,o.suffix))+'</b></span></div>':'');
+      }
       el.innerHTML=h;
       el.addEventListener("input",function(e){
         var k=e.target.dataset.k; if(!k) return;
         if(k==="cutOn"){ o.cutOff=!e.target.checked; render(); return; }
-        if(k==="suffix"){ o.suffix=cleanSfx(e.target.value); var sn=el.querySelector("[data-sfxname]"); if(sn) sn.innerHTML="Spot colour: <b>"+esc(cutName(S.brand,o.role,o.suffix))+"</b>"; render(); return; }
+        if(k==="suffix"){ o.suffix=cleanSfx(e.target.value); var sn=el.querySelector("[data-sfxname]"); if(sn) sn.innerHTML="Spot colour: <b>"+esc(cutName(S.brand,isLineObj(o)?o.role:extraCut(o),o.suffix))+"</b>"; render(); return; }
+        if(k==="alsoCut"){ o.alsoCut=e.target.value; buildObjs(); render(); return; }
         if(k==="bold"||k==="italic") o[k]=e.target.checked;
         else if(k==="text"||k==="family"||k==="color"||k==="ink"||k==="role") o[k]=e.target.value; else { var v=parseFloat(e.target.value); if(!isNaN(v)) o[k]=v; }
         if(k==="role"||k==="family"){ buildObjs(); }
@@ -1873,28 +1899,35 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
       parts.push('<path d="'+opsToD(p.ops)+'" fill="'+fill+'"'+(r==="noink"?' stroke="#888" stroke-width="'+n3(sw/2)+'" stroke-dasharray="'+n3(sw*2)+'"':'')+'/>');
     });
     if(wantOver){ parts.push('<g fill="url(#ptG)">'+ART.filter(function(p){ var r=S.colors[p.hex].role; return r!=="hide"&&r!=="noink"; }).map(function(p){ return '<path d="'+opsToD(p.ops)+'"/>'; }).join("")+'</g>'); }
+    var cutParts=[];   // cut lines are drawn last, on top of the artwork
+    function cutAttrs(role, active, sel){ return ' stroke="'+SCREEN[role]+'" stroke-width="'+n3(sel?sw*1.8:sw)+'"'+(active?(role==="perf"?' stroke-dasharray="'+n3(sw*4)+' '+n3(sw*2)+'"':''):' opacity="0.3" stroke-dasharray="'+n3(sw*1.5)+'"'); }
     S.objs.forEach(function(o, idx){
-      var attrs=forTile?'':' data-oi="'+idx+'"', sel=(!forTile && idx===S.sel);
-      if(S.brand==="brother" && (o.role==="cut"||o.role==="perf") && !sel) return;
+      var attrs=forTile?'':' data-oi="'+idx+'"', sel=(!forTile && idx===S.sel), line=isLineObj(o), xc=extraCut(o), act=lineActive(o);
+      if(S.brand==="brother" && line && !sel) return;
       if(o.kind==="text"){
         var f=fontInfo(o), fill=o.ink==="normal"?o.color:(PAT[o.ink]||o.color);
-        if(o.role==="cut"||o.role==="perf") fill="none";
-        var strokeAttr = (o.role==="cut"||o.role==="perf") ? ' stroke="'+SCREEN[o.role]+'" stroke-width="'+n3(sw)+'"'+(lineActive(o)?'':' opacity="0.3" stroke-dasharray="'+n3(sw*1.5)+'"') : '';
-        if(forTile && isLineObj(o) && !lineActive(o)) return;
-        parts.push('<text'+attrs+' x="'+n3(o.x)+'" y="'+n3(o.y)+'" font-family="'+esc(f.css)+'" font-weight="'+f.w+'" font-style="'+f.st+'" font-size="'+n3(o.pt/MM2PT)+'" fill="'+fill+'"'+strokeAttr+'>'+esc(o.text)+'</text>');
-        if(sel){ var tb=textBox(o); parts.push('<rect x="'+n3(tb.x)+'" y="'+n3(tb.y)+'" width="'+n3(tb.w)+'" height="'+n3(tb.h)+'" fill="none" stroke="#e8b923" stroke-width="'+n3(sw/2)+'" stroke-dasharray="'+n3(sw*3)+'" pointer-events="none"/>'); }
+        var tAttr=' x="'+n3(o.x)+'" y="'+n3(o.y)+'" font-family="'+esc(f.css)+'" font-weight="'+f.w+'" font-style="'+f.st+'" font-size="'+n3(o.pt/MM2PT)+'"';
+        if(line){ if(!(forTile && !act)) cutParts.push('<text'+attrs+tAttr+' fill="'+(forTile?"none":"transparent")+'"'+cutAttrs(o.role,act,false)+'>'+esc(o.text)+'</text>'); }
+        else {
+          parts.push('<text'+attrs+tAttr+' fill="'+fill+'">'+esc(o.text)+'</text>');
+          if(xc && !(forTile && !act)) cutParts.push('<text'+tAttr+' fill="none"'+cutAttrs(xc,act,false)+' pointer-events="none">'+esc(o.text)+'</text>');
+        }
+        if(sel){ var tb=textBox(o); cutParts.push('<rect x="'+n3(tb.x)+'" y="'+n3(tb.y)+'" width="'+n3(tb.w)+'" height="'+n3(tb.h)+'" fill="none" stroke="#e8b923" stroke-width="'+n3(sw/2)+'" stroke-dasharray="'+n3(sw*3)+'" pointer-events="none"/>'); }
       } else {
         var d=opsToD(shapeOps(o));
-        if(o.role==="fill") parts.push('<path'+attrs+' d="'+d+'" fill="'+(o.ink==="normal"?o.color:(PAT[o.ink]||o.color))+'"'+(sel?' stroke="#e8b923" stroke-width="'+n3(sw/2)+'"':'')+'/>');
-        else if(!lineActive(o)){ if(!forTile) parts.push('<path'+attrs+' d="'+d+'" fill="transparent" stroke="'+SCREEN[o.role]+'" stroke-width="'+n3(sel?sw*1.8:sw)+'" opacity="0.3" stroke-dasharray="'+n3(sw*1.5)+'"/>'); }
-        else parts.push('<path'+attrs+' d="'+d+'" fill="'+(forTile?"none":"transparent")+'" stroke="'+SCREEN[o.role]+'" stroke-width="'+n3(sel?sw*1.8:sw)+'"'+(o.role==="perf"?' stroke-dasharray="'+n3(sw*4)+' '+n3(sw*2)+'"':'')+'/>');
+        if(o.role==="fill"){
+          parts.push('<path'+attrs+' d="'+d+'" fill="'+(o.ink==="normal"?o.color:(PAT[o.ink]||o.color))+'"'+(sel?' stroke="#e8b923" stroke-width="'+n3(sw/2)+'"':'')+'/>');
+          if(xc && !(forTile && !act)) cutParts.push('<path d="'+d+'" fill="none"'+cutAttrs(xc,act,false)+' pointer-events="none"/>');
+        }
+        else if(!act){ if(!forTile) cutParts.push('<path'+attrs+' d="'+d+'" fill="transparent"'+cutAttrs(o.role,false,sel)+'/>'); }
+        else cutParts.push('<path'+attrs+' d="'+d+'" fill="'+(forTile?"none":"transparent")+'"'+cutAttrs(o.role,true,sel)+'/>');
       }
     });
     if(S.contour.on && S.contour.ops.length && S.brand!=="brother" && (cutsOn() || !forTile)){
-      var t=S.contour.type; parts.push('<path d="'+opsToD(S.contour.ops)+'" fill="none" stroke="'+SCREEN[t]+'" stroke-width="'+n3(sw)+'"'+(!cutsOn()?' opacity="0.3" stroke-dasharray="'+n3(sw*1.5)+'"':(t==="perf"?' stroke-dasharray="'+n3(sw*4)+' '+n3(sw*2)+'"':''))+' pointer-events="none"/>');
+      var t=S.contour.type; cutParts.push('<path d="'+opsToD(S.contour.ops)+'" fill="none" stroke="'+SCREEN[t]+'" stroke-width="'+n3(sw)+'"'+(!cutsOn()?' opacity="0.3" stroke-dasharray="'+n3(sw*1.5)+'"':(t==="perf"?' stroke-dasharray="'+n3(sw*4)+' '+n3(sw*2)+'"':''))+' pointer-events="none"/>');
     }
     var mc=mk(); if(mc.on && mc.scope==="each") parts.push(marksSvg(marksFor(contentBox(), mc)));
-    return parts.join("");
+    return parts.join("")+cutParts.join("");
   }
   function render(){
     if(!S.ready) return;
@@ -2083,27 +2116,32 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
       c.push("q"); setFill(r==="normal"?"normal":r, col.to); c.push(opsToPdf(p.ops)+"\nf Q");
     });
     if(S.over && brandHas(brand,"gloss")){ c.push("q"); setFill("gloss"); printable.forEach(function(p){ c.push(opsToPdf(p.ops)); }); c.push("f Q"); }
+    var cuts=[];   // cut lines go last so they sit on top of everything (they're easy to lose under artwork, e.g. with a negative offset)
+    function cutStroke(role, sfx, ops){ cuts.push("q /GSop gs "+spotCS(role,sfx)+" CS 1 SCN 0.25 w "+opsToPdf(ops)+"\nS Q"); }
+    function cutText(role, sfx, o){ cuts.push("q /GSop gs "+spotCS(role,sfx)+" CS 1 SCN 0.25 w 1 Tr 1 0 0 -1 "+n3(o.x*MM2PT)+" "+n3(o.y*MM2PT)+" cm BT "+fontRes(o)+" "+n3(o.pt)+" Tf 0 0 Td "+pdfStr(o.text||"")+" Tj ET Q"); }
     S.objs.forEach(function(o){
-      var isLine = o.role==="cut"||o.role==="perf";
-      if(isLine && !lineActive(o)) return;
-      if(!isLine && effRole(o.ink||"normal",brand)==="hide") return;
-      if(o.kind==="text" && OUT[o.id]){
-        if(isLine){ c.push("q /GSop gs "+spotCS(o.role,o.suffix)+" CS 1 SCN 0.25 w "+opsToPdf(OUT[o.id])+"\nS Q"); }
-        else { c.push("q"); setFill(effRole(o.ink||"normal",brand)==="normal"?"normal":effRole(o.ink,brand), o.color); c.push(opsToPdf(OUT[o.id])+"\nf Q"); }
-      } else if(o.kind==="text"){
-        c.push("q");
-        if(isLine){ var cs=spotCS(o.role,o.suffix); c.push("/GSop gs "+cs+" CS 1 SCN 0.25 w 1 Tr"); }
-        else { setFill(effRole(o.ink||"normal",brand)==="normal"?"normal":effRole(o.ink,brand), o.color); }
-        c.push("1 0 0 -1 "+n3(o.x*MM2PT)+" "+n3(o.y*MM2PT)+" cm BT "+fontRes(o)+" "+n3(o.pt)+" Tf 0 0 Td "+pdfStr(o.text||"")+" Tj ET Q");
-      } else if(isLine){
-        var cs2=spotCS(o.role,o.suffix); c.push("q /GSop gs "+cs2+" CS 1 SCN 0.25 w "+opsToPdf(shapeOps(o))+"\nS Q");
-      } else {
-        c.push("q"); var ir=effRole(o.ink||"normal",brand); setFill(ir==="normal"?"normal":ir, o.color); c.push(opsToPdf(shapeOps(o))+"\nf Q");
+      var isLine = isLineObj(o), xc = extraCut(o, brand);
+      if(isLine){
+        if(!lineActive(o)) return;
+        if(o.kind==="text"){ if(OUT[o.id]) cutStroke(o.role,o.suffix,OUT[o.id]); else cutText(o.role,o.suffix,o); }
+        else cutStroke(o.role,o.suffix,shapeOps(o));
+        return;
+      }
+      var ir=effRole(o.ink||"normal",brand);
+      if(ir!=="hide"){
+        if(o.kind==="text" && OUT[o.id]){ c.push("q"); setFill(ir==="normal"?"normal":ir, o.color); c.push(opsToPdf(OUT[o.id])+"\nf Q"); }
+        else if(o.kind==="text"){ c.push("q"); setFill(ir==="normal"?"normal":ir, o.color); c.push("1 0 0 -1 "+n3(o.x*MM2PT)+" "+n3(o.y*MM2PT)+" cm BT "+fontRes(o)+" "+n3(o.pt)+" Tf 0 0 Td "+pdfStr(o.text||"")+" Tj ET Q"); }
+        else { c.push("q"); setFill(ir==="normal"?"normal":ir, o.color); c.push(opsToPdf(shapeOps(o))+"\nf Q"); }
+      }
+      if(xc && lineActive(o)){
+        if(o.kind==="text"){ if(OUT[o.id]) cutStroke(xc,o.suffix,OUT[o.id]); else cutText(xc,o.suffix,o); }
+        else cutStroke(xc,o.suffix,shapeOps(o));
       }
     });
     var mcP=mk();
     if(mcP.on && mcP.scope==="each"){ marksFor(contentBox(), mcP).forEach(function(mm){ c.push("q 0 0 0 1 k "+opsToPdf(mm.ops)+"\n"+(mm.eo?"f*":"f")+" Q"); }); }
-    if(contourActive()){ var cs3=spotCS(S.contour.type, $("stCSuffix").value); c.push("q /GSop gs "+cs3+" CS 1 SCN 0.25 w "+opsToPdf(S.contour.ops)+"\nS Q"); }
+    if(contourActive()) cutStroke(S.contour.type, $("stCSuffix").value, S.contour.ops);
+    c.push.apply(c, cuts);
     c.push("Q");
     return { content:c.join("\n"), spotList:spotList, fontList:fontList, fallback:fallback };
   }
@@ -2178,7 +2216,7 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
       if(t[0]==="("||t[0]==="/"||/^[-+.\d]/.test(t)){ st.push(t); continue; }
       switch(t){
         case "q": emit("gsave"); break;
-        case "Q": emit("grestore"); break;
+        case "Q": emit("grestore"); tr=0; break;
         case "cm": emit("["+st.join(" ")+"] concat"); break;
         case "m": emit(st.join(" ")+" moveto"); break;
         case "l": emit(st.join(" ")+" lineto"); break;
@@ -2193,7 +2231,7 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
         case "gs": emit("true setoverprint"); break;
         case "cs": case "CS": emit("HDCS"+st[0].replace("/CS","")+" setcolorspace"); break;
         case "scn": case "SCN": emit(st.join(" ")+" setcolor"); break;
-        case "BT": tr=0; break;
+        case "BT": break;
         case "Tr": tr=+st[0]; break;
         case "Tf": emit("HD-"+st[0].slice(1)+" "+st[1]+" scalefont setfont"); break;
         case "Td": emit(st.join(" ")+" moveto"); break;
@@ -2249,6 +2287,89 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
     artOps().forEach(function(p){ var r=rgbOf(p.hex); c.push("q "+r.map(n3).join(" ")+" rg "+opsToPdf(p.ops)+"\nf Q"); });
     c.push("Q");
     return epsDoc({W:W, H:H, body:c.join("\n"), spots:[], fonts:[], title:S.name});
+  }
+
+  // ---- DXF (R12 ASCII, millimetres): cut paths and artwork outlines as closed polylines, one layer per spot colour / colour
+  function flattenOps(ops, tol){ // -> [{pts:[[x,y]...], closed}]
+    var out=[], cur=null, sx=0, sy=0, x=0, y=0;
+    ops.forEach(function(o){
+      if(o[0]==="M"){ if(cur && cur.pts.length>1) out.push(cur); cur={pts:[[o[1],o[2]]], closed:false}; sx=x=o[1]; sy=y=o[2]; }
+      else if(o[0]==="L"){ if(!cur){ cur={pts:[[x,y]],closed:false}; } cur.pts.push([o[1],o[2]]); x=o[1]; y=o[2]; }
+      else if(o[0]==="C"){
+        if(!cur){ cur={pts:[[x,y]],closed:false}; }
+        var x1=o[1],y1=o[2],x2=o[3],y2=o[4],x3=o[5],y3=o[6];
+        var len=Math.hypot(x1-x,y1-y)+Math.hypot(x2-x1,y2-y1)+Math.hypot(x3-x2,y3-y2), n=Math.max(2, Math.min(96, Math.ceil(len/Math.max(0.05,tol*6))));
+        for(var i=1;i<=n;i++){ var t=i/n, u=1-t;
+          cur.pts.push([u*u*u*x+3*u*u*t*x1+3*u*t*t*x2+t*t*t*x3, u*u*u*y+3*u*u*t*y1+3*u*t*t*y2+t*t*t*y3]); }
+        x=x3; y=y3;
+      } else if(o[0]==="Z"){ if(cur){ cur.closed=true; out.push(cur); cur=null; } x=sx; y=sy; }
+    });
+    if(cur && cur.pts.length>1) out.push(cur);
+    return out;
+  }
+  function dxfLayerName(s){ return String(s||"0").replace(/[^A-Za-z0-9_\-$]/g,"_").slice(0,31) || "0"; }
+  function aciFor(hex){ // nearest AutoCAD colour index from a small palette
+    var P=[[1,255,0,0],[2,255,255,0],[3,0,255,0],[4,0,255,255],[5,0,0,255],[6,255,0,255],[7,0,0,0],[8,128,128,128],[9,192,192,192],[30,255,127,0],[40,255,191,0],[140,0,127,255],[200,127,0,255],[250,51,51,51]];
+    var r=rgbOf(hex).map(function(v){ return v*255; }), best=7, bd=1e9;
+    P.forEach(function(p){ var d=(p[1]-r[0])*(p[1]-r[0])+(p[2]-r[1])*(p[2]-r[1])+(p[3]-r[2])*(p[3]-r[2]); if(d<bd){ bd=d; best=p[0]; } });
+    return best;
+  }
+  function dxfDoc(layers, H){ // layers: [{name, aci, rgb:hex|null, paths:[{pts,closed}]}], H: height in mm (DXF Y goes up)
+    var L=[], f=function(v){ return (Math.round(v*1000)/1000).toString(); };
+    function g(code, val){ L.push(String(code)); L.push(String(val)); }
+    var maxX=0; layers.forEach(function(l){ l.paths.forEach(function(p){ p.pts.forEach(function(q){ if(q[0]>maxX) maxX=q[0]; }); }); });
+    g(0,"SECTION"); g(2,"HEADER"); g(9,"$ACADVER"); g(1,"AC1009"); g(9,"$INSUNITS"); g(70,4); g(9,"$MEASUREMENT"); g(70,1);
+    g(9,"$EXTMIN"); g(10,0); g(20,0); g(30,0); g(9,"$EXTMAX"); g(10,f(maxX)); g(20,f(H)); g(30,0); g(0,"ENDSEC");
+    g(0,"SECTION"); g(2,"TABLES"); g(0,"TABLE"); g(2,"LAYER"); g(70,layers.length+1);
+    g(0,"LAYER"); g(2,"0"); g(70,0); g(62,7); g(6,"CONTINUOUS");
+    layers.forEach(function(l){ g(0,"LAYER"); g(2,l.name); g(70,0); g(62,l.aci); g(6,"CONTINUOUS"); });
+    g(0,"ENDTAB"); g(0,"ENDSEC");
+    g(0,"SECTION"); g(2,"ENTITIES");
+    layers.forEach(function(l){
+      l.paths.forEach(function(p){
+        var pts=p.pts.slice();
+        if(p.closed && pts.length>2){ var a=pts[0], z=pts[pts.length-1]; if(Math.abs(a[0]-z[0])<1e-6 && Math.abs(a[1]-z[1])<1e-6) pts.pop(); }
+        if(pts.length<2) return;
+        g(0,"POLYLINE"); g(8,l.name); g(62,l.aci); g(66,1); g(10,0); g(20,0); g(30,0); g(70,p.closed?1:0);
+        pts.forEach(function(q){ g(0,"VERTEX"); g(8,l.name); g(10,f(q[0])); g(20,f(H-q[1])); g(30,0); });
+        g(0,"SEQEND"); g(8,l.name);
+      });
+    });
+    g(0,"ENDSEC"); g(0,"EOF");
+    return L.join("\r\n")+"\r\n";
+  }
+  function shiftOps(ops, dx, dy, k){ k=k||1; return ops.map(function(o){ if(o[0]==="Z") return o; var r=[o[0]]; for(var i=1;i<o.length;i+=2) r.push((o[i]+dx)*k, (o[i+1]+dy)*k); return r; }); }
+  // Plain DXF of the traced artwork (converter's Download DXF): one layer per colour.
+  function plainDxf(){
+    var a=artSize(), real=a.defaulted ? { w:S.vw*25.4/96, h:S.vh*25.4/96 } : a, k=real.w/a.w, by={}, order=[];
+    artOps().forEach(function(p){ if(!by[p.hex]){ by[p.hex]=[]; order.push(p.hex); } by[p.hex]=by[p.hex].concat(flattenOps(shiftOps(p.ops,0,0,k), 0.02)); });
+    var layers=order.map(function(h){ return { name:dxfLayerName("COLOUR_"+h.replace("#","").toUpperCase()), aci:aciFor(h), paths:by[h] }; });
+    return dxfDoc(layers, real.h);
+  }
+  // Studio DXF: cut lines (contour, cut shapes, text cuts) on their spot-colour layers, printed artwork outlines, crop marks.
+  async function buildDxf(brand){
+    var box=designBox(); if(!(box.w>0 && box.h>0)) throw new Error("empty");
+    var dx=-box.x, dy=-box.y, tol=0.02, layers={}, order=[], skipped=[];
+    function layer(key, name, aci){ if(!layers[key]){ layers[key]={name:dxfLayerName(name), aci:aci, paths:[]}; order.push(key); } return layers[key]; }
+    function add(L, ops){ L.paths=L.paths.concat(flattenOps(shiftOps(ops,dx,dy), tol)); }
+    function cutLayer(role, sfx){ var n=cutName(brand,role,sfx)||(role==="perf"?"PerfCut":"CutContour"); return layer("cut:"+n, n, role==="perf"?3:6); }
+    var OUT={};
+    for(var ti=0; ti<S.objs.length; ti++){ var to=S.objs[ti]; if(to.kind!=="text") continue; var ol=await textOutline(to); if(ol) OUT[to.id]=ol; }
+    if(contourActive()) add(cutLayer(S.contour.type, $("stCSuffix").value), S.contour.ops);
+    S.objs.forEach(function(o){
+      var role = isLineObj(o) ? o.role : extraCut(o);
+      if(o.kind==="text" && !OUT[o.id]){ if((role && lineActive(o)) || o.role==="fill") skipped.push(o.text); }
+      var ops = o.kind==="text" ? OUT[o.id] : shapeOps(o);
+      if(!ops) return;
+      if(o.role==="fill") add(layer("print:"+o.color, "PRINT_"+o.color.replace("#","").toUpperCase(), aciFor(o.color)), ops);
+      if(role && lineActive(o)) add(cutLayer(role, o.suffix), ops);
+    });
+    artOps().forEach(function(p){ var c=S.colors[p.hex]; if(!c || c.role==="hide" || c.role==="noink") return; add(layer("print:"+c.to, "PRINT_"+c.to.replace("#","").toUpperCase(), aciFor(c.to)), p.ops); });
+    var mc=mk(); if(mc.on && mc.scope==="each") marksFor(contentBox(), mc).forEach(function(mm){ add(layer("marks","CROP_MARKS",7), mm.ops); });
+    // artwork first, then crop marks, then cut lines last so they draw on top
+    var rank=function(k){ return k.indexOf("cut:")===0?2:k==="marks"?1:0; };
+    order.sort(function(a,b){ return rank(a)-rank(b); });
+    return { text:dxfDoc(order.map(function(k){ return layers[k]; }), box.h), layers:order.map(function(k){ return layers[k].name; }), skipped:skipped };
   }
 
   // ---- Brother GTX PNG
@@ -2321,6 +2442,14 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
   }
   function fileName(brand){ return (S.name||"design")+"-"+BRANDS[brand].rip.replace(/\s+/g,"")+".pdf"; }
 
+  $("stDxf").addEventListener("click", async function(){
+    try{
+      if(S.objs.some(function(o){ return o.kind==="text"; }) && window.queryLocalFonts && !LF.list) await loadLocalFonts();
+      stStatus("Building the DXF…"); var r=await buildDxf(S.brand);
+      saveBlob(new Blob([r.text],{type:"application/dxf"}), (S.name||"design")+".dxf");
+      stStatus("DXF ready. Layers: "+r.layers.join(", ")+"."+(r.skipped.length?" Text \""+r.skipped.join("\", \"")+"\" was left out because its font file couldn't be read here (use Chrome or Edge on the computer with the font installed).":"")+(!cutsOn()?" Cut lines are off.":""), r.skipped.length?"err":"ok");
+    }catch(e){ console.error(e); stStatus(e.message==="empty"?"Nothing to export yet.":"Couldn't build the DXF.","err"); }
+  });
   [].forEach.call(document.querySelectorAll("[data-eps]"),function(btn){
     btn.addEventListener("click", async function(){
       var br=btn.dataset.eps;
@@ -2397,6 +2526,7 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
   window.__vcStudio=S; // for support/debugging
   window.__vcStudioApi = {
     eps: function(){ return S.ready ? plainEps() : null; },
+    dxf: function(){ return S.ready ? plainDxf() : null; },
     snap: function(){ return { colors:JSON.parse(JSON.stringify(S.colors)), objs:JSON.parse(JSON.stringify(S.objs)), sel:S.sel, brand:S.brand, under:S.under, over:S.over, contour:{ on:S.contour.on, type:S.contour.type }, view:S.view }; },
     restore: function(o){
       if(!o) return;
