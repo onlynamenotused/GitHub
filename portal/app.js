@@ -1109,6 +1109,15 @@ async function renderSupervisorsAdmin(host) {
     return el("div", { class: "card", style: "margin-top:12px" },
       el("div", { class: "bhead" }, el("h3", {}, sup.name), el("span", { class: "muted small" }, "Bill to: " + (sup.bill_to || "—") + (sup.last_sync ? " · history updated " + new Date(sup.last_sync).toLocaleString("en-AU") : ""))),
       el("p", { class: "muted small" }, "Supervisor logins see every machine, job and service record for these customers, can log jobs and add machines for them, and get Fleet reports. Adding a login sends nothing."),
+      el("label", { class: "check", style: "display:flex;gap:8px;align-items:flex-start;margin:4px 0 10px" },
+        el("input", { type: "checkbox", checked: !!sup.catalogue_access, onchange: async (e) => {
+          const on = e.target.checked; e.target.disabled = true;
+          const { error } = await sb.from("supervisors").update({ catalogue_access: on }).eq("id", sup.id);
+          e.target.disabled = false;
+          if (error) { e.target.checked = !on; return flash(note, "Catalogue access not changed", false); }
+          sup.catalogue_access = on; flash(note, on ? "Parts catalogue turned on for " + sup.name + " logins" : "Parts catalogue turned off for " + sup.name + " logins", true);
+        } }),
+        el("span", {}, "Parts catalogue access", el("br"), el("span", { class: "muted small" }, "Lets every " + sup.name + " login open the Parts Catalogue (prices ex/inc GST)."))),
       el("h3", {}, "Logins"),
       el("ul", { class: "links" }, ...logins.map((u) => el("li", {}, u.email + (u.full_name ? " (" + u.full_name + ")" : ""), " ",
         el("button", { class: "btn ghost small", type: "button", onclick: async () => { await sb.from("supervisor_access").delete().eq("supervisor_id", sup.id).eq("email", u.email); renderSupervisorsAdmin(host); } }, "Remove")))),
