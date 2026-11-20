@@ -191,7 +191,7 @@
       </div>
       <div class="row">
         <label for="detail">Detail <output id="detailOut"></output></label>
-        <input type="range" id="detail" min="1" max="10" step="1">
+        <input type="range" id="detail" min="1" max="20" step="1">
         <div class="hint">Lower = smoother curves, fewer nodes</div>
       </div>
       <div class="row">
@@ -918,7 +918,7 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
     $("rowThresh").style.display = state.bw ? "" : "none";
     $("colorsOut").textContent=$("colors").value;
     $("threshOut").textContent=$("thresh").value;
-    $("detailOut").textContent=$("detail").value+" / 10";
+    $("detailOut").textContent=$("detail").value+" / 20";
     $("speckOut").textContent=$("speck").value+" px";
     $("blurOut").textContent=$("blur").value==="0"?"off":$("blur").value;
   }
@@ -958,8 +958,10 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
   function schedule(ms){ if(!state.img) return; clearTimeout(state.timer); state.timer=setTimeout(run, ms); }
 
   function T(k, d){ var t=window.__vcTune; return t && (k in t) ? t[k] : d; }
+  // Detail 11–20 is the extra-fine range: 0 at detail ≤10, 1 at detail 20
+  function xfine(){ return Math.max(0, Math.min(1, (+$("detail").value-10)/10)); }
   function prepCanvas(){
-    var img=state.img, w=img.naturalWidth, h=img.naturalHeight, maxSide=Math.max(w,h), s=1, up=T("upTarget",2000), cap=T("maxCap",2400);
+    var img=state.img, w=img.naturalWidth, h=img.naturalHeight, maxSide=Math.max(w,h), s=1, xf=xfine(), up=T("upTarget",2000)*(1+xf*T("xRes",0.5)), cap=T("maxCap",2400)*(1+xf*T("xRes",0.5));
     if($("upscale").checked && maxSide<up) s=Math.min(T("upMax",4), up/maxSide);
     if(maxSide*s>cap) s=cap/maxSide;
     var cw=Math.max(1,Math.round(w*s)), ch=Math.max(1,Math.round(h*s));
@@ -1087,7 +1089,7 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
       cornerThreshold: o.corner*deg, lengthThreshold: o.length, maxIterations: 10, spliceThreshold: 45*deg,
       filterSpeckle: o.speckle, colorPrecision: T("colorPrecision",1), layerDifference: T("layerDifference",8), pathPrecision: T("pathPrecision",2)
     };
-    cfg.spliceThreshold=T("splice",45)*deg; cfg.maxIterations=T("iters",10);
+    cfg.spliceThreshold=T("splice",45)*deg; cfg.maxIterations=Math.round(T("iters",10)*(1+(o.xf||0)*T("xIter",0)));
     var svg = vt.to_svg(new Uint8Array(imgd.data.buffer.slice(0)), imgd.width, imgd.height, cfg);
     // snap every fill back to the chosen palette (VTracer averages colours when it merges small regions)
     var solid = o.pal.filter(function(p){ return p.a>=128; });
@@ -1142,13 +1144,13 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
           var best=null, bd=1e9; pal.forEach(function(p){ if(p.a<128) return; var dd=dist(p,bgColor); if(dd<bd){bd=dd;best=p;} });
           bgColor = (best && bd<90) ? best : null;
         }
-        var detail=+$("detail").value, s=Math.max(1,prep.scale);
+        var detail=Math.min(10,+$("detail").value), xf=xfine(), s=Math.max(1,prep.scale);
         var o={
-          bw:bw, cutout:$("cutout").checked, bgColor:bgColor, pal:pal,
-          corner: 118 - detail*7 + T("cornerAdd",0),               // 111° (smooth) .. 48° (sharp corners)
-          length: (3.5 + (10-detail)*0.7) * Math.sqrt(s) * T("lenMul",1),
-          speckle: Math.max(1, Math.round((+$("speck").value/4 + 1) * Math.sqrt(s))),
-          tol: (0.25 + (10-detail)*0.35) * Math.sqrt(s)
+          bw:bw, cutout:$("cutout").checked, bgColor:bgColor, pal:pal, xf:xf,
+          corner: 118 - detail*7 - xf*T("xCorner",0) + T("cornerAdd",0),   // 111° (smooth) .. 48° (sharp corners)
+          length: Math.max(3, (3.5 + (10-detail)*0.7) * Math.sqrt(s) * (1 - xf*T("xLen",0.5)) * T("lenMul",1)),
+          speckle: Math.max(1, Math.round((+$("speck").value/4 + 1) * Math.sqrt(s) * (1 - xf*T("xSpeck",0.5)))),
+          tol: Math.max(0.1, (0.25 + (10-detail)*0.35) * Math.sqrt(s) * (1 - xf*T("xTol",0.6)))
         };
         if(job!==state.jobId) return;
         var svg;
@@ -1279,7 +1281,7 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
   });
 
   $("angleOut").textContent="0°";
-  applyPreset("logo");
+  applyPreset("logo"); $("detail").value=T("detailStart",10); syncLabels();
   // for the Back (undo) button
   window.__vcConv = {
     hasImage: function(){ return !!state.src; },
