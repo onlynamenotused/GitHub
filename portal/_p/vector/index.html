@@ -93,7 +93,7 @@
   .toast{background:#e8b923;color:#111}
 
   /* ---- Print & Cut studio */
-  .studio [hidden],#ripDlg [hidden]{display:none!important}
+  .studio [hidden]{display:none!important}
   .studio{margin-top:16px}
   .studio h2{font:500 22px/1.2 "League Spartan",arial,sans-serif;text-transform:uppercase;letter-spacing:.02em;margin:0}
   .sthead{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justify-content:space-between;margin-bottom:12px}
@@ -143,14 +143,6 @@
   .stcanvas{border:1px solid var(--line);border-radius:10px;background:#2a2d31;min-height:320px;height:min(70vh,640px);overflow:hidden;display:flex;align-items:center;justify-content:center;touch-action:none}
   .stcanvas svg{width:100%;height:100%;display:block}
   .stcanvas [data-oi]{cursor:move}
-  dialog#ripDlg{max-width:min(560px,calc(100vw - 32px));border:1px solid var(--accent);border-radius:12px;background:#141416;color:var(--ink);padding:0}
-  dialog#ripDlg::backdrop{background:rgba(0,0,0,.6)}
-  .dlg{padding:18px 18px 16px;display:flex;flex-direction:column;gap:10px}
-  .dlg h3{margin:0;font:500 20px "League Spartan",arial,sans-serif;text-transform:uppercase}
-  .dlg ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:14px}
-  .pathbox{display:flex;gap:8px;align-items:center;background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:8px;padding:8px}
-  .pathbox code{flex:1;min-width:0;overflow-wrap:anywhere;font-size:12.5px;color:var(--accent)}
-  .dlgbtns{display:flex;flex-wrap:wrap;gap:8px}
 </style>
 </head>
 <body>
@@ -270,7 +262,7 @@
     <div class="sthead">
       <div>
         <h2 id="stTitle">Print &amp; Cut studio</h2>
-        <p class="sub">Add cut lines, perforations, white and gloss layers, text and shapes, then lay out copies and send a print-ready PDF to your RIP.</p>
+        <p class="sub">Add cut lines, perforations, white and gloss layers, text and shapes, then lay out copies and download a print-ready PDF for your RIP.</p>
       </div>
       <label class="brand">Printer / RIP
         <select id="stBrand">
@@ -362,13 +354,12 @@
         </details>
 
         <div class="sendbox" id="stSendRip">
-          <div class="sendlbl">Send to RIP</div>
+          <div class="sendlbl">Print-ready PDF</div>
           <div class="sendbtns">
-            <button type="button" class="btn primary" data-rip="roland">Send to VersaWorks</button>
-            <button type="button" class="btn primary" data-rip="mimaki">Send to RasterLink</button>
-            <button type="button" class="btn primary" data-rip="mutoh">Send to VerteLith</button>
+            <button type="button" class="btn primary" data-rip="roland">PDF for VersaWorks</button>
+            <button type="button" class="btn primary" data-rip="mimaki">PDF for RasterLink</button>
+            <button type="button" class="btn primary" data-rip="mutoh">PDF for VerteLith</button>
           </div>
-          <button type="button" class="btn" id="stPdf">Download PDF</button>
         </div>
         <div class="sendbox" id="stSendGtx" hidden>
           <div class="sendlbl">Brother GTX output</div>
@@ -391,19 +382,6 @@
     </div>
   </section>
 
-  <dialog id="ripDlg" aria-labelledby="ripTitle">
-    <form method="dialog" class="dlg">
-      <h3 id="ripTitle">Send to RIP</h3>
-      <ol id="ripSteps"></ol>
-      <div class="pathbox"><code id="ripPath"></code><button type="button" class="mini" id="ripCopy">Copy path</button></div>
-      <p class="hint" id="ripNote"></p>
-      <div class="dlgbtns">
-        <button type="button" class="btn primary" id="ripSave">Save PDF…</button>
-        <button type="button" class="btn" id="ripDl">Download instead</button>
-        <button class="btn" value="close">Close</button>
-      </div>
-    </form>
-  </dialog>
 </div>
 <div class="toast" id="toast"></div>
 
@@ -1257,10 +1235,10 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
   var ROLE_LABEL = { cut:"Cut line", perf:"Perforated cut", white:"White ink", gloss:"Gloss", primer:"Primer", silver:"Metallic silver" };
   var BRANDS = {
     roland:  { name:"Roland VersaWorks", rip:"VersaWorks",
-               spots:{ cut:"CutContour", perf:"PerfCutContour", white:"RDG_WHITE", gloss:"RDG_GLOSS", primer:"RDG_PRIMER", silver:"RDG_MetallicSilver" },
+               spots:{ cut:"CutContour", perf:"PerfCutContour", white:"RDG_WHITE", gloss:"RDG_Gloss", primer:"RDG_PRIMER", silver:"RDG_MetallicSilver" },
                glossLabel:"Gloss" },
     mimaki:  { name:"Mimaki RasterLink", rip:"RasterLink",
-               spots:{ cut:"CutContour", perf:"CutContourPerf", white:"RDG_WHITE", gloss:"RDG_GLOSS", primer:"RDG_PRIMER" },
+               spots:{ cut:"CutContour", perf:"CutContourPerf", white:"RDG_WHITE", gloss:"RDG_Gloss", primer:"RDG_PRIMER" },
                glossLabel:"Clear / gloss" },
     mutoh:   { name:"Mutoh VerteLith", rip:"VerteLith",
                spots:{ cut:"CutContour", perf:"PerfCutContour", white:"Spot_White", gloss:"Spot_Varnish" },
@@ -1940,50 +1918,10 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
     catch(e){ console.error(e); stStatus(e.message==="nofit"?"The design doesn't fit the media. Make it smaller or pick wider media.":"Couldn't build the PDF.","err"); return null; }
   }
   function fileName(brand){ return (S.name||"design")+"-"+BRANDS[brand].rip.replace(/\s+/g,"")+".pdf"; }
-  $("stPdf").addEventListener("click", async function(){ var r=await makePdf(S.brand); if(r) saveBlob(r.blob, fileName(S.brand)); });
 
-  var RIPINFO={
-    roland:{ title:"Send to VersaWorks", path:"C:\\ProgramData\\Roland DG VersaWorks\\VersaWorks\\Printers\\<your printer>\\<queue hot folder>",
-      steps:["Click <b>Save PDF…</b> below.","In the save window, go to the VersaWorks hot folder for the printer and queue you want (path below). From another PC, open the hot folder VersaWorks shares on the network.","VersaWorks picks the file up and prints with that queue's settings. Cut lines use <b>CutContour</b> / <b>PerfCutContour</b>; white uses <b>RDG_WHITE</b>."],
-      note:"VersaWorks creates one hot folder per queue. Your folder names depend on how VersaWorks was set up. Ask us if you can't find it." },
-    mimaki:{ title:"Send to RasterLink", path:"\\\\<RasterLink PC>\\<hot folder for your printer>   (on the RasterLink PC: under C:\\Mijctrl)",
-      steps:["Click <b>Save PDF…</b> below.","Save it into the hot folder RasterLink created for your printer (path below). RasterLink shares it on the network so other PCs can reach it.","RasterLink imports the job. Cut lines are spot colours starting with <b>CutContour</b>; set the perforation condition for <b>"+esc(BRANDS.mimaki.spots.perf)+"</b> in RasterLink's cut settings once."],
-      note:"RasterLink7 makes a hot folder for each printer you register. Folder names depend on your setup. Ask us if you can't find it." },
-    mutoh:{ title:"Send to VerteLith", path:"C:\\Users\\Public\\VerteLith\\HotFolders\\<your printer>\\<hot folder name>",
-      steps:["Click <b>Save PDF…</b> below.","Save it into the VerteLith hot folder for your printer and setting (path below). From another PC, use the hot folder shared from the VerteLith PC.","VerteLith picks the file up and applies that hot folder's settings. White and varnish use <b>Spot_White</b> and <b>Spot_Varnish</b>."],
-      note:"VerteLith hot folders are created per printer and per setting. Your folder names depend on your setup. Ask us if you can't find it." }
-  };
-  var dlgBrand="roland";
   [].forEach.call(document.querySelectorAll("[data-rip]"),function(btn){
-    btn.addEventListener("click",function(){
-      dlgBrand=btn.dataset.rip; var I=RIPINFO[dlgBrand];
-      $("ripTitle").textContent=I.title;
-      $("ripSteps").innerHTML=I.steps.map(function(s){ return "<li>"+s.replace(/(CutContour|PerfCutContour|RDG_WHITE|Spot_White|Spot_Varnish)/g,function(m){ return esc(spotName(dlgBrand, {CutContour:"cut",PerfCutContour:"perf",RDG_WHITE:"white",Spot_White:"white",Spot_Varnish:"gloss"}[m])||m); })+"</li>"; }).join("");
-      $("ripPath").textContent=I.path;
-      $("ripNote").textContent=I.note+(dlgBrand!==S.brand?" This PDF uses "+BRANDS[dlgBrand].name+" spot colour names.":"");
-      var d=$("ripDlg"); if(d.showModal) d.showModal(); else d.setAttribute("open","");
-    });
+    btn.addEventListener("click", async function(){ var br=btn.dataset.rip, r=await makePdf(br); if(r) saveBlob(r.blob, fileName(br)); });
   });
-  $("ripCopy").addEventListener("click",function(){
-    var t=$("ripPath").textContent;
-    if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(function(){ toast("Path copied"); },function(){ selectPath(); });
-    else selectPath();
-    function selectPath(){ var r=document.createRange(); r.selectNodeContents($("ripPath")); var s=getSelection(); s.removeAllRanges(); s.addRange(r); }
-  });
-  $("ripSave").addEventListener("click", async function(){
-    var r=await makePdf(dlgBrand); if(!r) return;
-    if(window.showSaveFilePicker){
-      try{
-        var h=await window.showSaveFilePicker({ id:"rip-"+dlgBrand, suggestedName:fileName(dlgBrand), types:[{description:"PDF",accept:{"application/pdf":[".pdf"]}}] });
-        var w=await h.createWritable(); await w.write(r.blob); await w.close();
-        $("ripDlg").close(); toast("Saved to "+h.name); stStatus("Saved "+h.name+". The save window remembers this folder next time.","ok");
-        return;
-      }catch(e){ if(e && e.name==="AbortError") return; console.warn(e); }
-    }
-    saveBlob(r.blob, fileName(dlgBrand)); $("ripDlg").close();
-    stStatus("Your browser saves to Downloads. Move the PDF into the hot folder shown.","ok");
-  });
-  $("ripDl").addEventListener("click", async function(){ var r=await makePdf(dlgBrand); if(r){ saveBlob(r.blob, fileName(dlgBrand)); $("ripDlg").close(); } });
 
   // ---- controls
   var ct=null; function scheduleContour(){ clearTimeout(ct); ct=setTimeout(buildContour, 300); }
