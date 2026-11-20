@@ -2084,7 +2084,8 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
     var tw=best.G.tw, th=best.G.th, cols=best.G.cols, left=best.count;
     for(var pg=0; pg<best.pages; pg++){
       var P={w:spec.w, h:best.H, items:[]}, perP=spec.roll?left:Math.min(left,best.perPage);
-      for(var k=0;k<perP;k++){ var c=k%cols, r=Math.floor(k/cols); P.items.push({x:m+c*(tw+g), y:m+r*(th+g), rot:best.r}); }
+      // first copy at the bottom right, then right to left along the row; each new row starts again at the far right, one row up
+      for(var k=0;k<perP;k++){ var c=k%cols, r=Math.floor(k/cols); P.items.push({x:m+(cols-1-c)*(tw+g), y:P.h-m-th-r*(th+g), rot:best.r}); }
       if(whole && P.items.length){ var ex=P.items.reduce(function(a,it){ return {x0:Math.min(a.x0,it.x), y0:Math.min(a.y0,it.y), x1:Math.max(a.x1,it.x+tw), y1:Math.max(a.y1,it.y+th)}; },{x0:1e9,y0:1e9,x1:-1e9,y1:-1e9});
         P.marks=marksFor({x:ex.x0, y:ex.y0, w:ex.x1-ex.x0, h:ex.y1-ex.y0}, mc); }
       left-=perP; L.pages.push(P);
