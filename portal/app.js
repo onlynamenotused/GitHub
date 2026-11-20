@@ -6,7 +6,7 @@ const sb = createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, {
 });
 
 const $ = (s) => document.querySelector(s);
-const views = ["loading", "login", "view-machines", "view-machine", "view-add", "view-kb", "view-contact", "view-customers", "view-book"];
+const views = ["loading", "login", "view-machines", "view-machine", "view-add", "view-reports", "view-kb", "view-contact", "view-customers", "view-book"];
 const state = { user: null, clients: [], machines: [], kb: null, resources: null, kbAccess: false, intranet: false, staff: false, access: null };
 
 // ---------- helpers ----------
@@ -60,7 +60,7 @@ async function signOut() { await sb.auth.signOut(); setAccessCookie(null); histo
 const navHost = () => $("#hd-nav");
 function drawNav(active) {
   window.HDNav?.render(navHost(), state.user
-    ? { signedIn: true, email: state.user.email, staff: state.staff, intranet: state.intranet, kb: state.kbAccess, cat: state.catAccess, active }
+    ? { signedIn: true, email: state.user.email, staff: state.staff, intranet: state.intranet, kb: state.kbAccess || isSupervisor(), cat: state.catAccess, supervisor: isSupervisor() || (state.staff && (state.supervisors || []).length > 0), active }
     : { signedIn: false });
 }
 
@@ -97,9 +97,11 @@ async function loadCore() {
     sb.rpc("is_intranet"),
     sb.from("machine_files").select("id,kind,name,machine_id,param_date,modified,size,fw").order("param_date", { ascending: false }),
     sb.from("fb_invoices").select("*").order("issued", { ascending: false }).limit(60),
-    sb.from("fb_estimates").select("*").order("issued", { ascending: false }).limit(60)
+    sb.from("fb_estimates").select("*").order("issued", { ascending: false }).limit(60),
+    sb.from("supervisors").select("id,name,bill_to")
   ]);
-  const [mf, inv, est] = rest;
+  const [mf, inv, est, sv] = rest;
+  state.supervisors = sv?.data || [];
   if (c.error) throw c.error;
   if (m.error) throw m.error;
   state.clients = c.data; state.machines = m.data;
@@ -152,7 +154,7 @@ function renderMachines() {
   const q = norm($("#machineSearch").value);
   const list = state.machines.filter((m) =>
     !q || [m.brand, m.model, m.serial, m.site, m.location, m.sub_category].some((v) => norm(v).includes(q)));
-  $("#clientTitle").textContent = state.staff ? "Customer Assets" : state.clients.length === 1 ? state.clients[0].name : "My machines";
+  $("#clientTitle").textContent = state.staff ? "Customer Assets" : isSupervisor() ? supName() + " fleet" : state.clients.length === 1 ? state.clients[0].name : "My machines";
 
   const counts = { over: 0, soon: 0, ok: 0 };
   for (const m of state.machines) { const s = pmStatus(m).cls; if (s in counts) counts[s]++; }
@@ -178,6 +180,7 @@ function renderMachines() {
     return el("button", { class: "mcard", onclick: () => (location.hash = "#machine/" + encodeURIComponent(m.id)) },
       el("span", { class: "model" }, machineName(m)),
       el("span", { class: "muted small" }, [m.sub_category || m.category, m.serial && "SN " + m.serial].filter(Boolean).join(" · ")),
+      (state.clients.length > 1 || state.staff) ? el("span", { class: "small cust" }, clientName(m.client_id)) : null,
       el("span", { class: "muted small" }, m.location || m.site || ""),
       el("span", { class: "pill " + s.cls }, s.label + (m.pm_next_due ? " · " + fmtDate(m.pm_next_due) : "")),
       m.added_via === "portal" && m.desk_seen === false ? el("span", { class: "muted small" }, "Added by you · we'll check the details") : null,
@@ -340,6 +343,7 @@ async function renderKb() {
 async function renderCustomers() {
   const body = $("#custRows");
   if (!state.staff) { body.replaceChildren(); return; }
+  if (!renderCustomers.sup) { renderCustomers.sup = true; renderSupervisorsAdmin($("#supAdmin")); }
   if (!state.access) {
     body.replaceChildren(el("tr", {}, el("td", { colspan: "5", class: "muted" }, "Loading…")));
     const { data, error } = await sb.from("portal_access").select("client_id,email");
@@ -392,7 +396,8 @@ const MFIELDS = [
   ["category", "Category", "text"], ["sub_category", "Sub-category", "text"], ["site", "Site", "text"],
   ["location", "Location / address", "text"], ["status", "Status", "status"],
   ["pm_interval_months", "Service every (months)", "number"], ["pm_last_done", "Last service", "date"],
-  ["pm_next_due", "Next service due", "date"], ["install_date", "Install date", "date"], ["warranty_end", "Warranty ends", "date"]
+  ["pm_next_due", "Next service due", "date"], ["install_date", "Install date", "date"], ["warranty_end", "Warranty ends", "date"],
+  ["supervisor_id", "Vendor supervisor", "supervisor"]
 ];
 const localIso = (d = new Date()) => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 function addMonths(iso, n) {
@@ -460,6 +465,7 @@ async function renderManage(c, cell) {
     const grid = el("div", { class: "fgrid" }, ...MFIELDS.map(([k, label, type]) => {
       let input;
       if (type === "status") input = el("select", { class: "field" }, el("option", { value: "active" }, "Active"), el("option", { value: "inactive" }, "Inactive"));
+      else if (type === "supervisor") input = el("select", { class: "field" }, el("option", { value: "" }, "None"), ...(state.supervisors || []).map((x) => el("option", { value: x.id }, x.name)));
       else input = el("input", { class: "field", type, min: type === "number" ? "1" : null, max: type === "number" ? "60" : null, list: k === "brand" ? "brandList" : null });
       input.value = m?.[k] ?? (k === "status" ? "active" : "");
       if (k === "model" || k === "brand") input.required = true;
@@ -471,7 +477,7 @@ async function renderManage(c, cell) {
     const f = el("form", { onsubmit: async (e) => {
       e.preventDefault();
       const row = { client_id: c.id };
-      for (const [k, , type] of MFIELDS) { const v = ins[k].value.trim(); row[k] = v === "" ? null : type === "number" ? Number(v) : v; }
+      for (const [k, , type] of MFIELDS) { const v = ins[k].value.trim(); row[k] = v === "" ? null : type === "number" || type === "supervisor" ? Number(v) : v; }
       if (!row.pm_next_due && row.pm_last_done && row.pm_interval_months) row.pm_next_due = addMonths(row.pm_last_done, row.pm_interval_months);
       save.disabled = true;
       const { error } = m ? await sb.from("machines").update(row).eq("id", m.id) : await sb.from("machines").insert(row);
@@ -797,7 +803,7 @@ function renderAddMachine() {
     e.preventDefault();
     const row = { brand: f.brand.value.trim(), model: f.model.value.trim(), serial: f.serial.value.trim(), category: f.category.value,
       site: f.site.value.trim(), location: f.location.value.trim(), install_date: f.install_date.value || null, ink_set: f.ink_set.value.trim(), ...sched.get() };
-    if (acct) row.client_id = acct.value;
+    row.client_id = acct ? acct.value : state.clients[0]?.id;
     if (!row.model) { st.className = "msg err"; st.textContent = "Add the model (scan the plate or type it in)."; f.model.focus(); return; }
     let j = null;
     if (jobOn.checked) { const err = job.check(); if (err) { st.className = "msg err"; st.textContent = err; return; } j = job.get(); }
@@ -879,16 +885,256 @@ async function machineExtras(m, host) {
   loadJobs();
 }
 
+// ---------- vendor supervisors (e.g. Avery Dennison): fleet view and fleet reports ----------
+const isSupervisor = () => !state.staff && (state.supervisors || []).length > 0;
+const supName = () => (state.supervisors || []).map((s) => s.name).join(", ");
+const money = (n) => "$" + (Number(n) || 0).toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const KIND_NAMES = { service: "Service visit", install: "Installation", parts: "Parts order", fault: "Fault or repair", other: "Other" };
+const rep = { data: null, loading: null, f: { from: "", to: "", client: "", machine: "", q: "", tab: "jobs" } };
+
+async function loadReportData(force) {
+  if (rep.data && !force) return rep.data;
+  if (rep.loading) return rep.loading;
+  rep.loading = (async () => {
+    const [sr, tj, pj] = await Promise.all([
+      sb.from("service_records").select("id,client_id,machine_id,number,issued,status,kind,po,notes,total_ex,total_inc,lines").order("issued", { ascending: false }),
+      sb.rpc("supervisor_jobs"),
+      sb.from("portal_jobs").select("id,client_id,machine_id,kind,description,error_code,status,ticket_num,created_at").order("created_at", { ascending: false })
+    ]);
+    if (sr.error) throw sr.error;
+    const jobs = [];
+    // Invoiced history (FreshBooks)
+    for (const r of sr.data || []) {
+      const lines = (r.lines || []).filter((l) => !/^(reports?|delivery)$/i.test(l.code || "") || Number(l.amount));
+      const labour = lines.find((l) => /labou?r|day rate|hourly/i.test(l.code || ""));
+      jobs.push({ key: "inv-" + r.id, ref: "Invoice " + r.number, date: r.issued, client_id: r.client_id, machine_id: r.machine_id, kind: r.kind,
+        title: r.po || (labour ? String(labour.desc || "").split("\n")[0] : "") || KIND_NAMES[r.kind], notes: r.notes || "",
+        detail: labour ? labour.desc : "", lines, amount: Number(r.total_ex) || 0, status: r.status, src: "invoice" });
+    }
+    // Open and recent service desk jobs (not yet on an invoice)
+    const invoiced = new Set((sr.data || []).map((r) => String(r.number).replace(/^0+/, "")));
+    for (const t of tj.data || []) {
+      const lines = (t.lines || []).map((l) => ({ code: l.code, desc: l.desc, qty: Number(l.qty) || 0, unit: Number(l.unit) || 0, amount: (Number(l.qty) || 0) * (Number(l.unit) || 0) }));
+      jobs.push({ key: "t-" + t.num, ref: "Job " + t.num, date: t.created, client_id: t.client_id, machine_id: t.machine_id,
+        kind: t.subtype === "installation" ? "install" : t.subtype === "pm" ? "service" : t.type === "incident" ? "fault" : "other",
+        title: t.summary || "", notes: [t.description, t.error_code && "Error " + t.error_code].filter(Boolean).join(" · "), detail: t.notes || "",
+        lines, amount: lines.reduce((s, l) => s + l.amount, 0), status: t.status, src: "ticket", error: t.error_code || "" });
+    }
+    for (const j of pj.data || []) if (j.status === "pending")
+      jobs.push({ key: "p-" + j.id, ref: "Logged in portal", date: String(j.created_at).slice(0, 10), client_id: j.client_id, machine_id: j.machine_id,
+        kind: j.kind, title: String(j.description || "").split("\n")[0], notes: j.description || "", detail: "", lines: [], amount: 0, status: "waiting", src: "portal", error: j.error_code || "" });
+    jobs.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+    rep.data = { jobs, invoicedCount: invoiced.size };
+    return rep.data;
+  })();
+  try { return await rep.loading; } finally { rep.loading = null; }
+}
+
+const cName = (id) => state.clients.find((c) => c.id === id)?.name || "Not matched to a customer";
+const mOf = (id) => state.machines.find((m) => m.id === id);
+const mLabel = (id) => { const m = mOf(id); return m ? machineName(m) + (m.serial ? " · SN " + m.serial : "") : ""; };
+function repFiltered() {
+  const f = rep.f, q = norm(f.q);
+  return rep.data.jobs.filter((j) => (!f.from || j.date >= f.from) && (!f.to || j.date <= f.to) &&
+    (!f.client || String(j.client_id) === f.client) && (!f.machine || j.machine_id === f.machine) &&
+    (!q || norm([j.ref, j.title, j.notes, j.detail, cName(j.client_id), mLabel(j.machine_id), ...j.lines.map((l) => l.code + " " + l.desc)].join(" ")).includes(q)));
+}
+function csvDownload(name, rows) {
+  const csv = rows.map((r) => r.map((c) => { c = String(c ?? ""); return /[",\n]/.test(c) ? '"' + c.replace(/"/g, '""') + '"' : c; }).join(",")).join("\n");
+  const url = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv" }));
+  const a = el("a", { href: url, download: name }); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+const isPart = (l) => /\d/.test(l.code || "") && !/\s{1,}/.test(String(l.code || "").trim()) && !/labou?r|callout|delivery|report|flight|hotel|accommodation|car hire|day rate|shipping/i.test(l.code || "");
+const monthKey = (d) => String(d || "").slice(0, 7);
+const monthLbl = (k) => { const [y, m] = k.split("-"); return new Date(+y, +m - 1, 1).toLocaleDateString("en-AU", { month: "short", year: "2-digit" }); };
+
+async function renderReports() {
+  const v = $("#view-reports");
+  if (!isSupervisor() && !state.staff) { v.replaceChildren(el("div", { class: "card empty" }, "Fleet reports are for vendor supervisor logins.")); return; }
+  v.replaceChildren(el("div", { class: "head" }, el("h1", {}, "Fleet reports")), el("div", { class: "card center" }, el("span", { class: "spin" }), " Loading service history…"));
+  try { await loadReportData(); } catch (e) { v.replaceChildren(el("div", { class: "card msg err" }, "Couldn't load the reports: " + (e.message || e))); return; }
+  drawReports();
+}
+function drawReports() {
+  const v = $("#view-reports"), f = rep.f;
+  const jobs = repFiltered();
+  const clientsUsed = [...new Set(rep.data.jobs.map((j) => j.client_id).concat(state.machines.map((m) => m.client_id)))].filter(Boolean)
+    .map((id) => [String(id), cName(id)]).sort((a, b) => a[1].localeCompare(b[1]));
+  const machinesUsed = state.machines.filter((m) => !f.client || String(m.client_id) === f.client);
+  const ctl = (node, k, ev = "change") => { node.addEventListener(ev, () => { f[k] = node.value; if (k === "client") f.machine = ""; drawReports(); if (ev === "input") { const n = $("#rq"); n.focus(); n.setSelectionRange(n.value.length, n.value.length); } }); return node; };
+  const preset = (label, months) => el("button", { class: "btn small ghost", type: "button", onclick: () => { if (!months) { f.from = ""; f.to = ""; } else { const d = new Date(); d.setMonth(d.getMonth() - months); f.from = localIso(d); f.to = ""; } drawReports(); } }, label);
+  const filters = el("div", { class: "card rfilters" },
+    el("label", { class: "f" }, el("span", {}, "Customer"), ctl(el("select", { class: "field" }, el("option", { value: "" }, "All customers"), ...clientsUsed.map(([id, n]) => el("option", { value: id, selected: f.client === id }, n))), "client")),
+    el("label", { class: "f" }, el("span", {}, "Machine"), ctl(el("select", { class: "field" }, el("option", { value: "" }, "All machines"), ...machinesUsed.map((m) => el("option", { value: m.id, selected: f.machine === m.id }, machineName(m) + (m.serial ? " · " + m.serial : "") + (f.client ? "" : " · " + cName(m.client_id))))), "machine")),
+    el("label", { class: "f" }, el("span", {}, "From"), ctl(el("input", { class: "field", type: "date", value: f.from }), "from")),
+    el("label", { class: "f" }, el("span", {}, "To"), ctl(el("input", { class: "field", type: "date", value: f.to }), "to")),
+    el("label", { class: "f grow" }, el("span", {}, "Search"), ctl(el("input", { class: "field", id: "rq", type: "search", value: f.q, placeholder: "Part number, fault, customer…" }), "q", "input")),
+    el("div", { class: "presets" }, preset("Last 3 months", 3), preset("Last 12 months", 12), preset("All time", 0)));
+
+  const spend = jobs.reduce((s, j) => s + j.amount, 0);
+  const cnt = (k) => jobs.filter((j) => j.kind === k).length;
+  const fleet = state.machines.filter((m) => (!f.client || String(m.client_id) === f.client) && (!f.machine || m.id === f.machine));
+  const overdue = fleet.filter((m) => pmStatus(m).cls === "over").length;
+  const kpis = el("div", { class: "stats" },
+    ...[[jobs.length, "Jobs"], [cnt("service") + cnt("fault"), "Service visits & repairs"], [cnt("install"), "Installations"], [cnt("parts"), "Parts orders"],
+        [money(spend), "Billed ex GST"], [fleet.length, "Machines"], [overdue, "PM overdue"]]
+      .map(([n, l]) => el("div", { class: "stat" }, el("div", { class: "n" }, n), el("div", { class: "l" }, l))));
+
+  const tabs = [["jobs", "Job details"], ["parts", "Parts used"], ["trends", "Trends"], ["machines", "Machine stats"]];
+  const tabBar = el("div", { class: "rtabs", role: "tablist" }, ...tabs.map(([k, l]) => el("button", { type: "button", role: "tab", class: "chipbtn", "aria-selected": String(f.tab === k), onclick: () => { f.tab = k; drawReports(); } }, l)));
+  const body = f.tab === "parts" ? partsReport(jobs) : f.tab === "trends" ? trendsReport(jobs) : f.tab === "machines" ? machineReport(jobs, fleet) : jobsReport(jobs);
+  v.replaceChildren(
+    el("div", { class: "head" }, el("h1", {}, "Fleet reports"), el("span", { class: "muted small" }, supName() || "All supervised fleets")),
+    el("p", { class: "muted small" }, "Service history for the customers whose support is contracted to Highway Digital through " + (supName() || "a vendor") + ": invoiced jobs from our accounts, plus open jobs from the service desk. Amounts are ex GST."),
+    filters, kpis, tabBar, body);
+}
+function jobsReport(jobs) {
+  const rows = jobs.map((j) => {
+    const det = el("tr", { class: "rdet", hidden: true }, el("td", { colspan: 7 },
+      j.notes ? el("p", {}, j.notes) : null, j.detail ? el("pre", { class: "rpre" }, j.detail) : null,
+      j.lines.length ? el("table", { class: "tbl sub" }, el("thead", {}, el("tr", {}, el("th", {}, "Item"), el("th", {}, "Description"), el("th", { class: "num" }, "Qty"), el("th", { class: "num" }, "Amount"))),
+        el("tbody", {}, ...j.lines.map((l) => el("tr", {}, el("td", { class: "mono" }, l.code), el("td", {}, String(l.desc || "").split("\n")[0]), el("td", { class: "num" }, l.qty), el("td", { class: "num" }, l.amount ? money(l.amount) : ""))))) : null));
+    const tr = el("tr", { class: "rrow", tabindex: 0, onclick: () => { det.hidden = !det.hidden; } },
+      el("td", { "data-l": "Date" }, fmtDate(j.date)), el("td", { "data-l": "Ref" }, j.ref), el("td", { "data-l": "Customer" }, cName(j.client_id)),
+      el("td", { "data-l": "Machine" }, mLabel(j.machine_id) || "—"), el("td", { "data-l": "Type" }, KIND_NAMES[j.kind] || j.kind),
+      el("td", { "data-l": "Job" }, j.title), el("td", { class: "num", "data-l": "Amount" }, j.amount ? money(j.amount) : ""));
+    return [tr, det];
+  }).flat();
+  return el("div", { class: "card" },
+    el("div", { class: "bhead" }, el("h2", {}, "Job details (" + jobs.length + ")"),
+      el("button", { class: "btn small", type: "button", onclick: () => csvDownload("Fleet job details.csv", [["Date", "Ref", "Customer", "Machine", "Type", "Job", "Notes", "Parts", "Amount ex GST"],
+        ...jobs.map((j) => [j.date, j.ref, cName(j.client_id), mLabel(j.machine_id), KIND_NAMES[j.kind] || j.kind, j.title, j.notes, j.lines.filter(isPart).map((l) => l.qty + "x " + l.code).join("; "), j.amount.toFixed(2)])]) }, "Download CSV")),
+    jobs.length ? el("div", { class: "tscroll" }, el("table", { class: "tbl rtbl" }, el("thead", {}, el("tr", {}, ...["Date", "Ref", "Customer", "Machine", "Type", "Job", "Amount"].map((h) => el("th", { class: h === "Amount" ? "num" : null }, h)))), el("tbody", {}, ...rows)))
+      : el("p", { class: "muted small" }, "No jobs match these filters."),
+    el("p", { class: "muted small" }, "Click a job to see the work notes and every line on it."));
+}
+function partsReport(jobs) {
+  const by = new Map();
+  for (const j of jobs) for (const l of j.lines) {
+    if (!isPart(l)) continue;
+    const k = String(l.code).trim().toUpperCase();
+    const p = by.get(k) || { code: l.code, desc: String(l.desc || "").split("\n")[0], qty: 0, orders: 0, spend: 0, customers: new Set(), machines: new Set(), last: "" };
+    p.qty += Number(l.qty) || 0; p.orders++; p.spend += Number(l.amount) || 0; p.customers.add(cName(j.client_id)); if (j.machine_id) p.machines.add(mLabel(j.machine_id));
+    if (j.date > p.last) p.last = j.date; by.set(k, p);
+  }
+  const list = [...by.values()].sort((a, b) => b.spend - a.spend || b.qty - a.qty);
+  return el("div", { class: "card" },
+    el("div", { class: "bhead" }, el("h2", {}, "Parts used (" + list.length + " part numbers)"),
+      el("button", { class: "btn small", type: "button", onclick: () => csvDownload("Fleet parts used.csv", [["Part", "Description", "Qty", "Times supplied", "Spend ex GST", "Last supplied", "Customers", "Machines"],
+        ...list.map((p) => [p.code, p.desc, p.qty, p.orders, p.spend.toFixed(2), p.last, [...p.customers].join("; "), [...p.machines].join("; ")])]) }, "Download CSV")),
+    list.length ? el("div", { class: "tscroll" }, el("table", { class: "tbl rtbl" },
+      el("thead", {}, el("tr", {}, ...["Part", "Description", "Qty", "Times", "Spend", "Last supplied", "Customers"].map((h) => el("th", { class: ["Qty", "Times", "Spend"].includes(h) ? "num" : null }, h)))),
+      el("tbody", {}, ...list.map((p) => el("tr", {}, el("td", { class: "mono", "data-l": "Part" }, p.code), el("td", { "data-l": "Description" }, p.desc), el("td", { class: "num", "data-l": "Qty" }, p.qty),
+        el("td", { class: "num", "data-l": "Times" }, p.orders), el("td", { class: "num", "data-l": "Spend" }, money(p.spend)), el("td", { "data-l": "Last" }, fmtDate(p.last)), el("td", { "data-l": "Customers" }, [...p.customers].join(", ")))))))
+      : el("p", { class: "muted small" }, "No parts in this period."));
+}
+function bars(series, fmt) {
+  const max = Math.max(1, ...series.map((s) => s[1]));
+  return el("div", { class: "rbars" }, ...series.map(([k, n]) => el("div", { class: "rbar", title: monthLbl(k) + ": " + fmt(n) },
+    el("span", { class: "rv" }, n ? fmt(n) : ""), el("span", { class: "rb", style: "height:" + Math.round((n / max) * 100) + "%" }), el("span", { class: "rk" }, monthLbl(k)))));
+}
+function trendsReport(jobs) {
+  const months = []; const dated = jobs.filter((j) => j.date);
+  if (!dated.length) return el("div", { class: "card" }, el("p", { class: "muted small" }, "No jobs in this period."));
+  const first = rep.f.from ? monthKey(rep.f.from) : monthKey(dated[dated.length - 1].date), last = rep.f.to ? monthKey(rep.f.to) : monthKey(localIso());
+  let [y, m] = first.split("-").map(Number); const [ly, lm] = last.split("-").map(Number);
+  while (y < ly || (y === ly && m <= lm)) { months.push(y + "-" + String(m).padStart(2, "0")); m++; if (m > 12) { m = 1; y++; } if (months.length > 60) break; }
+  const per = (fn) => months.map((k) => [k, dated.filter((j) => monthKey(j.date) === k).reduce((s, j) => s + fn(j), 0)]);
+  const visits = per((j) => (j.kind === "service" || j.kind === "fault" ? 1 : 0));
+  const spend = per((j) => j.amount);
+  const byCust = new Map(); for (const j of jobs) { const c = cName(j.client_id); const x = byCust.get(c) || { n: 0, s: 0 }; x.n++; x.s += j.amount; byCust.set(c, x); }
+  // Most frequent issues: error codes and repeated words in job titles
+  const codes = new Map(); for (const j of jobs) for (const c of String([j.error, j.title, j.notes].join(" ")).match(/\b(?:[A-Z]{1,2}\d{2,4}|\d{3,4}[A-Z]?)\b/g) || []) if (!/^(20\d\d|19\d\d)$/.test(c)) codes.set(c, (codes.get(c) || 0) + 1);
+  const topCodes = [...codes.entries()].filter(([, n]) => n > 1).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  const half = Math.floor(months.length / 2), a = visits.slice(0, half).reduce((s, x) => s + x[1], 0), b = visits.slice(half).reduce((s, x) => s + x[1], 0);
+  return el("div", { class: "stack" },
+    el("div", { class: "card" }, el("h2", {}, "Service visits and repairs per month"),
+      months.length > 1 ? el("p", { class: "muted small" }, b > a ? `Up: ${b} in the second half of this period against ${a} in the first.` : b < a ? `Down: ${b} in the second half of this period against ${a} in the first.` : "Steady across this period.") : null,
+      bars(visits, (n) => String(n))),
+    el("div", { class: "card" }, el("h2", {}, "Billed per month (ex GST)"), bars(spend, (n) => "$" + Math.round(n).toLocaleString("en-AU"))),
+    el("div", { class: "card" }, el("h2", {}, "By customer"),
+      el("table", { class: "tbl rtbl" }, el("thead", {}, el("tr", {}, el("th", {}, "Customer"), el("th", { class: "num" }, "Jobs"), el("th", { class: "num" }, "Billed ex GST"))),
+        el("tbody", {}, ...[...byCust.entries()].sort((a, b) => b[1].s - a[1].s).map(([c, x]) => el("tr", {}, el("td", {}, c), el("td", { class: "num" }, x.n), el("td", { class: "num" }, money(x.s))))))),
+    topCodes.length ? el("div", { class: "card" }, el("h2", {}, "Recurring error codes"), el("ul", { class: "links" }, ...topCodes.map(([c, n]) => el("li", {}, el("span", { class: "kind" }, n + "×"), c)))) : null);
+}
+function machineReport(jobs, fleet) {
+  const files = state.files || [];
+  const rows = fleet.map((m) => {
+    const js = jobs.filter((j) => j.machine_id === m.id).sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    const visits = js.filter((j) => j.kind === "service" || j.kind === "fault");
+    const gaps = []; for (let i = 1; i < visits.length; i++) gaps.push((new Date(visits[i].date) - new Date(visits[i - 1].date)) / 86400000);
+    const fs = files.filter((x) => x.machine_id === m.id), fw = fs.find((x) => x.fw)?.fw || "";
+    const lastLog = fs.filter((x) => x.kind === "log").map((x) => x.param_date || x.modified).sort().pop() || "";
+    return { m, n: js.length, visits: visits.length, parts: js.reduce((s, j) => s + j.lines.filter(isPart).reduce((t, l) => t + (Number(l.qty) || 0), 0), 0),
+      spend: js.reduce((s, j) => s + j.amount, 0), last: js.length ? js[js.length - 1].date : m.last_visit || "", gap: gaps.length ? Math.round(gaps.reduce((s, g) => s + g, 0) / gaps.length) : null,
+      fw, files: fs.length, lastLog, pm: pmStatus(m) };
+  }).sort((a, b) => b.spend - a.spend);
+  const unmatched = jobs.filter((j) => !j.machine_id).length;
+  return el("div", { class: "card" },
+    el("div", { class: "bhead" }, el("h2", {}, "Machine stats (" + rows.length + ")"),
+      el("button", { class: "btn small", type: "button", onclick: () => csvDownload("Fleet machine stats.csv", [["Customer", "Machine", "Serial", "Installed", "Jobs", "Service visits", "Avg days between visits", "Parts fitted", "Billed ex GST", "Last job", "Next PM due", "PM status", "Firmware", "Parameter/log files", "Latest log"],
+        ...rows.map((r) => [cName(r.m.client_id), machineName(r.m), r.m.serial || "", r.m.install_date || "", r.n, r.visits, r.gap ?? "", r.parts, r.spend.toFixed(2), r.last, r.m.pm_next_due || "", r.pm.label, r.fw, r.files, r.lastLog])]) }, "Download CSV")),
+    el("div", { class: "tscroll" }, el("table", { class: "tbl rtbl" },
+      el("thead", {}, el("tr", {}, ...["Machine", "Customer", "Jobs", "Visits", "Avg gap", "Parts", "Billed", "Last job", "Service", "Firmware / logs"].map((h) => el("th", { class: ["Jobs", "Visits", "Avg gap", "Parts", "Billed"].includes(h) ? "num" : null }, h)))),
+      el("tbody", {}, ...rows.map((r) => el("tr", { class: "rrow", tabindex: 0, onclick: () => (location.hash = "#machine/" + encodeURIComponent(r.m.id)) },
+        el("td", { "data-l": "Machine" }, el("b", {}, machineName(r.m)), el("br"), el("span", { class: "muted small" }, r.m.serial ? "SN " + r.m.serial : "")),
+        el("td", { "data-l": "Customer" }, cName(r.m.client_id)), el("td", { class: "num", "data-l": "Jobs" }, r.n), el("td", { class: "num", "data-l": "Visits" }, r.visits),
+        el("td", { class: "num", "data-l": "Avg gap" }, r.gap == null ? "—" : r.gap + " days"), el("td", { class: "num", "data-l": "Parts" }, r.parts),
+        el("td", { class: "num", "data-l": "Billed" }, money(r.spend)), el("td", { "data-l": "Last job" }, fmtDate(r.last)),
+        el("td", { "data-l": "Service" }, el("span", { class: "pill " + r.pm.cls }, r.pm.label + (r.m.pm_next_due ? " · " + fmtDate(r.m.pm_next_due) : ""))),
+        el("td", { "data-l": "Firmware / logs" }, [r.fw && "FW " + r.fw, r.files ? r.files + " file" + (r.files > 1 ? "s" : "") : "", r.lastLog && "last log " + fmtDate(r.lastLog)].filter(Boolean).join(" · ") || "—")))))),
+    el("p", { class: "muted small" }, "Usage figures (print volumes, ink use, running hours) come from the machine logs we save at each service; machines show their latest firmware and log date here. " +
+      (unmatched ? unmatched + " job" + (unmatched > 1 ? "s" : "") + " in this period couldn't be tied to a specific machine and count only in the customer totals." : "")));
+}
+
+// ---------- staff: manage vendor supervisors ----------
+async function renderSupervisorsAdmin(host) {
+  const [s, a, c] = await Promise.all([
+    sb.from("supervisors").select("*").order("name"), sb.from("supervisor_access").select("*").order("email"), sb.from("supervisor_clients").select("*")]);
+  if (s.error) { host.replaceChildren(el("p", { class: "msg err" }, "Couldn't load vendor supervisors.")); return; }
+  const note = el("span", { class: "saved" });
+  const cards = s.data.map((sup) => {
+    const logins = a.data.filter((x) => x.supervisor_id === sup.id), custs = c.data.filter((x) => x.supervisor_id === sup.id);
+    const em = el("input", { class: "field", type: "email", placeholder: "name@vendor.com" }), fn = el("input", { class: "field", placeholder: "Full name" });
+    const pick = el("select", { class: "field" }, el("option", { value: "" }, "Add a customer…"), ...state.clients.filter((x) => !custs.some((y) => y.client_id === x.id)).map((x) => el("option", { value: x.id }, x.name)));
+    const sync = el("button", { class: "btn small", type: "button", onclick: async () => {
+      sync.disabled = true; sync.textContent = "Reading FreshBooks…";
+      const { data, error } = await sb.rpc("staff_sync_supervisor", { p_sup: sup.id });
+      sync.disabled = false; sync.textContent = "Update service history from FreshBooks";
+      flash(note, error ? "Sync failed: " + error.message : data?.ok ? data.invoices + " invoices read" : "Sync failed: " + (data?.error || ""), !error && data?.ok);
+    } }, "Update service history from FreshBooks");
+    return el("div", { class: "card", style: "margin-top:12px" },
+      el("div", { class: "bhead" }, el("h3", {}, sup.name), el("span", { class: "muted small" }, "Bill to: " + (sup.bill_to || "—") + (sup.last_sync ? " · history updated " + new Date(sup.last_sync).toLocaleString("en-AU") : ""))),
+      el("p", { class: "muted small" }, "Supervisor logins see every machine, job and service record for these customers, can log jobs and add machines for them, and get Fleet reports. Adding a login sends nothing."),
+      el("h3", {}, "Logins"),
+      el("ul", { class: "links" }, ...logins.map((u) => el("li", {}, u.email + (u.full_name ? " (" + u.full_name + ")" : ""), " ",
+        el("button", { class: "btn ghost small", type: "button", onclick: async () => { await sb.from("supervisor_access").delete().eq("supervisor_id", sup.id).eq("email", u.email); renderSupervisorsAdmin(host); } }, "Remove")))),
+      el("form", { class: "inline", onsubmit: async (e) => { e.preventDefault(); if (!em.value.trim()) return;
+        const { error } = await sb.from("supervisor_access").insert({ supervisor_id: sup.id, email: em.value.trim().toLowerCase(), full_name: fn.value.trim() || null });
+        if (error) return flash(note, "Login not added", false); renderSupervisorsAdmin(host); } }, em, fn, el("button", { class: "btn small", type: "submit" }, "Add login")),
+      el("h3", {}, "Customers (" + custs.length + ")"),
+      el("ul", { class: "links" }, ...custs.map((x) => el("li", {}, cName(x.client_id), x.match_terms?.length ? el("span", { class: "muted small" }, "  matched on invoices by: " + x.match_terms.join(", ")) : "", " ",
+        el("button", { class: "btn ghost small", type: "button", onclick: async () => { await sb.from("supervisor_clients").delete().eq("supervisor_id", sup.id).eq("client_id", x.client_id); renderSupervisorsAdmin(host); } }, "Remove")))),
+      el("form", { class: "inline", onsubmit: async (e) => { e.preventDefault(); if (!pick.value) return;
+        const cl = state.clients.find((x) => String(x.id) === pick.value);
+        const { error } = await sb.from("supervisor_clients").insert({ supervisor_id: sup.id, client_id: Number(pick.value), match_terms: [norm(cl?.name || "")] });
+        if (error) return flash(note, "Customer not added", false); renderSupervisorsAdmin(host); } }, pick, el("button", { class: "btn small", type: "submit" }, "Add customer")),
+      el("p", {}, sync, " ", note));
+  });
+  host.replaceChildren(el("h2", { style: "margin-top:24px" }, "Vendor supervisors"), ...cards);
+}
+
 // ---------- routing ----------
 function route() {
   if (!state.user) return;
   const h = location.hash.replace(/^#/, "") || "machines";
   if (h === "signout") { signOut(); return; }
   const top = h.split("/")[0];
-  window.HDNav?.setActive(navHost(), top === "machine" || top === "add-machine" ? "machines" : top === "kb" ? "intranet" : top === "book" ? "contact" : top);
+  window.HDNav?.setActive(navHost(), top === "machine" || top === "add-machine" ? "machines" : top === "reports" ? "reports" : top === "kb" ? "intranet" : top === "book" ? "contact" : top);
   if (h === "book" || h.startsWith("book/")) { show("view-book"); renderBook(decodeURIComponent(h.slice(5))); }
   else if (h.startsWith("machine/")) { show("view-machine"); renderMachine(decodeURIComponent(h.slice(8))); }
   else if (h === "add-machine") { show("view-add"); renderAddMachine(); }
+  else if (h === "reports") { show("view-reports"); renderReports(); }
   else if (h === "kb" && state.intranet) { show("view-kb"); renderKb(); }
   else if (h === "customers" && state.staff) { show("view-customers"); renderCustomers(); }
   else if (h === "contact") { show("view-contact"); renderContact(); }

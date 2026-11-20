@@ -8,12 +8,12 @@
 <meta name="theme-color" content="#000000">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="styles.css?v=22">
-<link rel="stylesheet" href="nav.css?v=22">
+<link rel="stylesheet" href="styles.css?v=23">
+<link rel="stylesheet" href="nav.css?v=23">
 <link rel="icon" href="favicon.ico">
-<script src="config.js?v=22"></script>
-<script src="nav.js?v=22"></script>
-<script type="module" src="app.js?v=22"></script>
+<script src="config.js?v=23"></script>
+<script src="nav.js?v=23"></script>
+<script type="module" src="app.js?v=23"></script>
 </head>
 <body>
 <div id="hd-nav"></div>
@@ -21,17 +21,40 @@
 <main class="wrap" id="app">
   <section id="loading" class="card center"><span class="spin"></span> Loading…</section>
 
-  <section id="login" class="card login" hidden>
+  <section id="login" class="loginwrap" hidden>
+   <div class="card login">
     <h1>Sign in</h1>
     <!-- TEMPORARY: beta notice. Remove this block when the portal leaves beta. -->
     <div class="beta" role="note"><span class="betatag">Beta</span> This Service Desk is currently in development. We encourage you to try it out and tell us what you think at <a href="mailto:hello@highwaydigital.com.au">hello@highwaydigital.com.au</a>.</div>
-    <p class="muted">All existing customers have an account that is linked to your email address. No passwords required. If you would like to add or remove a user please <a href="mailto:hello@highwaydigital.com.au?subject=Service%20Desk%20users">send us an email</a> with the details.</p>
+    <p class="muted">All existing customers have an account that is linked to your email address. No passwords required. If you would like to add or remove a user please <a href="mailto:hello@highwaydigital.com.au?subject=Service%20Desk%20users%3A%20add%20or%20remove&amp;body=Hi%20Highway%20Digital%2C%0A%0APlease%20update%20the%20Service%20Desk%20logins%20for%20our%20account.%0A%0ACompany%20name%3A%0AYour%20name%3A%0AYour%20phone%3A%0A%0AADD%20a%20user%0AFull%20name%3A%0AEmail%20address%20%28this%20is%20their%20login%29%3A%0ARole%20/%20position%3A%0APhone%3A%0AMachines%20or%20sites%20they%20look%20after%20%28or%20%22all%22%29%3A%0A%0AREMOVE%20a%20user%0AFull%20name%3A%0AEmail%20address%3A%0A%0AThanks%2C%0A">send us an email</a> with the details.</p>
     <form id="loginForm">
       <label for="email">Email</label>
       <input id="email" type="email" required autocomplete="email" placeholder="you@yourcompany.com.au">
       <button class="btn primary" type="submit">Email me a sign-in link</button>
     </form>
     <p id="loginMsg" class="msg" role="status"></p>
+   </div>
+   <aside class="card about" aria-labelledby="aboutTitle">
+    <h2 id="aboutTitle">About Highway Digital</h2>
+    <p>Highway Digital is a Perth-based equipment service business. We install, service and repair wide-format printers, print-and-cut machines, laser engravers and embroidery machines, specialising in Mimaki, Mutoh, Brother and Epilog. We also support customers across regional WA and interstate, and provide IT services for homes and small businesses.</p>
+    <h3>What's in the Service Desk</h3>
+    <ul class="feat">
+      <li><b>My machines</b>: every machine on your account, with serial numbers, service history and when the next service is due.</li>
+      <li><b>Add a machine</b>: scan its serial plate with your phone and set its service schedule.</li>
+      <li><b>Book a service or log a job</b>: choose a free time from our calendar, or log a job and we'll call you to arrange it.</li>
+      <li><b>Manuals and downloads</b>: manuals, drivers and firmware links for your models, plus your machine's saved parameter and log files.</li>
+      <li><b>Invoices and estimates</b>: see what's outstanding and pay or accept online.</li>
+      <li><b>Knowledge Base and Parts Catalogue</b>: fixes for common faults, and parts and consumables with pricing.</li>
+      <li><b>Fleet reports</b> for dealers and vendor partners: job details, parts used, trends and machine stats.</li>
+    </ul>
+    <h3>In development</h3>
+    <ul class="feat dev">
+      <li>Service reminders when a machine is due.</li>
+      <li>Photos and job reports from each visit, on the machine's page.</li>
+      <li>Machine health and usage figures from the logs we collect at each service.</li>
+    </ul>
+    <p class="muted small">Questions or ideas? Email <a href="mailto:hello@highwaydigital.com.au">hello@highwaydigital.com.au</a> or call <a href="tel:1300880815">1300 880 815</a>.</p>
+   </aside>
   </section>
 
   <section id="view-machines" hidden>
@@ -48,6 +71,8 @@
   <section id="view-machine" hidden></section>
 
   <section id="view-add" hidden></section>
+
+  <section id="view-reports" hidden></section>
 
   <section id="view-kb" hidden>
     <div class="head">
@@ -75,6 +100,7 @@
         <tbody id="custRows"></tbody>
       </table>
     </div>
+    <div id="supAdmin"></div>
   </section>
 
   <section id="view-book" hidden>

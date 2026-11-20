@@ -198,3 +198,36 @@ table.billing td.act{text-align:right;white-space:nowrap}
 .head .btn{white-space:nowrap}
 .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
 .bookform[hidden]{display:none}
+
+/* fleet reports */
+.rfilters{display:flex;flex-wrap:wrap;gap:10px 12px;align-items:flex-end;margin-bottom:14px}
+.rfilters .f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);min-width:150px}
+.rfilters .grow{flex:1 1 200px}
+.presets{display:flex;gap:6px;flex-wrap:wrap}
+.rtabs{display:flex;gap:6px;flex-wrap:wrap;margin:14px 0}
+.chipbtn{border:1px solid var(--line);background:transparent;color:var(--fg);border-radius:999px;padding:7px 14px;font:inherit;font-size:13px;cursor:pointer}
+.chipbtn[aria-selected=true]{background:var(--fg);color:#000;border-color:var(--fg)}
+.tscroll{overflow-x:auto}
+.rtbl{width:100%;border-collapse:collapse;font-size:13.5px}
+.rtbl th,.rtbl td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+.rtbl .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.rrow{cursor:pointer}.rrow:hover td{background:var(--sunk)}
+.rdet td{background:var(--sunk)}
+.rpre{white-space:pre-wrap;font:12.5px/1.5 ui-monospace,Menlo,monospace;margin:6px 0}
+.rbars{display:flex;align-items:flex-end;gap:4px;height:180px;overflow-x:auto;padding-top:18px}
+.rbar{flex:1 0 34px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:4px;min-width:34px}
+.rbar .rb{display:block;width:70%;background:var(--accent);border-radius:4px 4px 0 0;min-height:2px}
+.rbar .rv{font-size:10.5px;color:var(--muted);white-space:nowrap}
+.rbar .rk{font-size:10.5px;color:var(--muted);white-space:nowrap}
+.mcard .cust{color:var(--accent);font-weight:600}
+@media (max-width:640px){.rtbl thead{display:none}.rtbl tr{display:block;border-bottom:1px solid var(--line);padding:6px 0}.rtbl td{display:flex;justify-content:space-between;gap:12px;border:0;padding:3px 4px}.rtbl td[data-l]::before{content:attr(data-l);color:var(--muted);font-size:12px}.rtbl .num{text-align:right}}
+
+/* sign-in page */
+.loginwrap{display:grid;grid-template-columns:minmax(0,440px) minmax(0,520px);gap:20px;justify-content:center;align-items:start;margin:40px auto}
+.loginwrap .login{margin:0;max-width:none}
+.about h2{margin:0 0 8px}
+.about h3{margin:16px 0 6px;font-size:15px}
+.about p{margin:0 0 8px}
+.feat{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.feat.dev li::marker{color:var(--accent)}
+@media (max-width:900px){.loginwrap{grid-template-columns:minmax(0,1fr);margin:24px auto}}

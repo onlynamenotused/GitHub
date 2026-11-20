@@ -8,6 +8,7 @@
     if (f.intranet) out.push(["intranet", "/#kb", "Intranet Knowledge"]);
     if (f.kb) out.push(["kb", "/kb/", "Knowledge Base"]);
     if (f.cat) out.push(["catalogue", "/catalogue/", "Parts Catalogue"]);
+    if (f.supervisor) out.push(["reports", "/#reports", "Fleet reports"]);
     out.push(["contact", "/#contact", "Contact & booking"]);
     if (f.staff) out.push(["customers", "/#customers", "Customers (staff)"]);
     return out;
