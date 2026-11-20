@@ -235,6 +235,7 @@
       </div>
       <div class="actions">
         <button class="btn primary" id="dl" disabled>Download SVG</button>
+        <button class="btn" id="dlEps" disabled>Download EPS</button>
         <button class="btn" id="copy" disabled>Copy SVG code</button>
       </div>
       <div class="status" id="status"></div>
@@ -402,6 +403,13 @@
             <button type="button" class="btn primary" data-rip="mimaki">PDF for RasterLink</button>
             <button type="button" class="btn primary" data-rip="mutoh">PDF for VerteLith</button>
           </div>
+          <div class="sendlbl">EPS (one copy)</div>
+          <div class="sendbtns">
+            <button type="button" class="btn dim" data-eps="roland">EPS for VersaWorks</button>
+            <button type="button" class="btn dim" data-eps="mimaki">EPS for RasterLink</button>
+            <button type="button" class="btn dim" data-eps="mutoh">EPS for VerteLith</button>
+          </div>
+          <div class="hint">EPS holds one copy of the design with its spot colours, cut lines and crop marks, for Illustrator, CorelDRAW, FlexiSign or the RIP's own layout. Copies and sheet layout are in the PDF.</div>
         </div>
         <div class="sendbox" id="stSendGtx" hidden>
           <div class="sendlbl">Brother GTX output</div>
@@ -1126,7 +1134,7 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
 
   function run(){
     var job=++state.jobId;
-    $("busy").classList.add("show"); $("dl").disabled=true; $("copy").disabled=true;
+    $("busy").classList.add("show"); $("dl").disabled=true; $("dlEps").disabled=true; $("copy").disabled=true;
     status("Tracing…");
     setTimeout(function(){
       try{
@@ -1170,7 +1178,7 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
         st.insertBefore(im, $("busy"));
         var empty=st.querySelector(".empty"); if(empty) empty.remove();
         $("vecInfo").textContent=paths+" shapes · "+(kb>1024?(kb/1024).toFixed(1)+" MB":Math.round(kb)+" KB");
-        $("dl").disabled=!paths; $("copy").disabled=!paths;
+        $("dl").disabled=!paths; $("dlEps").disabled=!paths; $("copy").disabled=!paths;
         var secs=((performance.now()-t0)/1000).toFixed(1);
         if(!paths) status("Nothing left to trace. Try lowering “Remove specks” or turning off background removal.","err");
         else if($("removeBg").checked && !bgColor && !bw) status("Done in "+secs+" s. No solid background found to remove.","ok");
@@ -1256,11 +1264,22 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
     }
     browserDownload(fname);
   });
-  function browserDownload(fname){
+  $("dlEps").addEventListener("click",function(){
+    var api=window.__vcStudioApi, eps=api && api.eps && api.eps();
+    if(!eps){ status("Couldn't make the EPS.","err"); return; }
+    var fname=state.name+".eps";
+    if(dlCap){
+      dlCap.save({filename:fname, data:eps}).then(function(){ toast("Saved "+fname); })
+        .catch(function(e){ if(e && e.code==="declined") return; browserDownload(fname, eps, "application/postscript"); });
+      return;
+    }
+    browserDownload(fname, eps, "application/postscript");
+  });
+  function browserDownload(fname, data, type){
     try{
       // GoDaddy's HTML section runs in a sandboxed frame without download rights; save through the host page when allowed
       var P=window; try{ if(window.parent!==window && window.parent.document.body) P=window.parent; }catch(x){}
-      var blob=new P.Blob([state.svg],{type:"image/svg+xml"}), url=P.URL.createObjectURL(blob), a=P.document.createElement("a");
+      var blob=new P.Blob([data||state.svg],{type:type||"image/svg+xml"}), url=P.URL.createObjectURL(blob), a=P.document.createElement("a");
       a.href=url; a.download=fname; a.style.display="none"; P.document.body.appendChild(a); a.click(); a.remove();
       setTimeout(function(){ P.URL.revokeObjectURL(url); }, 4000);
       toast("Downloading "+fname);
@@ -2042,9 +2061,9 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
     var cs=new Blob([bytes]).stream().pipeThrough(new CompressionStream("deflate"));
     return new Uint8Array(await new Response(cs).arrayBuffer());
   }
-  async function buildPdf(brand){
-    var L=layout(); if(!L.fits || !L.pages.length) throw new Error("nofit");
-    var box=L.box, TW=box.w*MM2PT, TH=box.h*MM2PT;
+  // Content stream for one copy of the design, PDF operators, in points with the top-left of `box` at the origin.
+  async function designContent(brand, box){
+    var TH=box.h*MM2PT;
     var spots={}, spotList=[];
     function spotCS(role, sfx){ var name=(role==="cut"||role==="perf")?cutName(brand,role,sfx):spotName(brand,role); if(!name) return null; if(!spots[name]){ spots[name]="/CS"+spotList.length; spotList.push({role:role,name:name}); } return spots[name]; }
     var c=[], fonts={}, fontList=[];
@@ -2086,7 +2105,12 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
     if(mcP.on && mcP.scope==="each"){ marksFor(contentBox(), mcP).forEach(function(mm){ c.push("q 0 0 0 1 k "+opsToPdf(mm.ops)+"\n"+(mm.eo?"f*":"f")+" Q"); }); }
     if(contourActive()){ var cs3=spotCS(S.contour.type, $("stCSuffix").value); c.push("q /GSop gs "+cs3+" CS 1 SCN 0.25 w "+opsToPdf(S.contour.ops)+"\nS Q"); }
     c.push("Q");
-    var formContent=c.join("\n");
+    return { content:c.join("\n"), spotList:spotList, fontList:fontList, fallback:fallback };
+  }
+  async function buildPdf(brand){
+    var L=layout(); if(!L.fits || !L.pages.length) throw new Error("nofit");
+    var box=L.box, TW=box.w*MM2PT, TH=box.h*MM2PT;
+    var D=await designContent(brand, box), spotList=D.spotList, fontList=D.fontList, fallback=D.fallback, formContent=D.content;
 
     // objects
     var objs=[]; function add(s){ objs.push(s); return objs.length; }
@@ -2142,6 +2166,89 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
     put(x+"trailer\n<< /Size "+(objs.length+1)+" /Root "+catalogId+" 0 R /Info "+infoId+" 0 R >>\nstartxref\n"+xref+"\n%%EOF\n");
     var blob=new Blob(chunks,{type:"application/pdf"});
     return { blob:blob, pages:L.pages.length, copies:L.count, spots:spotList.map(function(s){return s.name;}), fallback:[...new Set(fallback)] };
+  }
+
+  // ---- EPS: the same artwork as the PDF (spot colours, overprint, cut lines, outlined text), as Level 2 PostScript
+  function pdfToPs(content){
+    var out=[], st=[], tr=0, m,
+        re=/\((?:\\[\s\S]|[^\\)])*\)|\/[^\s\/\[\]()<>{}%]+|[-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?|[A-Za-z*'"]+/g;
+    function emit(x){ out.push(x); }
+    while((m=re.exec(content))){
+      var t=m[0];
+      if(t[0]==="("||t[0]==="/"||/^[-+.\d]/.test(t)){ st.push(t); continue; }
+      switch(t){
+        case "q": emit("gsave"); break;
+        case "Q": emit("grestore"); break;
+        case "cm": emit("["+st.join(" ")+"] concat"); break;
+        case "m": emit(st.join(" ")+" moveto"); break;
+        case "l": emit(st.join(" ")+" lineto"); break;
+        case "c": emit(st.join(" ")+" curveto"); break;
+        case "h": emit("closepath"); break;
+        case "f": emit("fill"); break;
+        case "f*": emit("eofill"); break;
+        case "S": emit("stroke"); break;
+        case "w": emit(st[0]+" setlinewidth"); break;
+        case "rg": case "RG": emit(st.join(" ")+" setrgbcolor"); break;
+        case "k": case "K": emit(st.join(" ")+" setcmykcolor"); break;
+        case "gs": emit("true setoverprint"); break;
+        case "cs": case "CS": emit("HDCS"+st[0].replace("/CS","")+" setcolorspace"); break;
+        case "scn": case "SCN": emit(st.join(" ")+" setcolor"); break;
+        case "BT": tr=0; break;
+        case "Tr": tr=+st[0]; break;
+        case "Tf": emit("HD-"+st[0].slice(1)+" "+st[1]+" scalefont setfont"); break;
+        case "Td": emit(st.join(" ")+" moveto"); break;
+        case "Tj": emit(tr===1 ? st[0]+" false charpath stroke" : st[0]+" show"); break;
+        case "ET": break;
+        default: console.warn("EPS: unhandled operator", t);
+      }
+      st=[];
+    }
+    return out.join("\n");
+  }
+  function epsDoc(o){ // o: {W,H (pt), body (PDF operators), spots:[{name,role}], fonts:[PostScript base names], title}
+    var d=new Date(), pad=function(n){ return ("0"+n).slice(-2); };
+    var h=["%!PS-Adobe-3.0 EPSF-3.0",
+      "%%BoundingBox: 0 0 "+Math.ceil(o.W)+" "+Math.ceil(o.H),
+      "%%HiResBoundingBox: 0 0 "+n3(o.W)+" "+n3(o.H),
+      "%%Creator: Highway Digital Vector Converter",
+      "%%Title: "+pdfStr(o.title||"design"),
+      "%%CreationDate: "+d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())+" "+pad(d.getHours())+":"+pad(d.getMinutes()),
+      "%%LanguageLevel: 2",
+      "%%DocumentProcessColors: Cyan Magenta Yellow Black"];
+    if(o.spots.length){
+      h.push("%%DocumentCustomColors: "+o.spots.map(function(sp){ return pdfStr(sp.name); }).join(" "));
+      o.spots.forEach(function(sp){ var a=ALT[sp.role]||[0,0,0,1]; h.push("%%CMYKCustomColor: "+a.join(" ")+" "+pdfStr(sp.name)); });
+    }
+    if(o.fonts.length) h.push("%%DocumentNeededResources: "+o.fonts.map(function(f){ return "font "+f; }).join(" "));
+    h.push("%%Pages: 1","%%EndComments","%%BeginProlog","/HDdict 64 dict def HDdict begin");
+    o.spots.forEach(function(sp,i){
+      var a=ALT[sp.role]||[0,0,0,1];
+      h.push("/HDCS"+i+" [/Separation "+pdfStr(sp.name)+" cvn /DeviceCMYK {dup "+a[0]+" mul exch dup "+a[1]+" mul exch dup "+a[2]+" mul exch "+a[3]+" mul}] def");
+    });
+    o.fonts.forEach(function(f,i){
+      h.push("/HD-F"+i+" /"+f+" findfont dup length dict begin {1 index /FID ne {def} {pop pop} ifelse} forall /Encoding ISOLatin1Encoding def currentdict end /HD-F"+i+"-L1 exch definefont def");
+    });
+    h.push("end","%%EndProlog","%%Page: 1 1",
+      "HDdict begin save",
+      "newpath 0 setgray 1 setlinewidth 0 setlinecap 0 setlinejoin 10 setmiterlimit [] 0 setdash false setoverprint");
+    h.push(pdfToPs(o.body));
+    h.push("restore end","showpage","%%Trailer","%%EOF","");
+    return h.join("\n");
+  }
+  async function buildEps(brand){
+    var box=designBox(); if(!(box.w>0 && box.h>0)) throw new Error("empty");
+    var D=await designContent(brand, box);
+    var txt=epsDoc({W:box.w*MM2PT, H:box.h*MM2PT, body:D.content, spots:D.spotList, fonts:D.fontList, title:S.name});
+    return { blob:new Blob([txt],{type:"application/postscript"}), text:txt, spots:D.spotList.map(function(x){ return x.name; }), fallback:[...new Set(D.fallback)] };
+  }
+  // Plain EPS of the traced artwork (the converter's Download EPS): the traced colours, no spot colours or cut lines.
+  // With no output size set it keeps the image's own size at 96 dpi, like the SVG.
+  function plainEps(){
+    var a=artSize(), real=a.defaulted ? { w:S.vw*25.4/96, h:S.vh*25.4/96 } : a, k=real.w/a.w, W=real.w*MM2PT, H=real.h*MM2PT, c=[];
+    c.push("q 1 0 0 -1 0 "+n3(H)+" cm "+n3(k)+" 0 0 "+n3(k)+" 0 0 cm");
+    artOps().forEach(function(p){ var r=rgbOf(p.hex); c.push("q "+r.map(n3).join(" ")+" rg "+opsToPdf(p.ops)+"\nf Q"); });
+    c.push("Q");
+    return epsDoc({W:W, H:H, body:c.join("\n"), spots:[], fonts:[], title:S.name});
   }
 
   // ---- Brother GTX PNG
@@ -2214,6 +2321,17 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
   }
   function fileName(brand){ return (S.name||"design")+"-"+BRANDS[brand].rip.replace(/\s+/g,"")+".pdf"; }
 
+  [].forEach.call(document.querySelectorAll("[data-eps]"),function(btn){
+    btn.addEventListener("click", async function(){
+      var br=btn.dataset.eps;
+      try{
+        if(S.objs.some(function(o){ return o.kind==="text"; }) && window.queryLocalFonts && !LF.list) await loadLocalFonts();
+        stStatus("Building the EPS…"); var r=await buildEps(br);
+        saveBlob(r.blob, (S.name||"design")+"-"+BRANDS[br].rip.replace(/\s+/g,"")+".eps");
+        stStatus("EPS ready"+(r.spots.length?". Spot colours: "+r.spots.join(", "):"")+"."+(r.fallback.length?" Text in "+r.fallback.join(", ")+" uses a standard PostScript font because the font file couldn't be read here.":(S.objs.some(function(o){ return o.kind==="text"; })?" Text is converted to outlines.":""))+(!cutsOn()?" Cut lines are off.":""), r.fallback.length?"err":"ok");
+      }catch(e){ console.error(e); stStatus(e.message==="empty"?"Nothing to export yet.":"Couldn't build the EPS.","err"); }
+    });
+  });
   [].forEach.call(document.querySelectorAll("[data-rip]"),function(btn){
     btn.addEventListener("click", async function(){ var br=btn.dataset.rip, r=await makePdf(br); if(r) saveBlob(r.blob, fileName(br)); });
   });
@@ -2278,6 +2396,7 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
   });
   window.__vcStudio=S; // for support/debugging
   window.__vcStudioApi = {
+    eps: function(){ return S.ready ? plainEps() : null; },
     snap: function(){ return { colors:JSON.parse(JSON.stringify(S.colors)), objs:JSON.parse(JSON.stringify(S.objs)), sel:S.sel, brand:S.brand, under:S.under, over:S.over, contour:{ on:S.contour.on, type:S.contour.type }, view:S.view }; },
     restore: function(o){
       if(!o) return;
