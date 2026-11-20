@@ -1352,9 +1352,9 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
                glossLabel:"Varnish" },
     brother: { name:"Brother GTX", rip:"GTX Graphics Lab", spots:{}, glossLabel:"" }
   };
-  // preview / PDF alternate colours for each role (CMYK 0..1) and screen colours
-  var ALT = { cut:[0,1,0,0], perf:[1,0,1,0], white:[0.15,0,0,0], gloss:[0,0,0.12,0], primer:[0,0.1,0.1,0], silver:[0,0,0,0.3] };
-  var SCREEN = { cut:"#ff2bd6", perf:"#2bd65a", white:"#ffffff", gloss:"#ffe58a", primer:"#e7c0a8", silver:"#c0c4c8" };
+  // preview / PDF alternate colours (cut and perforated cut both use the Roland/Mimaki CutContour magenta) for each role (CMYK 0..1) and screen colours
+  var ALT = { cut:[0,1,0,0], perf:[0,1,0,0], white:[0.15,0,0,0], gloss:[0,0,0.12,0], primer:[0,0.1,0.1,0], silver:[0,0,0,0.3] };
+  var SCREEN = { cut:"#ff2bd6", perf:"#ff2bd6", white:"#ffffff", gloss:"#ffe58a", primer:"#e7c0a8", silver:"#c0c4c8" };
 
   var LS_NAMES = "hd_vc_spotnames_v1";
   var customNames = {};
@@ -2352,7 +2352,7 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
     var dx=-box.x, dy=-box.y, tol=0.02, layers={}, order=[], skipped=[];
     function layer(key, name, aci){ if(!layers[key]){ layers[key]={name:dxfLayerName(name), aci:aci, paths:[]}; order.push(key); } return layers[key]; }
     function add(L, ops){ L.paths=L.paths.concat(flattenOps(shiftOps(ops,dx,dy), tol)); }
-    function cutLayer(role, sfx){ var n=cutName(brand,role,sfx)||(role==="perf"?"PerfCut":"CutContour"); return layer("cut:"+n, n, role==="perf"?3:6); }
+    function cutLayer(role, sfx){ var n=cutName(brand,role,sfx)||(role==="perf"?"PerfCut":"CutContour"); return layer("cut:"+n, n, 6); }
     var OUT={};
     for(var ti=0; ti<S.objs.length; ti++){ var to=S.objs[ti]; if(to.kind!=="text") continue; var ol=await textOutline(to); if(ol) OUT[to.id]=ol; }
     if(contourActive()) add(cutLayer(S.contour.type, $("stCSuffix").value), S.contour.ops);
