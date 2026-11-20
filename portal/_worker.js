@@ -65,6 +65,20 @@ async function rpc(name, body, token) {
   const t = await r.text(); let j = null; try { j = JSON.parse(t); } catch (e) {}
   return { ok: r.ok, status: r.status, j };
 }
+// "Version 1.22 Beta · 21 Nov 2026" on a page is kept current: the database bumps the minor version (and the date)
+// the first time it sees a changed page file, and the label in the page is replaced with that.
+const VER_RE = /Version \d+\.\d+ Beta · \d{1,2} [A-Za-z]{3} \d{4}/g;
+async function withVersion(page, key, token) {
+  const text = await page.text();
+  if (!VER_RE.test(text)) return new Response(text, page);
+  VER_RE.lastIndex = 0;
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)));
+  const hash = [...digest.slice(0, 16)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  const r = await rpc("page_version", { p_path: key, p_hash: hash }, token).catch(() => null);
+  const v = r && r.ok && r.j && r.j.v ? r.j : null;
+  const hd = new Headers(page.headers); hd.delete("Content-Length"); hd.delete("ETag");
+  return new Response(v ? text.replace(VER_RE, `Version ${v.v} Beta · ${v.date}`) : text, { status: page.status, headers: hd });
+}
 // Small JSON endpoints used by the gated pages (same-origin, signed-in cookie).
 async function apiRoute(req, env, url, p) {
   // The edge function reads the raw catalogue (for quote prices) with the bridge key, checked by the database.
@@ -153,6 +167,7 @@ export default {
     let page = (!g.flag || f[g.flag])
       ? await env.ASSETS.fetch(new Request(new URL(g.page, url.origin), { headers: req.headers }))
       : new Response(notAvailable(g.name), { headers: { "content-type": "text/html; charset=utf-8" } });
+    if ((!g.flag || f[g.flag]) && page.ok) page = await withVersion(page, key, token);
     if (key === "catalogue" && f.cat && !f.staff && page.ok) {
       const allow = new Set(Array.isArray(f.cat_brands) && f.cat_brands.length ? f.cat_brands : CAT_ALL);
       if (CAT_ALL.some((b) => !allow.has(b))) {
