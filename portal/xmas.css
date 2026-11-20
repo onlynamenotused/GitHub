@@ -1,7 +1,0 @@
-/* Parts Catalogue: Christmas store backdrop (portal only, added by _worker.js) */
-html{background:#0d2418}
-body{background:transparent!important}
-body::after{content:"";position:fixed;inset:0;z-index:-1;background:#0d2418 url(/xmas-store.svg?v=1) center/cover no-repeat}
-main>.wrap{background:color-mix(in srgb,var(--bg) 92%,transparent);border-radius:12px;margin-top:18px;margin-bottom:18px;box-shadow:0 12px 40px rgba(0,0,0,.35)}
-footer{border-top:0}
-footer .wrap{background:color-mix(in srgb,var(--bg) 92%,transparent);border-radius:12px;margin-bottom:24px}
