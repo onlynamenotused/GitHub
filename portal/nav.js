@@ -1,5 +1,5 @@
 /* Highway Service Desk: the one menu used on every portal page.
-   The app (index.html) calls HDNav.render(); the Knowledge Base and Parts Catalogue pages get it from
+   The app (index.html) calls HDNav.render(); the Knowledge Base, Parts Catalogue and Vector Converter pages get it from
    _worker.js, which adds <div id="hd-nav" data-flags='…'> and this script to the top of the page. */
 (function () {
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -8,6 +8,7 @@
     if (f.intranet) out.push(["intranet", "/#kb", "Intranet Knowledge"]);
     if (f.kb) out.push(["kb", "/kb/", "Knowledge Base"]);
     if (f.cat) out.push(["catalogue", "/catalogue/", "Parts Catalogue"]);
+    out.push(["vector", "/vector/", "Vector Converter"]);
     if (f.supervisor) out.push(["reports", "/#reports", "Fleet reports"]);
     out.push(["contact", "/#contact", "Contact & booking"]);
     if (f.staff) out.push(["customers", "/#customers", "Customers (staff)"]);

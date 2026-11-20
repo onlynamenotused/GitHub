@@ -10,11 +10,16 @@ Cloudflare Pages project **highway-portal** (direct upload, no Git build). Sourc
   `_worker.js` checks the `hd_at` cookie against Supabase (`portal_menu()`), serves the page only if
   the customer has access, and adds the shared menu.
 - `nav.js` + `nav.css`: the one menu used on every page:
-  My machines · Knowledge Base* · Parts Catalogue* · Contact & booking (* only if ticked for the
-  customer; staff also get Intranet Knowledge and Customers). Sign out = `/#signout` from any page.
+  My machines · Knowledge Base* · Parts Catalogue* · Vector Converter · Contact & booking (* only if
+  ticked for the customer; staff also get Intranet Knowledge and Customers). Sign out = `/#signout` from any page.
 
 The KB and catalogue page files aren't in this repo (they were copied from the previous deployment by
 content hash). To change them, publish the new HTML as `/_p/kb/index.html` / `/_p/catalogue/index.html`.
+
+## Vector Converter
+`/vector/`: image-to-vector (SVG) tool for every signed-in customer. Runs entirely in the customer's
+browser (VTracer WebAssembly + imagetracerjs fallback, both inlined); images are never uploaded.
+Stored as `/_p/vector/index.html`; source in this repo at `portal/_p/vector/index.html`.
 
 ## Booking
 1. Service desk (while open) publishes free times every 30 min to `portal_slots`

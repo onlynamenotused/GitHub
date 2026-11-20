@@ -231,3 +231,14 @@ table.billing td.act{text-align:right;white-space:nowrap}
 .feat{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px;font-size:14px}
 .feat.dev li::marker{color:var(--accent)}
 @media (max-width:900px){.loginwrap{grid-template-columns:minmax(0,1fr);margin:24px auto}}
+
+/* open jobs + export menu */
+.openjobs{margin-bottom:16px}
+.xwrap{display:inline-flex;align-items:center;gap:8px}
+.xmenu{position:relative}
+.xmenu>summary{list-style:none;cursor:pointer}
+.xmenu>summary::-webkit-details-marker{display:none}
+.xpanel{position:absolute;right:0;top:calc(100% + 6px);z-index:20;min-width:250px;background:#111;border:1px solid var(--line);border-radius:10px;padding:6px;display:flex;flex-direction:column;box-shadow:0 12px 30px rgba(0,0,0,.5)}
+.xhd{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:8px 10px 4px}
+.xopt{all:unset;cursor:pointer;padding:8px 10px;border-radius:6px;font-size:14px}
+.xopt:hover,.xopt:focus-visible{background:var(--sunk);color:var(--accent)}

@@ -166,6 +166,8 @@ function renderMachines() {
 
   const box = $("#machineList");
   $("#addMachineBtn").hidden = !isCustomer();
+  const xh = $("#exportHost"); if (xh && !xh.firstChild && state.machines.length) xh.append(exportMenu());
+  renderOpenJobs();
   if (!state.machines.length) {
     box.replaceChildren(el("div", { class: "card empty" },
       ...(isCustomer() ? ["No machines on your account yet. ", el("a", { href: "#add-machine" }, "Add your first machine"), " (you can scan its serial plate), or contact "]
@@ -754,6 +756,7 @@ function jobFields(prefix) {
 }
 async function logJob(machineId, j) {
   try { localStorage.setItem("hd_contact", JSON.stringify({ name: j.name, phone: j.phone })); } catch (e) {}
+  state.jobs = null;
   const { data, error } = await sb.rpc("portal_log_job", { p_machine: machineId, p_kind: j.kind, p_desc: j.desc, p_code: j.code, p_name: j.name, p_phone: j.phone });
   if (error) throw new Error(error.message || "Couldn't log the job");
   return data;
@@ -1122,6 +1125,137 @@ async function renderSupervisorsAdmin(host) {
       el("p", {}, sync, " ", note));
   });
   host.replaceChildren(el("h2", { style: "margin-top:24px" }, "Vendor supervisors"), ...cards);
+}
+
+// ---------- all jobs for the account: open jobs on My machines, and exports ----------
+const JOB_OPEN = (s) => !["completed", "invoiced", "cancelled"].includes(s);
+const TSTAT = { new: "Logged", scheduled: "Scheduled", "in-progress": "In progress", waiting: "Waiting on parts / info", quote: "Quote sent", completed: "Completed", invoiced: "Completed" };
+const jobKind = (t) => t.subtype === "installation" ? "Installation" : t.subtype === "pm" ? "Scheduled service" : t.type === "incident" ? "Fault or repair" : "Request";
+const kindName = (k) => ({ service: "Service visit", install: "Installation", parts: "Parts", fault: "Fault or repair", other: "Request" }[k] || k || "");
+function labourField(desc, label) {
+  const m = String(desc || "").match(new RegExp("^\\s*" + label + "[^:\\n]*:[ \\t]*([\\s\\S]*?)(?=\\n\\s*[A-Z][A-Za-z /()]{2,40}:|$)", "mi"));
+  return m ? m[1].trim() : "";
+}
+async function loadJobs(force) {
+  if (state.jobs && !force) return state.jobs;
+  const { data, error } = await sb.rpc("my_jobs");
+  if (error) throw error;
+  const jobs = [];
+  const ticketNums = new Set();
+  for (const t of data.tickets || []) {
+    ticketNums.add(String(t.num));
+    jobs.push({ ref: "Job " + t.num, date: t.created, client_id: t.client_id, machine_id: t.machine_id, type: jobKind(t), status: TSTAT[t.status] || t.status, open: JOB_OPEN(t.status),
+      scheduled: t.sched_date || "", problem: [t.problem || t.summary, t.error_code && "Error " + t.error_code].filter(Boolean).join(". "),
+      work: t.work || "", parts: (t.parts || []).map((p) => (Number(p.qty) || 1) + " x " + p.code + (p.desc ? " " + p.desc : "")).join("; ") });
+  }
+  for (const r of data.history || []) {
+    const labour = (r.lines || []).find((l) => /labou?r|hourly|day rate/i.test(l.code || "")) || {};
+    const job = labourField(labour.desc, "Job");
+    if (job && ticketNums.has(job.replace(/\D/g, ""))) continue; // already listed from the service desk
+    const problem = labourField(labour.desc, "Reported Issue") || r.po || String(labour.desc || "").split("\n")[0] || "";
+    const work = labourField(labour.desc, "Work Performed") || (labour.desc && !/Reported Issue|Work Performed/i.test(labour.desc) ? labour.desc : "");
+    const parts = (r.lines || []).filter((l) => /\d/.test(l.code || "") && !/\s/.test(String(l.code).trim()) && !/labou?r|callout|delivery|report|flight|hotel|accommodation|car hire|day rate|shipping/i.test(l.code))
+      .map((l) => (Number(l.qty) || 1) + " x " + l.code + (l.desc ? " " + String(l.desc).split("\n")[0] : "")).join("; ");
+    jobs.push({ ref: "Invoice " + r.number, date: r.issued, client_id: r.client_id, machine_id: r.machine_id, type: kindName(r.kind), status: "Completed", open: false,
+      scheduled: labourField(labour.desc, "Date Scheduled"), problem, work, parts });
+  }
+  for (const j of data.portal || []) if (j.status === "pending")
+    jobs.push({ ref: "Portal request", date: String(j.created).slice(0, 10), client_id: j.client_id, machine_id: j.machine_id, type: kindName(j.kind), status: "Waiting for us", open: true,
+      scheduled: "", problem: [j.description, j.error_code && "Error " + j.error_code].filter(Boolean).join(". "), work: "", parts: "" });
+  jobs.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  state.jobs = jobs;
+  return jobs;
+}
+const machLabel = (id) => { const m = state.machines.find((x) => x.id === id); return m ? machineName(m) + (m.serial ? " (SN " + m.serial + ")" : "") : ""; };
+
+async function renderOpenJobs() {
+  const box = $("#openJobs"); if (!box) return;
+  if (state.staff) { box.hidden = true; return; }
+  box.hidden = false;
+  if (!state.jobs) box.replaceChildren(el("h2", {}, "Open jobs"), el("p", { class: "muted small" }, "Loading…"));
+  let jobs;
+  try { jobs = await loadJobs(); } catch (e) { box.replaceChildren(el("h2", {}, "Open jobs"), el("p", { class: "msg err" }, "Couldn't load your jobs.")); return; }
+  const open = jobs.filter((j) => j.open);
+  const multi = state.clients.length > 1;
+  box.replaceChildren(
+    el("div", { class: "bhead" }, el("h2", {}, "Open jobs"), el("span", { class: "pill " + (open.length ? "soon" : "ok") }, open.length ? open.length + " open" : "None open")),
+    open.length ? el("div", { class: "tscroll" }, el("table", { class: "tbl rtbl" },
+      el("thead", {}, el("tr", {}, ...["Logged", "Job", multi ? "Customer" : null, "Machine", "Type", "Problem / request", "Status", "Scheduled"].filter(Boolean).map((h) => el("th", {}, h)))),
+      el("tbody", {}, ...open.map((j) => el("tr", { class: j.machine_id ? "rrow" : null, onclick: j.machine_id ? () => (location.hash = "#machine/" + encodeURIComponent(j.machine_id)) : null },
+        el("td", { "data-l": "Logged" }, fmtDate(j.date)), el("td", { "data-l": "Job" }, j.ref),
+        multi ? el("td", { "data-l": "Customer" }, clientName(j.client_id)) : null,
+        el("td", { "data-l": "Machine" }, machLabel(j.machine_id) || "—"), el("td", { "data-l": "Type" }, j.type),
+        el("td", { "data-l": "Problem" }, j.problem || "—"), el("td", { "data-l": "Status" }, el("span", { class: "pill soon" }, j.status)),
+        el("td", { "data-l": "Scheduled" }, j.scheduled ? fmtDate(j.scheduled) : "To be arranged"))))))
+      : el("p", { class: "muted small" }, "No open jobs right now. Log a job from any machine's page, or book a service."));
+}
+
+/* ---------- exports: CSV, Excel, PDF ---------- */
+function loadScript(src, test) {
+  if (test()) return Promise.resolve();
+  return new Promise((ok, no) => { const s = el("script", { src }); s.onload = ok; s.onerror = () => no(new Error("Couldn't load " + src)); document.head.append(s); });
+}
+function saveBlob(name, blob) {
+  const url = URL.createObjectURL(blob);
+  const a = el("a", { href: url, download: name }); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+async function exportTable(fmt, base, title, head, rows) {
+  const stamp = localIso(), name = `${base} ${stamp}`;
+  if (fmt === "csv") {
+    const csv = [head, ...rows].map((r) => r.map((c) => { c = String(c ?? ""); return /[",\n]/.test(c) ? '"' + c.replace(/"/g, '""') + '"' : c; }).join(",")).join("\r\n");
+    return saveBlob(name + ".csv", new Blob(["﻿" + csv], { type: "text/csv" }));
+  }
+  if (fmt === "xlsx") {
+    await loadScript("https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js", () => window.XLSX);
+    const ws = XLSX.utils.aoa_to_sheet([head, ...rows]);
+    ws["!cols"] = head.map((h, i) => ({ wch: Math.min(60, Math.max(String(h).length, ...rows.map((r) => String(r[i] ?? "").split("\n")[0].length)) + 2) }));
+    ws["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: rows.length, c: head.length - 1 } }) };
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, title.slice(0, 31));
+    return saveBlob(name + ".xlsx", new Blob([XLSX.write(wb, { bookType: "xlsx", type: "array" })], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+  }
+  await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js", () => window.jspdf);
+  await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js", () => window.jspdf && window.jspdf.jsPDF.API.autoTable);
+  const doc = new window.jspdf.jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+  const who = state.staff ? "Customer Assets" : isSupervisor() ? supName() + " fleet" : state.clients.map((c) => c.name).join(", ");
+  doc.setFont("helvetica", "bold"); doc.setFontSize(15); doc.text("Highway Digital · " + title, 12, 14);
+  doc.setFont("helvetica", "normal"); doc.setFontSize(9.5); doc.setTextColor(90);
+  doc.text(`${who}  ·  ${rows.length} rows  ·  exported ${new Date().toLocaleString("en-AU")}  ·  portal.highwaydigital.com.au`, 12, 20);
+  doc.autoTable({ startY: 24, head: [head], body: rows.map((r) => r.map((c) => String(c ?? ""))), margin: { left: 10, right: 10 },
+    styles: { fontSize: 7.5, cellPadding: 1.6, overflow: "linebreak", valign: "top" }, headStyles: { fillColor: [20, 20, 20], textColor: [232, 185, 35] },
+    alternateRowStyles: { fillColor: [246, 246, 246] },
+    didDrawPage: (d) => { doc.setFontSize(8); doc.setTextColor(120); doc.text("Page " + doc.internal.getNumberOfPages(), doc.internal.pageSize.getWidth() - 25, doc.internal.pageSize.getHeight() - 6); } });
+  saveBlob(name + ".pdf", doc.output("blob"));
+}
+function machineExportRows() {
+  const head = ["Customer", "Brand", "Model", "Serial number", "Category", "Type", "Site", "Location", "Ink set", "Installed", "Warranty ends",
+    "Service every (months)", "Last service", "Next service due", "Service status", "Last visit", "Parameter/log files", "Latest firmware", "Machine ID"];
+  const rows = state.machines.map((m) => { const fs = filesFor(m); return [clientName(m.client_id), m.brand || "", m.model || "", m.serial || "", m.category || "", m.sub_category || "",
+    m.site || "", m.location || "", m.ink_set || "", m.install_date || "", m.warranty_end || "", m.pm_interval_months || "", m.pm_last_done || "", m.pm_next_due || "",
+    pmStatus(m).label, m.last_visit || "", fs.length || "", (fs.find((f) => f.fw) || {}).fw || "", m.id]; });
+  return [head, rows];
+}
+async function jobExportRows() {
+  const jobs = await loadJobs();
+  const head = ["Date", "Reference", "Customer", "Machine", "Type", "Status", "Scheduled", "Problem / request", "Work done", "Parts used"];
+  return [head, jobs.map((j) => [j.date || "", j.ref, clientName(j.client_id), machLabel(j.machine_id), j.type, j.status, j.scheduled || "", j.problem, j.work, j.parts])];
+}
+function exportMenu() {
+  const msg = el("span", { class: "muted small", role: "status" });
+  const go = (what, fmt) => async (e) => {
+    e.preventDefault(); dd.open = false; msg.textContent = "Preparing…";
+    try {
+      const [head, rows] = what === "jobs" ? await jobExportRows() : machineExportRows();
+      await exportTable(fmt, what === "jobs" ? "Highway Digital jobs" : "Highway Digital machines", what === "jobs" ? "Service jobs" : "Machines", head, rows);
+      msg.textContent = "";
+    } catch (er) { msg.textContent = "Export failed: " + (er.message || er); }
+  };
+  const item = (what, fmt, label) => el("button", { type: "button", class: "xopt", onclick: go(what, fmt) }, label);
+  const dd = el("details", { class: "xmenu" }, el("summary", { class: "btn" }, "Export ▾"),
+    el("div", { class: "xpanel" },
+      el("div", { class: "xhd" }, "Machines (full asset details)"), item("machines", "xlsx", "Excel (.xlsx)"), item("machines", "csv", "CSV"), item("machines", "pdf", "PDF"),
+      el("div", { class: "xhd" }, "All jobs (problem and work done)"), item("jobs", "xlsx", "Excel (.xlsx)"), item("jobs", "csv", "CSV"), item("jobs", "pdf", "PDF")));
+  document.addEventListener("click", (e) => { if (dd.open && !dd.contains(e.target)) dd.open = false; });
+  return el("span", { class: "xwrap" }, dd, msg);
 }
 
 // ---------- routing ----------

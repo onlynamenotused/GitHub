@@ -1,13 +1,14 @@
 // Highway Service Desk portal: Cloudflare Pages worker.
-// Everything is served as static files, except /kb/ and /catalogue/, which are only for signed-in
+// Everything is served as static files, except /kb/, /catalogue/ and /vector/, which are only for signed-in
 // users with access. Those two pages are stored under /_p/ (never served directly) and get the
 // shared portal menu (nav.js + nav.css) added at the top, with their old cross-links removed.
 const SB_URL = "https://sfuuzcgwbbhdjqzrchvv.supabase.co";
 const SB_KEY = "sb_publishable_uu0N60ZMVjJ1kl14FW1NBA_v-cm_U3_"; // publishable key: safe, RLS protects data
-const V = "23";
+const V = "24";
 const GATED = {
   kb: { page: "/_p/kb/", flag: "kb", name: "Knowledge Base" },
-  catalogue: { page: "/_p/catalogue/", flag: "cat", name: "Parts Catalogue" }
+  catalogue: { page: "/_p/catalogue/", flag: "cat", name: "Parts Catalogue" },
+  vector: { page: "/_p/vector/", flag: null, name: "Vector Converter" }   // every signed-in user
 };
 
 function readCookie(req, name) {
@@ -42,7 +43,7 @@ export default {
     const url = new URL(req.url);
     const p = url.pathname;
     if (p.startsWith("/_p/")) return new Response("Not found", { status: 404 });
-    const key = /^\/kb(\/|$)/.test(p) ? "kb" : /^\/catalogue(\/|$)/.test(p) ? "catalogue" : null;
+    const key = /^\/kb(\/|$)/.test(p) ? "kb" : /^\/catalogue(\/|$)/.test(p) ? "catalogue" : /^\/vector(\/|$)/.test(p) ? "vector" : null;
     if (!key) return env.ASSETS.fetch(req);
     if (p !== "/" + key + "/") return Response.redirect(url.origin + "/" + key + "/", 302);
 
@@ -51,7 +52,7 @@ export default {
     if (!f || !f.email) return Response.redirect(url.origin + "/?next=" + encodeURIComponent("/" + key + "/"), 302);
 
     const g = GATED[key];
-    const page = f[g.flag]
+    const page = (!g.flag || f[g.flag])
       ? await env.ASSETS.fetch(new Request(new URL(g.page, url.origin), { headers: req.headers }))
       : new Response(notAvailable(g.name), { headers: { "content-type": "text/html; charset=utf-8" } });
 
