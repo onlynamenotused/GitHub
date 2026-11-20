@@ -6,7 +6,7 @@ const sb = createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, {
 });
 
 const $ = (s) => document.querySelector(s);
-const views = ["loading", "login", "view-machines", "view-machine", "view-add", "view-reports", "view-kb", "view-contact", "view-customers", "view-book"];
+const views = ["loading", "login", "view-machines", "view-machine", "view-add", "view-reports", "view-kb", "view-contact", "view-customers", "view-book", "view-kits"];
 const state = { user: null, clients: [], machines: [], kb: null, resources: null, kbAccess: false, intranet: false, staff: false, access: null };
 
 // ---------- helpers ----------
@@ -111,6 +111,8 @@ async function loadCore() {
   state.catAccess = g.data === true;
   state.intranet = it.data === true;
   state.files = mf.data || []; state.invoices = inv.data || []; state.estimates = est.data || [];
+  state.kits = {};
+  if (isCustomer()) { const kq = await sb.rpc("my_service_kits"); state.kits = (kq && kq.data) || {}; }
   drawNav();
 }
 async function loadKb() {
@@ -192,7 +194,10 @@ function renderMachines() {
       m.added_via === "portal" && m.desk_seen === false ? el("span", { class: "muted small" }, "Added by you · we'll check the details") : null,
       filesFor(m).length ? el("span", { class: "muted small" }, "📄 " + filesFor(m).length + " parameter/log file" + (filesFor(m).length > 1 ? "s" : "")) : null,
       state.staff ? null : el("span", { class: "mbook", role: "link", title: "Book a service or log a job for this machine",
-        onclick: (e) => { e.stopPropagation(); location.hash = "#book/" + encodeURIComponent(m.id); } }, "Book")
+        onclick: (e) => { e.stopPropagation(); location.hash = "#book/" + encodeURIComponent(m.id); } }, "Book"),
+      isCustomer() && !isSupervisor() ? el("span", { class: "mquote", role: "button", tabindex: 0, title: kitFor(m) ? "Get a quote for this machine's service and PM parts, emailed to you now" : "Get a quote for a service visit, emailed to you now",
+        onclick: (e) => { e.stopPropagation(); openServiceQuote(m.id); },
+        onkeydown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); openServiceQuote(m.id); } } }, "Quote me") : null
     );
   }));
 }
@@ -1356,6 +1361,235 @@ function exportMenu() {
   return el("span", { class: "xwrap" }, dd, msg);
 }
 
+// ---------- "Quote me": fixed-price service + PM kit parts, several machines on one callout ----------
+const money2 = (n) => "$" + (Math.round((+n || 0) * 100) / 100).toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const STD_LABOUR = 150; // no PM kit: 1 hour at the hourly rate (ex GST), parts quoted on inspection
+const SQ = { open: false, sel: {}, extras: [], parts: null, note: "" };
+function kitFor(m) { return (state.kits || {})[m.id] || null; }
+function sqMachines() { return state.machines; }
+function sqPartsOf(mid) {
+  const s = SQ.sel[mid], k = kitFor(state.machines.find((x) => x.id === mid));
+  if (!s || !k) return [];
+  return (s.plan === "six" ? k.six_parts : k.annual_parts) || [];
+}
+function openServiceQuote(mid) {
+  if (!SQ.sel[mid]) SQ.sel[mid] = { plan: "annual", remove: new Set() };
+  SQ.open = true; renderServiceQuote();
+}
+function closeServiceQuote() { SQ.open = false; document.body.classList.remove("sq-lock"); $("#sqLayer")?.remove(); }
+function sqTotals() {
+  let svc = 0, parts = 0, hrs = 0, n = 0;
+  for (const [mid, s] of Object.entries(SQ.sel)) {
+    const k = kitFor(state.machines.find((x) => x.id === mid));
+    if (!k) { n++; svc += STD_LABOUR; hrs += 1; continue; }
+    n++; svc += +(s.plan === "six" ? k.six_fee : k.annual_fee) || 0; hrs += +(s.plan === "six" ? k.six_hours : k.annual_hours) || 0;
+    for (const p of sqPartsOf(mid)) if (!s.remove.has(p.pn) && p.ex != null) parts += (+p.ex) * (+p.qty || 1);
+  }
+  for (const x of SQ.extras) parts += x.ex * x.qty;
+  return { svc, parts, hrs, n };
+}
+function renderServiceQuote() {
+  let layer = $("#sqLayer");
+  if (!layer) {
+    layer = el("div", { id: "sqLayer", class: "sq-layer", onclick: (e) => { if (e.target === layer) closeServiceQuote(); } });
+    document.body.append(layer); document.body.classList.add("sq-lock");
+    document.addEventListener("keydown", function esc(e) { if (e.key === "Escape") { closeServiceQuote(); document.removeEventListener("keydown", esc); } });
+  }
+  const list = sqMachines();
+  const machineBlock = (m) => {
+    const k = kitFor(m), s = SQ.sel[m.id], on = !!s;
+    const head = el("label", { class: "sq-mhead" },
+      el("input", { type: "checkbox", checked: on, onchange: (e) => { if (e.target.checked) SQ.sel[m.id] = { plan: "annual", remove: new Set() }; else delete SQ.sel[m.id]; renderServiceQuote(); } }),
+      el("span", {}, el("b", {}, machineName(m)), el("span", { class: "muted small" }, " " + [m.serial && "SN " + m.serial, m.location || m.site].filter(Boolean).join(" · "))));
+    if (!on) return el("div", { class: "sq-m" }, head);
+    if (!k) return el("div", { class: "sq-m on" }, head,
+      el("p", { class: "sq-warn" }, el("b", {}, "No PM kit found for this model. "),
+        "We'll quote a standard service visit: 1 hour's labour (" + money2(STD_LABOUR) + " + GST, billed hourly for the actual time) plus the callout. All parts required will be quoted on inspection."));
+    const parts = sqPartsOf(m.id);
+    const planBtn = (val, label, fee, hrs) => el("label", { class: "sq-plan" + (s.plan === val ? " on" : "") },
+      el("input", { type: "radio", name: "plan-" + m.id, checked: s.plan === val, onchange: () => { s.plan = val; s.remove = new Set(); renderServiceQuote(); } }),
+      el("span", {}, el("b", {}, label), el("span", { class: "small" }, " " + money2(fee) + " + parts" + (+hrs ? " · about " + (+hrs) + " h on site" : ""))));
+    return el("div", { class: "sq-m on" }, head,
+      el("div", { class: "sq-plans" }, planBtn("annual", "Annual service", k.annual_fee, k.annual_hours),
+        k.six_fee != null ? planBtn("six", "6-month service", k.six_fee, k.six_hours) : null),
+      s.plan === "six" ? el("p", { class: "sq-warn" }, el("b", {}, "Caps, wipers and absorbers only. "),
+        "The 6-month service skips the annual PM parts (pumps, dampers, filters and valves). Skipping them can lead to a malfunction, so book the full annual service when you can.") : null,
+      parts.length ? el("table", { class: "tbl sub sq-parts" },
+        el("thead", {}, el("tr", {}, el("th", {}, ""), el("th", {}, "Part"), el("th", { class: "n" }, "Qty"), el("th", { class: "n" }, "Ex GST"))),
+        el("tbody", {}, ...parts.map((p) => {
+          const inc = !s.remove.has(p.pn);
+          return el("tr", { class: inc ? "" : "off" },
+            el("td", {}, el("input", { type: "checkbox", checked: inc, "aria-label": "Include " + p.name, onchange: (e) => { e.target.checked ? s.remove.delete(p.pn) : s.remove.add(p.pn); renderServiceQuote(); } })),
+            el("td", {}, p.name, el("div", { class: "muted small mono" }, p.pn)),
+            el("td", { class: "n" }, p.qty || 1),
+            el("td", { class: "n" }, p.ex == null ? "On the quote" : money2(p.ex * (p.qty || 1))));
+        }))) : el("p", { class: "muted small" }, "No parts in this kit."),
+      s.remove.size ? el("p", { class: "muted small" }, "Untick a part to leave it off. Leaving PM parts out can lead to a malfunction.") : null);
+  };
+  const t = sqTotals();
+  const extras = el("div", { class: "sq-extras" },
+    el("h3", {}, "Other parts"),
+    state.catAccess ? el("div", {},
+      el("input", { class: "field", id: "sqSearch", type: "search", placeholder: "Search parts, e.g. wiper, damper, ink filter", oninput: sqSearch }),
+      el("div", { id: "sqHits", class: "sq-hits" }),
+      SQ.extras.length ? el("table", { class: "tbl sub" }, el("tbody", {}, ...SQ.extras.map((x, i) => el("tr", {},
+        el("td", {}, x.name, el("div", { class: "muted small mono" }, x.pn || x.brand)),
+        el("td", { class: "n" }, el("input", { class: "field sq-qty", type: "number", min: 1, max: 99, value: x.qty, "aria-label": "Quantity", onchange: (e) => { x.qty = Math.max(1, Math.min(99, Math.round(+e.target.value || 1))); renderServiceQuote(); } })),
+        el("td", { class: "n" }, money2(x.ex * x.qty)),
+        el("td", {}, el("button", { class: "btn ghost small", type: "button", onclick: () => { SQ.extras.splice(i, 1); renderServiceQuote(); } }, "Remove")))))) : null)
+      : el("p", { class: "muted small" }, "To add other parts, ask us to turn on the Parts Catalogue for your account."));
+  const msg = el("p", { class: "msg", role: "status" });
+  const go = el("button", { class: "btn primary send", type: "button", disabled: !t.n, onclick: () => sendServiceQuote(go, msg) }, "Email me this quote");
+  layer.replaceChildren(el("div", { class: "sq-panel", role: "dialog", "aria-modal": "true", "aria-label": "Service quote" },
+    el("div", { class: "sq-headrow" }, el("h2", {}, "Service quote"), el("button", { class: "btn ghost", type: "button", "aria-label": "Close", onclick: closeServiceQuote }, "✕")),
+    el("p", { class: "muted small" }, "A fixed-price service for each machine, plus the PM parts it needs. Tick more machines to service them on the same visit: there's one callout for the whole visit. We create the quote and email it to you straight away."),
+    el("div", { class: "sq-list" }, ...list.map(machineBlock)),
+    extras,
+    el("label", { class: "f sq-note" }, el("span", { class: "small muted" }, "Anything we should know? (optional)"),
+      el("textarea", { class: "field", rows: 2, maxlength: 1000, oninput: (e) => (SQ.note = e.target.value) }, SQ.note)),
+    el("div", { class: "sq-sum" },
+      el("div", {}, el("span", {}, "Service" + (t.n > 1 ? "s (" + t.n + " machines)" : "")), el("span", {}, money2(t.svc))),
+      el("div", {}, el("span", {}, "Parts"), el("span", {}, money2(t.parts))),
+      el("div", {}, el("span", {}, "Callout (one for the visit)"), el("span", { class: "small" }, "$80 within 30 km · $125 within 100 km")),
+      el("div", { class: "sq-tot" }, el("span", {}, "Estimate before callout"), el("b", {}, money2(t.svc + t.parts) + " + GST")),
+      t.hrs ? el("div", { class: "muted small" }, "About " + t.hrs + " hours on site in total.") : null,
+      el("div", { class: "muted small" }, "Prices are ex GST. Service plan members' parts discount is applied on the quote.")),
+    go, msg));
+}
+async function sqSearch(e) {
+  const q = norm(e.target.value).trim(), box = $("#sqHits");
+  if (!q || q.length < 2) { box.replaceChildren(); return; }
+  if (!SQ.parts) {
+    box.replaceChildren(el("p", { class: "muted small" }, "Loading parts…"));
+    try { const r = await fetch("/service/parts", { credentials: "same-origin" }); SQ.parts = (await r.json()).parts || []; } catch (x) { SQ.parts = []; }
+  }
+  const words = q.split(/\s+/);
+  const hits = SQ.parts.filter((p) => { const h = norm([p.pn, p.name, p.brand, p.fam].join(" ")); return words.every((w) => h.includes(w)); }).slice(0, 12);
+  box.replaceChildren(...(hits.length ? hits.map((p) => el("button", { class: "sq-hit", type: "button", onclick: () => {
+    const ex = SQ.extras.find((x) => x.brand === p.brand && x.key === p.key);
+    if (ex) ex.qty++; else SQ.extras.push({ ...p, qty: 1 });
+    renderServiceQuote(); } }, el("span", {}, p.name, el("span", { class: "muted small" }, " " + [p.pn, p.fam].filter(Boolean).join(" · "))), el("span", { class: "small" }, money2(p.ex) + " +"))) : [el("p", { class: "muted small" }, "No parts match.")]));
+}
+async function sendServiceQuote(btn, msg) {
+  const machines = Object.entries(SQ.sel).map(([id, s]) => ({ id, plan: s.plan, remove: [...s.remove] }));
+  if (!machines.length) return;
+  btn.disabled = true; msg.className = "msg"; msg.textContent = "Creating your quote…";
+  try {
+    const r = await fetch("/service/quote", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ machines, extras: SQ.extras.map((x) => ({ brand: x.brand, key: x.key, qty: x.qty })), note: SQ.note }) });
+    const j = await r.json().catch(() => ({}));
+    if (!j.ok) throw new Error(j.error || "Couldn't create the quote.");
+    const panel = btn.closest(".sq-panel");
+    SQ.sel = {}; SQ.extras = []; SQ.note = "";
+    panel.replaceChildren(...[el("div", { class: "sq-headrow" }, el("h2", {}, "Quote sent"), el("button", { class: "btn ghost", type: "button", "aria-label": "Close", onclick: closeServiceQuote }, "✕")),
+      el("p", {}, "Quote " + (j.number || "") + " for " + money2(j.total) + " inc GST " + (j.sent ? "has been emailed to " + j.email + "." : "has been created. " + (j.error || ""))),
+      (j.skipped || []).length ? el("p", { class: "muted small" }, "Some parts couldn't be priced online, so we'll follow up on those.") : null,
+      el("p", { class: "muted small" }, "Accept the quote from the email or from Estimates on this page, then press Book on the machine to choose a time."),
+      el("button", { class: "btn primary", type: "button", onclick: closeServiceQuote }, "Done")].filter(Boolean));
+  } catch (e) {
+    msg.className = "msg err"; msg.textContent = e.message; btn.disabled = false;
+  }
+}
+
+// ---------- staff: Service kits (annual and 6-month PM kits, fixed prices, hours) ----------
+async function renderKits() {
+  const v = $("#view-kits");
+  if (!state.staff) { v.replaceChildren(); return; }
+  v.replaceChildren(el("div", { class: "head" }, el("h1", {}, "Service kits")), el("p", { class: "muted" }, "Loading…"));
+  const [{ data, error }, cov] = await Promise.all([sb.from("service_kits").select("*").order("priority").order("id"), sb.rpc("service_kit_coverage")]);
+  if (error) { v.replaceChildren(el("p", { class: "msg err" }, "Couldn't load the kits: " + error.message)); return; }
+  const kits = data || [], c = cov?.data || {}, used = c.kits || {};
+  const unc = (c.uncovered || []).filter((u) => /^(mim|mut|bro|epi|rol)/i.test(u.brand || ""));
+  v.replaceChildren(...[
+    el("div", { class: "head" }, el("h1", {}, "Service kits"),
+      el("button", { class: "btn", type: "button", onclick: async () => {
+        const { error: e } = await sb.from("service_kits").insert({ name: "New kit", brand: "Mimaki", models: [], priority: 100 });
+        if (e) alert(e.message); else renderKits(); } }, "+ New kit")),
+    el("p", { class: "muted small" }, "Each kit is the fixed service price, the hours on site and the parts for one model family. Customers see ",
+      el("b", {}, "Quote me"), " on a machine only when its kit is ", el("b", {}, "approved"),
+      ". The 6-month kit is the caps, wipers and absorbers only; leave its price blank to offer annual only. Part prices are ex GST and are what the quote uses. A callout is added once per visit. Models are matched on letters and digits, so “CJV150” matches CJV150-160; lower priority numbers are checked first."),
+    unc.length ? el("details", { class: "kb" }, el("summary", {}, unc.length + " customer models have no kit yet"),
+      el("p", { class: "small" }, unc.map((u) => u.brand + " " + (u.model || "(no model)") + " ×" + u.n).join(" · "))) : null,
+    ...kits.map((k) => kitCard(k, used[k.id] || 0))].filter(Boolean));
+}
+function kitCard(k, nMachines) {
+  const d = JSON.parse(JSON.stringify(k));
+  const note = el("span", { class: "saved" });
+  const inp = (key, attrs = {}) => el("input", { class: "field", value: d[key] ?? "", ...attrs, oninput: (e) => (d[key] = e.target.value) });
+  const partsEditor = (key, title) => {
+    const box = el("div", { class: "kit-pbox" });
+    const draw = () => box.replaceChildren(...[el("h4", {}, title),
+      el("table", { class: "tbl sub kit-parts" },
+        el("thead", {}, el("tr", {}, ...["Part no.", "Name", "Qty", "Ex GST each", "Note", ""].map((h) => el("th", {}, h)))),
+        el("tbody", {}, ...(d[key] || []).map((p, i) => el("tr", {},
+          el("td", {}, el("input", { class: "field", value: p.pn || "", oninput: (e) => (p.pn = e.target.value.trim()) })),
+          el("td", {}, el("input", { class: "field", value: p.name || "", oninput: (e) => (p.name = e.target.value) })),
+          el("td", {}, el("input", { class: "field n", type: "number", min: 1, value: p.qty ?? 1, oninput: (e) => (p.qty = Math.max(1, Math.round(+e.target.value || 1))) })),
+          el("td", {}, el("input", { class: "field n" + (p.ex == null || p.ex === "" ? " need" : ""), type: "number", step: "0.01", min: 0, value: p.ex ?? "", placeholder: "price",
+            oninput: (e) => { p.ex = e.target.value === "" ? null : +e.target.value; e.target.classList.toggle("need", e.target.value === ""); } })),
+          el("td", {}, el("input", { class: "field", value: p.note || "", oninput: (e) => (p.note = e.target.value) })),
+          el("td", {}, el("button", { class: "btn ghost small", type: "button", onclick: () => { d[key].splice(i, 1); draw(); } }, "Remove")))))),
+      el("button", { class: "btn small", type: "button", onclick: () => { (d[key] = d[key] || []).push({ pn: "", name: "", qty: 1, ex: null }); draw(); } }, "+ Add part"),
+      key === "six_parts" ? el("button", { class: "btn ghost small", type: "button", onclick: () => {
+        const cap = (d.annual_parts || []).filter((p) => /cap|wip|absorb|pad|felt|foam|pouch/i.test(p.name || ""));
+        d.six_parts = JSON.parse(JSON.stringify(cap)); draw(); } }, "Copy caps / wipers / absorbers from the annual kit") : null].filter(Boolean));
+    draw(); return box;
+  };
+  const approved = el("input", { type: "checkbox", checked: !!d.approved, onchange: (e) => (d.approved = e.target.checked) });
+  const save = async (btn) => {
+    const num = (x) => (x === "" || x == null ? null : +x);
+    const missing = [...(d.annual_parts || []), ...(d.six_parts || [])].filter((p) => !p.pn || p.ex == null || p.ex === "" || isNaN(+p.ex));
+    if (d.approved && missing.length) { note.className = "saved msg err"; note.textContent = "Price every part (and give it a part number) before approving: " + missing.map((p) => p.pn || p.name || "blank row").join(", "); return; }
+    if (d.approved && num(d.annual_hours) == null) { note.className = "saved msg err"; note.textContent = "Add the annual hours before approving."; return; }
+    const clean = (arr) => (arr || []).filter((p) => p.pn || p.name).map((p) => ({ pn: String(p.pn || "").trim(), name: String(p.name || "").trim(), qty: Math.max(1, Math.round(+p.qty || 1)), ex: p.ex == null || p.ex === "" ? null : Math.round(+p.ex * 100) / 100, ...(p.note ? { note: String(p.note) } : {}) }));
+    const row = { name: String(d.name || "").trim() || "Kit", brand: String(d.brand || "").trim(), priority: Math.round(+d.priority || 100),
+      models: String(Array.isArray(d.models) ? d.models.join(",") : d.models || "").split(",").map((s) => s.trim()).filter((s, i, a) => s || a.length === 1),
+      exclude: String(Array.isArray(d.exclude) ? d.exclude.join(",") : d.exclude || "").split(",").map((s) => s.trim()).filter(Boolean),
+      annual_fee: num(d.annual_fee) ?? 0, six_fee: num(d.six_fee), annual_hours: num(d.annual_hours), six_hours: num(d.six_hours),
+      annual_parts: clean(d.annual_parts), six_parts: clean(d.six_parts), approved: !!d.approved, notes: d.notes || null,
+      updated_at: new Date().toISOString(), updated_by: state.user?.email || null };
+    if (!row.models.length) row.models = [""];
+    btn.disabled = true; note.className = "saved"; note.textContent = "Saving…";
+    const { error } = await sb.from("service_kits").update(row).eq("id", k.id);
+    btn.disabled = false;
+    if (error) { note.className = "saved msg err"; note.textContent = "Not saved: " + error.message; return; }
+    Object.assign(k, row); note.className = "saved"; note.textContent = "Saved";
+    summary.replaceChildren(...summaryBits(k, nMachines));
+  };
+  const summary = el("summary", {}, ...summaryBits(k, nMachines));
+  const delBox = el("span", {});
+  const askDelete = () => delBox.replaceChildren(el("span", { class: "small" }, "Delete this kit for good? "),
+    el("button", { class: "btn danger small", type: "button", onclick: async () => { const { error } = await sb.from("service_kits").delete().eq("id", k.id); if (error) note.textContent = error.message; else renderKits(); } }, "Yes, delete"),
+    el("button", { class: "btn ghost small", type: "button", onclick: () => delBox.replaceChildren() }, "No"));
+  return el("details", { class: "kb kitcard" }, summary,
+    el("div", { class: "fgrid kit-grid" },
+      el("label", { class: "f" }, "Kit name", inp("name")),
+      el("label", { class: "f" }, "Brand", inp("brand")),
+      el("label", { class: "f" }, "Models (comma separated)", el("input", { class: "field", value: (d.models || []).join(", "), oninput: (e) => (d.models = e.target.value) })),
+      el("label", { class: "f" }, "Not these models", el("input", { class: "field", value: (d.exclude || []).join(", "), oninput: (e) => (d.exclude = e.target.value) })),
+      el("label", { class: "f" }, "Priority", inp("priority", { type: "number" })),
+      el("label", { class: "f" }, "Annual service price (ex GST)", inp("annual_fee", { type: "number", step: "0.01", min: 0 })),
+      el("label", { class: "f" }, "Annual service hours on site", inp("annual_hours", { type: "number", step: "0.5", min: 0, placeholder: "e.g. 3" })),
+      el("label", { class: "f" }, "6-month service price (blank = none)", inp("six_fee", { type: "number", step: "0.01", min: 0 })),
+      el("label", { class: "f" }, "6-month service hours on site", inp("six_hours", { type: "number", step: "0.5", min: 0, placeholder: "e.g. 1.5" }))),
+    partsEditor("annual_parts", "Annual PM kit"),
+    partsEditor("six_parts", "6-month kit (caps, wipers, absorbers)"),
+    el("label", { class: "f" }, el("span", { class: "small muted" }, "Notes (staff only)"), el("textarea", { class: "field", rows: 2, oninput: (e) => (d.notes = e.target.value) }, d.notes || "")),
+    k.source ? el("p", { class: "muted small" }, "Source: " + k.source) : null,
+    el("div", { class: "kit-actions" },
+      el("label", { class: "chk" }, approved, " Approved: customers can get this quote"),
+      el("button", { class: "btn primary", type: "button", onclick: (e) => save(e.currentTarget) }, "Save"), note,
+      el("button", { class: "btn ghost small", type: "button", onclick: askDelete }, "Delete kit"), delBox));
+}
+function summaryBits(k, n) {
+  const priced = [...(k.annual_parts || []), ...(k.six_parts || [])].every((p) => p.ex != null);
+  return [el("b", {}, k.name), " ",
+    el("span", { class: "pill " + (k.approved ? "ok" : "soon") }, k.approved ? "Approved" : "Draft"), " ",
+    el("span", { class: "muted small" }, [money2(k.annual_fee) + " annual" + (k.annual_hours ? " · " + k.annual_hours + " h" : " · hours not set"),
+      k.six_fee != null ? money2(k.six_fee) + " 6-month" + (k.six_hours ? " · " + k.six_hours + " h" : "") : "no 6-month",
+      (k.annual_parts || []).length + " annual parts", priced ? null : "some parts unpriced", n + " customer machine" + (n === 1 ? "" : "s")].filter(Boolean).join(" · "))];
+}
+
 // ---------- routing ----------
 function route() {
   if (!state.user) return;
@@ -1369,6 +1603,7 @@ function route() {
   else if (h === "reports") { show("view-reports"); renderReports(); }
   else if (h === "kb" && state.intranet) { show("view-kb"); renderKb(); }
   else if (h === "customers" && state.staff) { show("view-customers"); renderCustomers(); }
+  else if (h === "service-kits" && state.staff) { show("view-kits"); renderKits(); }
   else if (h === "contact") { show("view-contact"); renderContact(); }
   else { show("view-machines"); renderMachines(); }
   window.scrollTo(0, 0);

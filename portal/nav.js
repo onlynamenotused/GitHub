@@ -12,6 +12,7 @@
     if (f.supervisor) out.push(["reports", "/#reports", "Fleet reports"]);
     out.push(["contact", "/#contact", "Contact & booking"]);
     if (f.staff) out.push(["customers", "/#customers", "Customers (staff)"]);
+    if (f.staff) out.push(["service-kits", "/#service-kits", "Service kits (staff)"]);
     return out;
   }
   // f: { signedIn, email, staff, intranet, kb, cat, vector, active }

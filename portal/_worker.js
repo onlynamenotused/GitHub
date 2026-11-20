@@ -4,7 +4,7 @@
 // shared portal menu (nav.js + nav.css) added at the top, with their old cross-links removed.
 const SB_URL = "https://sfuuzcgwbbhdjqzrchvv.supabase.co";
 const SB_KEY = "sb_publishable_uu0N60ZMVjJ1kl14FW1NBA_v-cm_U3_"; // publishable key: safe, RLS protects data
-const V = "31";
+const V = "32";
 const GATED = {
   kb: { page: "/_p/kb/", flag: "kb", name: "Knowledge Base" },
   catalogue: { page: "/_p/catalogue/", flag: "cat", name: "Parts Catalogue" },
@@ -96,6 +96,35 @@ async function apiRoute(req, env, url, p) {
     const j = await r.json().catch(() => ({ ok: false, error: "The quote service didn't answer." }));
     return jres(j);
   }
+  // "Quote me" service quotes from My machines: same two steps as parts quotes.
+  if (p === "/service/quote" && req.method === "POST") {
+    const b = await req.json().catch(() => null);
+    if (!b) return jres({ ok: false, error: "Bad request" }, 400);
+    const s = await rpc("portal_service_quote_start", { p: b }, token);
+    if (!s.ok || !s.j || !s.j.quote_id) return jres({ ok: false, error: (s.j && (s.j.message || s.j.error)) || "Couldn't start the quote." });
+    const r = await fetch(FN_URL + "/quote", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ quote_id: s.j.quote_id, token: s.j.token }) });
+    return jres(await r.json().catch(() => ({ ok: false, error: "The quote service didn't answer." })));
+  }
+  // Parts a customer may add to a service quote: the catalogue rows for the brands they're allowed, with ex-GST prices.
+  if (p === "/service/parts") {
+    const f = await menuFlags(token).catch(() => null);
+    if (!f || !f.cat) return jres({ ok: true, parts: [] });
+    const allow = new Set(Array.isArray(f.cat_brands) && f.cat_brands.length && !f.staff ? f.cat_brands : CAT_ALL);
+    const html = await (await env.ASSETS.fetch(new Request(new URL("/_p/catalogue/", url.origin)))).text();
+    const a = html.indexOf("const DATA=["), z = html.indexOf("\n];", a), out = [], seen = new Set();
+    let brand = "", fam = "";
+    if (a >= 0 && z > a) for (const line of html.slice(a, z).split("\n")) {
+      const b = line.match(/^\{brand:"([^"]*)"(?:,family:"((?:[^"\\]|\\.)*)")?/);
+      if (b) { brand = b[1]; try { fam = b[2] ? JSON.parse('"' + b[2] + '"') : ""; } catch (e) { fam = ""; } }
+      const m = line.match(/^\s*\["((?:[^"\\]|\\.)*)","((?:[^"\\]|\\.)*)","((?:[^"\\]|\\.)*)",\s*(null|-?[\d.]+)/);
+      if (!m || !brand || m[4] === "null" || m[3] === "head" || !catKeep(brand, allow)) continue;
+      let pn, name; try { pn = JSON.parse('"' + m[1] + '"'); name = JSON.parse('"' + m[2] + '"'); } catch (e) { continue; }
+      const key = pn && pn !== "—" ? pn : name;
+      if (seen.has(brand + "|" + key)) continue; seen.add(brand + "|" + key);
+      out.push({ brand, key, pn, name, fam, ex: +m[4] });
+    }
+    return new Response(JSON.stringify({ ok: true, parts: out }), { headers: { "content-type": "application/json", "Cache-Control": "private, max-age=300" } });
+  }
   return null;
 }
 function quoteBlock(f) {
@@ -107,7 +136,7 @@ export default {
   async fetch(req, env) {
     const url = new URL(req.url);
     const p = url.pathname;
-    if (p === "/_src/catalogue" || p === "/vector/log" || p.startsWith("/catalogue/quote")) {
+    if (p === "/_src/catalogue" || p === "/vector/log" || p.startsWith("/catalogue/quote") || p.startsWith("/service/")) {
       const r = await apiRoute(req, env, url, p);
       if (r) return r;
     }

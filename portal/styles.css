@@ -255,3 +255,61 @@ table.billing td.act{text-align:right;white-space:nowrap}
 .mcard .mbook{position:absolute;top:12px;right:12px;padding:4px 14px;border-radius:999px;background:var(--accent);color:var(--accent-ink,#161616);font:600 13px var(--body);cursor:pointer}
 .mcard .mbook:hover{filter:brightness(1.08)}
 .mcard .model{padding-right:64px}
+
+/* "Quote me" on machine cards and the service quote panel */
+.mcard .mquote{position:absolute;top:46px;right:12px;padding:4px 12px;border-radius:999px;border:1px solid var(--accent);color:var(--fg);font:600 13px var(--body);cursor:pointer;background:transparent}
+.mcard .mquote:hover,.mcard .mquote:focus-visible{background:var(--accent);color:var(--accent-ink,#161616);outline:none}
+.sq-lock{overflow:hidden}
+.sq-layer{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.6);display:flex;justify-content:flex-end}
+.sq-panel{width:min(620px,100%);height:100%;overflow-y:auto;background:#121214;border-left:1px solid var(--line);box-sizing:border-box;display:flex;flex-direction:column;gap:12px;
+  padding:calc(16px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) calc(24px + env(safe-area-inset-bottom,0px)) 18px}
+.sq-headrow{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.sq-headrow h2{margin:0;font:700 24px var(--display)}
+.sq-list{display:flex;flex-direction:column;gap:8px}
+.sq-m{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--sunk);display:flex;flex-direction:column;gap:8px;min-width:0}
+.sq-m.on{border-color:var(--accent)}
+.sq-mhead{display:flex;gap:10px;align-items:flex-start;cursor:pointer}
+.sq-mhead input,.sq-parts input[type=checkbox]{width:18px;height:18px;accent-color:var(--accent);flex:none;margin-top:2px}
+.sq-plans{display:flex;flex-wrap:wrap;gap:6px}
+.sq-plan{flex:1 1 220px;display:flex;gap:8px;align-items:flex-start;border:1px solid var(--line);border-radius:8px;padding:8px 10px;cursor:pointer}
+.sq-plan.on{border-color:var(--accent);background:rgba(255,255,255,.05)}
+.sq-plan input{accent-color:var(--accent);margin-top:3px}
+.sq-warn{margin:0;padding:8px 10px;border-left:3px solid #e8b923;background:rgba(232,185,35,.12);border-radius:6px;font-size:13px}
+.sq-parts{width:100%;table-layout:fixed}
+.sq-parts th:nth-child(1),.sq-parts td:nth-child(1){width:30px}
+.sq-parts th:nth-child(3),.sq-parts td:nth-child(3){width:44px}
+.sq-parts th:nth-child(4),.sq-parts td:nth-child(4){width:96px}
+.sq-parts td:nth-child(2){overflow-wrap:anywhere}
+.sq-parts tr.off td:nth-child(n+2){opacity:.45;text-decoration:line-through}
+.tbl .n,.sq-parts .n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+.sq-extras h3{margin:4px 0 6px;font:600 16px var(--display)}
+.sq-extras .field{width:100%;box-sizing:border-box}
+.sq-hits{display:flex;flex-direction:column;gap:4px;margin:6px 0}
+.sq-hit{all:unset;box-sizing:border-box;display:flex;justify-content:space-between;gap:10px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;cursor:pointer;font-size:14px}
+.sq-hit:hover,.sq-hit:focus-visible{border-color:var(--accent)}
+.sq-qty{width:64px}
+.sq-note{display:flex;flex-direction:column;gap:4px}
+.sq-note textarea{width:100%;box-sizing:border-box}
+.sq-sum{display:flex;flex-direction:column;gap:4px;border-top:1px solid var(--line);padding-top:10px}
+.sq-sum>div{display:flex;justify-content:space-between;gap:12px}
+.sq-sum>div.muted{display:block}
+.sq-tot{font-size:16px;border-top:1px solid var(--line);padding-top:6px}
+/* staff Service kits page */
+.kitcard{margin-bottom:10px}
+.kitcard summary{cursor:pointer;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.kit-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin:12px 0}
+.kit-grid .f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
+.kit-parts{width:100%;margin:6px 0}
+.kit-parts .field{width:100%;box-sizing:border-box;padding:6px 8px}
+.kit-parts td:nth-child(1){width:150px}.kit-parts td:nth-child(3){width:70px}.kit-parts td:nth-child(4){width:110px}
+.field.need{border-color:var(--bad)}
+.kitcard h4{margin:12px 0 4px;font:600 14px var(--body)}
+.kitcard textarea{width:100%;box-sizing:border-box}
+.kit-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:10px}
+.chk{display:inline-flex;gap:8px;align-items:center;font-size:14px}
+.chk input{width:18px;height:18px;accent-color:var(--accent)}
+.kitcard>div.fgrid+div{overflow-x:auto}
+.kit-pbox{overflow-x:auto}
+.kit-pbox .kit-parts{min-width:640px}
+.mcard:has(.mquote)>span:nth-child(2){padding-right:96px}

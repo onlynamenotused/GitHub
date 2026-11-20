@@ -10,6 +10,8 @@ create table if not exists public.service_kits (
   exclude      text[] not null default '{}',
   annual_fee   numeric(10,2) not null default 0,    -- fixed annual service price, ex GST, parts and callout extra
   six_fee      numeric(10,2),                       -- fixed 6-month service price; null = no 6-month option
+  annual_hours numeric(4,1),                         -- hours on site for the service (staff record these)
+  six_hours    numeric(4,1),
   annual_parts jsonb not null default '[]',         -- [{pn, name, qty, ex, note}]
   six_parts    jsonb not null default '[]',
   approved     boolean not null default false,
@@ -41,7 +43,7 @@ grant execute on function public.service_kit_for(text, text, boolean) to authent
 create or replace function public.my_service_kits() returns jsonb
  language sql stable security definer set search_path = public as $$
   select coalesce(jsonb_object_agg(m.id, jsonb_build_object('id', k.id, 'name', k.name, 'annual_fee', k.annual_fee, 'six_fee', k.six_fee,
-           'annual_parts', k.annual_parts, 'six_parts', k.six_parts)), '{}'::jsonb)
+           'annual_hours', k.annual_hours, 'six_hours', k.six_hours, 'annual_parts', k.annual_parts, 'six_parts', k.six_parts)), '{}'::jsonb)
     from machines m
     join service_kits k on k.id = public.service_kit_for(m.brand, m.model, true)
    where m.status = 'active'
@@ -68,7 +70,7 @@ grant execute on function public.service_kit_coverage() to authenticated;
 -- and snapshots each machine's kit (fee + parts left in) so the quote matches what the customer saw.
 create or replace function public.portal_service_quote_start(p jsonb) returns jsonb
  language plpgsql security definer set search_path = public as $$
-declare em text := public.current_email(); cid bigint; nm text; qid bigint; tok text; r jsonb; mach record; k record;
+declare em text := public.current_email(); cid bigint; nm text; qid bigint; tok text; r jsonb; mach record; k record; has_kit boolean;
         plan text; rem jsonb; parts jsonb; ms jsonb := '[]'::jsonb; first_mid text; six_skipped jsonb;
         extras jsonb := coalesce(p->'extras', '[]'::jsonb);
 begin
@@ -85,7 +87,13 @@ begin
     elsif cid <> mach.client_id then raise exception 'Quote machines from one company at a time.'; end if;
     if ms @> jsonb_build_array(jsonb_build_object('id', mach.id)) then continue; end if;
     select * into k from service_kits where id = public.service_kit_for(mach.brand, mach.model, true);
-    if not found then raise exception 'We can''t quote a service for the % online yet. Please call us on 1300 880 815.', coalesce(nullif(trim(mach.brand || ' ' || coalesce(mach.model,'')),''), 'machine'); end if;
+    has_kit := found;
+    if not has_kit then
+      -- No approved PM kit for this model: a standard quote (1 hour labour + the visit's callout); parts quoted on inspection.
+      ms := ms || jsonb_build_array(jsonb_build_object('id', mach.id, 'brand', mach.brand, 'model', mach.model, 'serial', mach.serial,
+              'address', coalesce(nullif(trim(mach.location),''), nullif(trim(mach.site),'')), 'plan', 'standard', 'hours', 1, 'parts', '[]'::jsonb));
+      continue;
+    end if;
     plan := case when r->>'plan' = 'six' then 'six' else 'annual' end;
     if plan = 'six' and k.six_fee is null then raise exception 'The % has no 6-month service option.', k.name; end if;
     rem := case when jsonb_typeof(r->'remove') = 'array' then r->'remove' else '[]'::jsonb end;
@@ -101,6 +109,7 @@ begin
     ms := ms || jsonb_build_array(jsonb_build_object('id', mach.id, 'brand', mach.brand, 'model', mach.model, 'serial', mach.serial,
             'address', coalesce(nullif(trim(mach.location),''), nullif(trim(mach.site),'')),
             'kit_id', k.id, 'kit', k.name, 'plan', plan, 'fee', case when plan = 'six' then k.six_fee else k.annual_fee end,
+            'hours', case when plan = 'six' then k.six_hours else k.annual_hours end,
             'parts', parts, 'removed', (select coalesce(jsonb_agg(x->>'name'), '[]'::jsonb) from jsonb_array_elements(case when plan = 'six' then k.six_parts else k.annual_parts end) x where rem ? (x->>'pn')),
             'six_skipped', six_skipped));
   end loop;
