@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>Highway Digital Customer Knowledge Base</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@500;700;800&family=Inter:wght@400;500;600&display=swap">
+<style>
+/* Layout: same black band + gold identity as the Service and Hardware Catalogue. Machine finder at top, model detail panel, then brand libraries and the cleaning supplies guide. */
+:root{
+  --bg:#ffffff; --surface:#f6f6f6; --fg:#111111; --muted:#5e5e5e; --line:#e2e2e2;
+  --band:#161616; --band-fg:#ffffff; --gold:#e3c021; --gold-ink:#161616;
+  --chip:#ececec; --chip-fg:#1b1b1b; --warn:#7a4b00; --warn-bg:#fbf0d4;
+  --font-display:"League Spartan",Arial,Helvetica,sans-serif;
+  --font-body:"Inter",Arial,sans-serif;
+  --font-mono:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#111111; --surface:#1b1b1b; --fg:#f2f2f2; --muted:#a4a4a4; --line:#303030;
+  --band:#000000; --band-fg:#ffffff; --chip:#2a2a2a; --chip-fg:#dbdbdb; --warn:#f0d36a; --warn-bg:#3a3214; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111111; --surface:#1b1b1b; --fg:#f2f2f2; --muted:#a4a4a4; --line:#303030;
+  --band:#000000; --band-fg:#ffffff; --chip:#2a2a2a; --chip-fg:#dbdbdb; --warn:#f0d36a; --warn-bg:#3a3214; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:15px;line-height:1.5}
+.wrap{max-width:1100px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header.band{background:var(--band);color:var(--band-fg);position:relative;overflow:hidden}
+header.band .bandbg{position:absolute;inset:0;width:100%;height:100%;max-width:none;object-fit:cover;object-position:center 40%;z-index:0;pointer-events:none}
+header.band .wrap{position:relative;z-index:1}
+header.band .wrap{padding-block:90px 30px;min-height:200px;display:flex;flex-wrap:wrap;gap:16px 32px;align-items:flex-end;justify-content:space-between}
+.plate{display:flex;flex-direction:column;gap:6px}
+.plate small{font:600 12px var(--font-body);letter-spacing:.16em;text-transform:uppercase;color:var(--gold)}
+.plate h1{margin:0;font-family:var(--font-display);font-weight:800;font-size:clamp(28px,5vw,44px);line-height:1;text-transform:uppercase;text-wrap:balance}
+.plate h1 span{display:block;width:72px;height:5px;background:var(--gold);margin-top:12px}
+.meta{font-size:13px;color:#d6d6d6;text-shadow:0 1px 3px rgba(0,0,0,.8);max-width:46ch;display:flex;flex-direction:column;gap:10px}
+.meta a{color:var(--gold);font-weight:600}
+nav.jump{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+nav.jump .wrap{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding-block:10px}
+.chipbtn{font:600 13px var(--font-body);border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:4px;padding:6px 12px;cursor:pointer;text-decoration:none}
+.chipbtn:hover{border-color:var(--gold)}
+.chipbtn:focus-visible,#q:focus-visible,.mbtn:focus-visible,a:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.finder{display:flex;flex-direction:column;gap:10px}
+.finder label{font:700 13px var(--font-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+#q{font:16px var(--font-body);padding:10px 14px;border:2px solid var(--line);border-radius:6px;background:var(--surface);color:var(--fg);width:100%;max-width:560px;min-width:0}
+#q:focus{border-color:var(--gold)}
+.hits{display:flex;flex-wrap:wrap;gap:6px}
+main .wrap{padding-block:24px 48px;display:flex;flex-direction:column;gap:40px}
+h2.sec{font-family:var(--font-display);font-weight:800;font-size:28px;text-transform:uppercase;margin:0 0 6px;display:flex;align-items:center;gap:12px}
+h2.sec::after{content:"";flex:1;height:3px;background:var(--gold)}
+.lede{margin:0 0 14px;color:var(--muted);max-width:72ch;font-size:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.card h3{margin:0;font-family:var(--font-display);font-size:19px;font-weight:700}
+.card .sub{font-size:12px;color:var(--muted);margin-top:-6px}
+.spec{font:500 12px var(--font-body);color:var(--muted);margin-top:-6px;padding-left:8px;border-left:3px solid var(--gold);font-variant-numeric:tabular-nums}
+.inkpc{margin:-2px 0 0;font-size:12px;display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 8px}
+.inkpc dt{font-weight:600;color:var(--fg)}
+.inkpc dd{margin:0;color:var(--muted)}
+#detail .dh .dspec{font-size:13px;color:#cfcfcf;margin-top:4px}
+.links{display:flex;flex-direction:column;gap:4px;margin:0;padding:0;list-style:none}
+.links a{color:var(--fg);font-weight:600;font-size:14px;text-decoration:none;display:flex;gap:8px;align-items:baseline}
+.links a::before{content:"→";color:var(--gold);font-weight:800}
+.links a:hover{text-decoration:underline}
+.links .k{font:500 11px var(--font-body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-left:auto;white-space:nowrap}
+.mbtn{font:600 13px var(--font-body);border:1px solid var(--gold);background:transparent;color:var(--fg);border-radius:4px;padding:6px 10px;cursor:pointer;align-self:flex-start}
+.mbtn:hover{background:var(--gold);color:var(--gold-ink)}
+.modelchips{display:flex;flex-wrap:wrap;gap:6px}
+.modelchips button{font:500 12px var(--font-mono);background:var(--chip);color:var(--chip-fg);border:0;border-radius:3px;padding:3px 8px;cursor:pointer}
+.modelchips button:hover{background:var(--gold);color:var(--gold-ink)}
+#detail{border:2px solid var(--gold);border-radius:8px;background:var(--bg);overflow:hidden}
+#detail .dh{background:var(--band);color:var(--band-fg);padding:14px 16px;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:baseline;justify-content:space-between}
+#detail .dh h3{margin:0;font-family:var(--font-display);font-size:26px;font-weight:800;text-transform:uppercase}
+#detail .dh .brandtag{font:600 12px var(--font-body);letter-spacing:.14em;text-transform:uppercase;color:var(--gold)}
+#detail .dh button{font:600 13px var(--font-body);background:transparent;color:#ddd;border:1px solid #555;border-radius:4px;padding:4px 10px;cursor:pointer}
+.dbody{padding:16px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:20px}
+@media (max-width:760px){.dbody{grid-template-columns:1fr}}
+.dbody h4{margin:0 0 8px;font:700 12px var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.tbl{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:460px}
+th{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);font-weight:600}
+td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top;font-size:14px}
+th.num,td.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.pn{font:13px var(--font-mono);color:var(--muted);white-space:nowrap}
+.poa{font:600 12px var(--font-body);color:var(--warn);background:var(--warn-bg);border-radius:3px;padding:1px 7px}
+.buybtn{display:inline-block;font:600 12px var(--font-body);color:var(--gold-ink);background:var(--gold);border-radius:4px;padding:3px 9px;text-decoration:none;white-space:nowrap}
+.buybtn:hover{filter:brightness(.92)}
+.fam{font-size:12px;color:var(--muted)}
+.note{font-size:13px;color:var(--muted);margin:0;overflow-wrap:anywhere}
+#detail{scroll-margin-top:110px}
+.callout{background:var(--warn-bg);color:var(--fg);border-left:4px solid var(--gold);padding:12px 14px;border-radius:4px;font-size:14px;max-width:80ch}
+.callout b{color:var(--fg)}
+.clean{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.clean .cimg{width:100%;max-width:100%;aspect-ratio:4/3;object-fit:contain;background:#fff;border-radius:4px;border:1px solid var(--line)}
+.clean .card p{margin:0;font-size:14px}
+.clean ul{margin:0;padding-left:18px;font-size:14px;display:flex;flex-direction:column;gap:4px}
+.codes{display:flex;flex-wrap:wrap;gap:6px}
+.codes a,.codes span{font:600 12px var(--font-mono);text-decoration:none;border-radius:3px;padding:2px 7px}
+.codes a{background:var(--gold);color:var(--gold-ink)}
+.codes span{background:var(--chip);color:var(--chip-fg)}
+.empty{color:var(--muted);font-size:14px}
+.aibar{background:var(--warn-bg);color:var(--fg);border-bottom:1px solid var(--line)}
+.aibar .wrap{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:baseline;padding-block:8px;font-size:13px}
+.aibar b{color:var(--warn)}
+.aibar .ver{font:600 12px var(--font-mono);background:var(--band);color:var(--gold);border-radius:3px;padding:2px 8px;white-space:nowrap}
+.tpgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.tp{background:var(--surface);border:1px solid var(--line);border-radius:6px;overflow:hidden;display:flex;flex-direction:column;min-width:0}
+.tp .thumb{aspect-ratio:4/3;max-width:100%;background:#e9e9e9;display:flex;align-items:center;justify-content:center;border-bottom:1px solid var(--line)}
+.tp .thumb img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+.tp .tb{padding:12px;display:flex;flex-direction:column;gap:6px;flex:1}
+.tp h3{margin:0;font-family:var(--font-display);font-size:17px;font-weight:700;line-height:1.2}
+.tp .for{font:600 11px var(--font-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.tp p{margin:0;font-size:13px;color:var(--muted)}
+.tp .meta2{font:12px var(--font-mono);color:var(--muted);margin-top:auto;padding-top:4px}
+.tp .acts{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.dlbtn{font:600 13px var(--font-body);color:var(--gold-ink);background:var(--gold);border:0;border-radius:4px;padding:7px 12px;cursor:pointer;text-decoration:none}
+.dlbtn:hover{filter:brightness(.92)}
+.dlbtn:focus-visible{outline:3px solid var(--fg);outline-offset:2px}
+.dlbtn[disabled]{opacity:.6;cursor:progress}
+.reqtag{font:600 12px var(--font-body);color:var(--warn);background:var(--warn-bg);border-radius:3px;padding:3px 8px}
+.dlmsg{font-size:12px;color:var(--muted)}
+footer{border-top:1px solid var(--line)}
+footer .wrap{padding-block:20px 40px;font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:6px}
+footer a{color:var(--fg)}
+</style>
+<style>*,*::before,*::after{box-sizing:border-box}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<header class="band"><img class="bandbg" src="/img/kb-library-bg.jpg" alt="" aria-hidden="true"><div class="wrap">
+  <div class="plate"><small>Highway Digital · Perth WA</small><h1>Customer Knowledge Base<span></span></h1></div>
+  <div class="meta"><div>Operation manuals, drivers, firmware, RIP software, colour profiles and maintenance guides.</div></div>
+</div></header>
+<div class="aibar" role="note"><div class="wrap"><span class="ver">Version 1.22 Beta · 21 Nov 2026</span><span><b>AI-assisted.</b> This knowledge base was compiled with the help of AI, which can make mistakes. Check with us if anything looks wrong, and follow the manufacturer's instructions for any maintenance.</span></div></div>
+
+<nav class="jump" aria-label="Sections"><div class="wrap">
+  <a class="chipbtn" href="#find">Find my machine</a>
+  <a class="chipbtn" href="#mimaki">Mimaki</a>
+  <a class="chipbtn" href="#mutoh">Mutoh</a>
+  <a class="chipbtn" href="#gtx">Brother GTX</a>
+  <a class="chipbtn" href="#epilog">Epilog</a>
+  <a class="chipbtn" href="#cleaning">Cleaning &amp; maintenance</a>
+  <a class="chipbtn" href="#office">Office lasers</a>
+  <a class="chipbtn" href="#testprints">Test prints</a>
+</div></nav>
+
+<main><div class="wrap">
+  <section id="find" class="finder">
+    <label for="q">Find my machine</label>
+    <input id="q" type="search" autocomplete="off" placeholder="Type a model, e.g. UCJV300, UJF-7151, Fusion Pro, HL-L3270CDW, M5526cdw" aria-describedby="qhelp">
+    <p id="qhelp" class="note">Pick your model to see its downloads, manuals and specifications. Parts and consumables are in the <a href="../catalogue/">Parts Catalogue</a>. Service manuals aren't published here. Contact us for repairs.</p>
+    <div class="hits" id="hits" aria-live="polite"></div>
+    <div id="detail" hidden></div>
+  </section>
+
+  <section id="mimaki"><h2 class="sec">Mimaki</h2>
+    <p class="lede">Links go to Mimaki Australia. Each model has its operation manuals page and a download page with printer drivers, utilities and the RasterLink device profiles for your ink set. Firmware for the JV/CJV300 and 150 series is updated through Mimaki's updater; we can apply it for you at your next service.</p>
+    <p class="note" style="margin:-6px 0 12px">Print widths and speeds are the manufacturer's published figures; speeds are the fastest mode and real-world output is lower. The default ink set is the ink line and head layout the machine is shipped with, from Mimaki's installation guides; using it needs no change to the ink system. Any other ink set needs the ink paths changed by a technician. No Mimaki printer has Wi-Fi, and RasterLink runs on Windows only, so Mac users need a Windows PC for the RIP.</p>
+    <div class="grid" id="g-mimaki"></div></section>
+
+  <section id="mutoh"><h2 class="sec">Mutoh</h2>
+    <p class="lede">Mutoh has no Australian support site, so these link to its European support portal for firmware, user guides and technical bulletins.</p>
+    <div class="grid" id="g-mutoh"></div></section>
+
+  <section id="gtx"><h2 class="sec">Brother GTX</h2>
+    <p class="lede">Direct-to-garment printers. Use the printer driver and firmware versions together, as Brother recommends.</p>
+    <div class="grid" id="g-gtx"></div></section>
+
+  <section id="epilog"><h2 class="sec">Epilog</h2>
+    <p class="lede">Epilog has no Australian support site; its US support site holds the owner's manual for every laser, current and discontinued, and the print driver and firmware for each model.</p>
+    <div class="grid" id="g-epilog"></div></section>
+
+  <section id="cleaning"><h2 class="sec">Cleaning &amp; maintenance</h2>
+    <p class="lede">Daily and weekly user maintenance. Washing liquids, swabs, wipes and other consumables are in the <a href="../catalogue/">Parts Catalogue</a>.</p>
+    <p class="callout"><b>Match the liquid to your ink.</b> Washing liquids are made for one ink chemistry. The wrong one can block or damage print heads, so check your ink type first, or ask us. Never use household cleaners, cotton buds or tissues on print heads, caps or wipers.</p>
+    <div class="clean" id="g-clean" style="margin-top:14px"></div></section>
+
+  <section id="office"><h2 class="sec">Office lasers</h2>
+    <p class="lede">Brother and Kyocera office printers. Tap a model for its manufacturer downloads. Toner, drums and belts are in the <a href="../catalogue/">Parts Catalogue</a>.</p>
+    <div class="grid" id="g-office"></div></section>
+
+  <section id="testprints"><h2 class="sec">Test prints</h2>
+    <p class="lede">Reference files for checking colour, banding, white and clear layers, contour cutting and engraving after a service, an ink change or a new profile. Download, open in your RIP and print at 100% scale.</p>
+    <div class="tpgrid" id="g-tp"></div>
+    <p class="note" style="margin-top:12px">Downloads come from the Highway Digital OneDrive. The larger files (up to 178 MB) can take a few minutes. You can also <a href="https://netorgft6773677-my.sharepoint.com/:f:/g/personal/hello_highwaydigital_com_au/IgBKZsi2tdwARLzfYCAegI88AdI5bRWnipSA0y7Q_kZM0ow" target="_blank" rel="noopener">browse every public test file in one folder</a>. For files marked <b>On request</b>, email hello@highwaydigital.com.au with the file name and we'll send you a download link.</p></section>
+</div></main>
+
+<footer><div class="wrap">
+  <div>Customer Knowledge Base Version 1.22 Beta · 21 Nov 2026 · Highway Digital · hello@highwaydigital.com.au · Links go to the manufacturers' official support sites, Australian (.com.au) sites first where one exists; their pages may change.</div>
+  <div>Parts and consumables, with prices, are in the <a href="../catalogue/">Parts Catalogue</a>.</div>
+</div></footer>
+
+<script>
+const OFF_TAGS=["HL-1110", "HL-1210W", "DCP-1510", "MFC-1810", "HL-2040", "HL-2070N", "MFC-7220", "MFC-7420", "DCP-7040", "HL-2140", "HL-2150N", "HL-2170W", "DCP-7060D", "DCP-7065DN", "HL-2240D", "HL-2270DW", "HL-L2300D", "HL-L2340DW", "HL-L2365DW", "MFC-L2700DW", "HL-L2350DW", "HL-L2375DW", "HL-L2395DW", "MFC-L2710DW", "DCP-L2640DW", "HL-L2400DW", "HL-L2445DW", "HL-L2460DW", "MFC-L2820DW", "DCP-8040", "DCP-8045DN", "HL-5240", "HL-5250DN", "HL-5440D", "HL-5450DN", "HL-5470DW", "HL-6180DW", "HL-L5100DN", "HL-L5200DW", "HL-L6200DW", "HL-L6400DW", "MFC-L5755DW", "HL-L6210DW", "MFC-L5710DW", "MFC-L5915DW", "MFC-L6720DW", "HL-3040CN", "HL-3070CW", "MFC-9120CN", "MFC-9320CW", "HL-3150CDN", "HL-3170CDW", "MFC-9140CDN", "MFC-9330CDW", "HL-L3230CDW", "HL-L3270CDW", "MFC-L3745CDW", "MFC-L3750CDW", "MFC-L3770CDW", "DCP-L3520CDW", "DCP-L3560CDW", "HL-L3240CDW", "HL-L3280CDW", "MFC-L3760CDW", "HL-L8250CDN", "HL-L8350CDW", "MFC-L8600CDW", "MFC-L8850CDW", "DCP-9055CDN", "HL-4150CDN", "HL-4570CDW", "MFC-9460CDN", "HL-L9200CDW", "MFC-L9550CDW", "HL-L8260CDW", "HL-L8360CDW", "MFC-L8690CDW", "MFC-L8900CDW", "HL-L8430CDW", "MFC-L8730CDW", "MFC-L8930CDW", "MFC-L8970CDW", "MFC-7440", "HL-2250DN", "HL-5340D", "HL-5350DN", "HL-5370DW", "HL-5380DN", "DCP-8155DN", "HL-L8240CDW", "HL-L9310CDW", "HL-L1230W", "DCP-7055", "HL-2130", "HL-2135", "MFC-7340", "FAX-2840", "MFC-L2750DW", "MFC-L2880DW", "MFC-L2920DW", "HL-5270DN", "MFC-8460N", "MFC-8860DN", "MFC-8950DW", "MFC-L6700DW", "MFC-L6900DW", "HL-L5210DW", "DCP-9010CN", "MFC-9340CDW", "MFC-L3755CDW", "MFC-L8390CDW", "MFC-9970CDW", "HL-L9470CDN", "MFC-L9630CDN", "MFC-L9670CDN", "MFC-8880DN", "HL-L6415DW", "TASKalfa MZ2501ci", "TASKalfa 2552ci", "TASKalfa 3252ci", "TASKalfa 2553ci", "TASKalfa 3253ci", "FS-720", "FS-820", "FS-920", "FS-1016MFP", "FS-1028MFP", "FS-1128MFP", "FS-1300D", "FS-1120D", "P2035d", "FS-1320D", "FS-1370DN", "P2135d", "FS-2020D", "FS-3040MFP", "FS-3140MFP", "FS-3540MFP", "FS-3640MFP", "FS-4020DN", "FS-6970DN", "FS-6025MFP", "FS-6030MFP", "FS-6525MFP", "FS-6530MFP", "FS-9530DN", "FS-1061DN", "FS-1325MFP", "FS-1030MFP", "FS-1130MFP", "M2030dn", "M2530dn", "FS-1035MFP", "FS-1135MFP", "P2235dn", "P2235dw", "P2040dn", "P2040dw", "M2040dn", "M2540dn", "M2640idw", "M2635dn", "M2735dw", "MA2000w", "PA3500x", "PA4000x", "PA4000wx", "MA4000x", "MA4000fx", "MA4000wifx", "MA3501wfx", "FS-2100D", "FS-2100DN", "M3040idn", "M3540idn", "FS-4100DN", "FS-4200DN", "FS-4300DN", "M3550idn", "M3560idn", "P3045dn", "P3145dn", "M3645dn", "M3645idn", "P3050dn", "P3150dn", "P3055dn", "P3060dn", "P3155dn", "M3860idn", "PA4500x", "MA4500fx", "MA4500ifx", "PA5000x", "PA5500x", "MA5500ifx", "PA6000x", "MA6000ifx", "M4125idn", "M4132idn", "P4060dn", "MZ3201i", "P4040dn", "P4140dn", "FS-C2026MFP", "FS-C2126MFP", "FS-C2526MFP", "FS-C2626MFP", "FS-C8020MFP", "FS-C8025MFP", "FS-C8520MFP", "FS-C8525MFP", "P6130cdn", "M6030cdn", "M6530cdn", "P6035cdn", "M6535cdn", "P7040cdn", "P5021cdn", "P5021cdw", "M5521cdn", "M5521cdw", "P5026cdn", "P5026cdw", "M5526cdn", "M5526cdw", "P6230cdn", "M6230cidn", "M6630cidn", "P6235cdn", "M6635cidn", "P7240cdn", "PA3500cx", "MA3500cix", "MA3500cifx", "PA4000cx", "MA4000cifx", "PA4500cx", "PA2100cx", "PA2100cwx", "MA2100cfx", "MA2100cwfx", "PA2600cx", "PA2600cwx", "MA2600cwx", "MA2600cwfx", "PA2101cx", "PA2101cwx", "MA2101cfx", "MA2101cwfx", "M8124cidn", "M8130cidn", "P8060cdn"];
+const SGM="https://www.mimakiaus.com.au/product/inkjet/";
+const L={
+  mmVideos:["Maintenance videos","https://www.mimakiaus.com.au/support/support-videos.html","Video"],
+  mmFaq:["Mimaki Australia FAQ","https://www.mimakiaus.com.au/support/faq/","Help"],
+  rl7:["RasterLink7 RIP software","https://www.mimakiaus.com.au/product/software/rip/raster-link7/","RIP"],
+  rl6p:["RasterLink6 Plus RIP software","https://www.mimakiaus.com.au/product/software/rip/raster-link6plus/","RIP"],
+  mmFw300:["JV/CJV300 & 150 firmware updater (Mimaki global)","https://mimaki.com/download/driver/entry-285808.html","Firmware"],
+  mtPortal:["Mutoh Europe support portal (manuals, bulletins)","https://support.mutoh.eu/support/solutions","Docs"],
+  mtFw:["Latest XPJ-1641SR firmware","https://support.mutoh.eu/support/solutions/latest-firmware-download-for-xpj-1641sr-p","Firmware"],
+  gtxMan:["Instruction & setup manuals (Brother Asia-Pacific)","https://garmentprinter.global.brother/en-ap/support/download/download-manual","Manual"],
+  gtxDrv:["Printer driver & firmware (Brother Asia-Pacific)","https://garmentprinter.global.brother/en-ap/support/download/download-driver-and-firm","Firmware"],
+  gtxTools:["GTX Graphics Lab & tools (Brother Asia-Pacific)","https://garmentprinter.global.brother/en-ap/support/download/download-useful-tools","Software"],
+  gtxMaint:["Maintenance videos (Brother Asia-Pacific)","https://garmentprinter.global.brother/en-ap/support/maintenance","Video"],
+  epMan:["Owner's manuals, all models (Epilog USA)","https://support.epiloglaser.com/manuals/","Manual"],
+  epDrv:["Drivers & firmware (Epilog USA)","https://support.epiloglaser.com/drivers/","Firmware"],
+  kyDc:["Kyocera download centre (drivers, manuals, global)","https://www.kyoceradocumentsolutions.com/support_product/index_en.html","Drivers"],
+  kyHelp:["Kyocera Australia help centre","https://kyoceradocumentsolutions.com.au/support-centre","Help"],
+  kySetup:["Setting up a Kyocera printer","https://help.kyoceradocumentsolutions.com.au/knowledge/setup-printer","Guide"]
+};
+const mm=(path,label)=>[label||"Downloads: drivers, profiles, utilities",SGM+path+"/download.html","Downloads"];
+const mmMan=path=>["Operation manuals",SGM+path+"/download-manual.html","Manual"];
+/* machines: name, brand key, subtitle, links, catalogue fit tags */
+function inkPc(m){if(!m.ink&&!m.pc&&!m.hd&&!m.th)return"";return `<dl class="inkpc">${m.hd?`<dt>Print heads</dt><dd>${esc(m.hd)}</dd>`:""}${m.th?`<dt>Max media thickness</dt><dd>${esc(m.th)}</dd>`:""}${m.ink?`<dt>Default ink set</dt><dd>${esc(m.ink)}</dd>`:""}${m.pc?`<dt>PC connection</dt><dd>${esc(m.pc)}</dd>`:""}</dl>`}
+const M=[
+ {n:"JV150",th:"1.0 mm or less",hd:"1",ink:"4-colour · ink slots 1–8: M M C C Y Y K K",pc:"USB 2.0 · LAN for email alerts only · Windows PC (RasterLink)",sp:"Print width 1,361 / 1,610 mm · up to 56.2 m²/h",b:"mimaki",s:"Eco-solvent roll printer",l:[mmMan("i-roll/jv150-series"),mm("i-roll/jv150-series"),L.mmFw300,L.rl7,L.mmVideos,L.mmFaq],t:["JV150","All Mimaki inkjets"]},
+ {n:"JV300",th:"1.0 mm or less",hd:"2, staggered",ink:"4-colour · ink slots 1–8: M M C C Y Y K K",pc:"USB 2.0 · LAN for email alerts only · Windows PC (RasterLink)",sp:"Print width 1,361 / 1,610 mm · up to 105.9 m²/h",b:"mimaki",s:"Eco-solvent roll printer",l:[mmMan("i-roll/jv300-series"),mm("i-roll/jv300-series"),L.mmFw300,L.rl7,L.mmVideos,L.mmFaq],t:["JV300","JV300 / Plus","All Mimaki inkjets"]},
+ {n:"JV300 Plus",th:"1.0 mm or less",hd:"2, staggered",ink:"4-colour · ink slots 1–8: M M C C Y Y K K",pc:"USB 2.0 · LAN for email alerts only · Windows PC (RasterLink)",sp:"Print width 1,361 / 1,610 mm · up to 105.9 m²/h",b:"mimaki",s:"Eco-solvent roll printer",l:[mmMan("i-roll/jv300_plus-series"),mm("i-roll/jv300_plus-series"),L.mmFw300,L.rl7,L.mmVideos,L.mmFaq],t:["JV300 / Plus","All Mimaki inkjets"]},
+ {n:"CJV150",th:"1.0 mm or less",hd:"1",ink:"4-colour · ink slots 1–8: M M C C Y Y K K",pc:"USB 2.0 · LAN for email alerts only · Windows PC (RasterLink)",sp:"Print width 800–1,610 mm · up to 56.2 m²/h",b:"mimaki",s:"Print & cut",l:[mmMan("print-cut/cjv150-series"),mm("print-cut/cjv150-series"),L.mmFw300,L.rl7,L.mmVideos,L.mmFaq],t:["CJV150","All Mimaki inkjets"]},
+ {n:"CJV300",th:"1.0 mm or less",hd:"2, staggered",ink:"4-colour · ink slots 1–8: M M C C Y Y K K",pc:"USB 2.0 · LAN for email alerts only · Windows PC (RasterLink)",sp:"Print width 1,361 / 1,610 mm · up to 105.9 m²/h",b:"mimaki",s:"Print & cut",l:[mmMan("print-cut/cjv300-series"),mm("print-cut/cjv300-series"),L.mmFw300,L.rl7,L.mmVideos,L.mmFaq],t:["CJV300","CJV300 / Plus","All Mimaki inkjets"]},
+ {n:"CJV300 Plus",th:"1.0 mm or less",hd:"2, staggered",ink:"4-colour · ink slots 1–8: M M C C Y Y K K",pc:"USB 2.0 · LAN for email alerts only · Windows PC (RasterLink)",sp:"Print width 1,361 / 1,610 mm · up to 105.9 m²/h",b:"mimaki",s:"Print & cut",l:[mmMan("print-cut/cjv300_plus-series"),mm("print-cut/cjv300_plus-series"),L.mmFw300,L.rl7,L.mmVideos,L.mmFaq],t:["CJV300 / Plus","All Mimaki inkjets"]},
+ {n:"UCJV150",th:"1.0 mm or less",hd:"1",ink:"4-colour · ink bottles 1–4: C M Y K (the only ink set)",pc:"USB 2.0 · Ethernet 1000BASE-T · Windows PC (RasterLink)",sp:"Print width 1,610 mm · up to 13.4 m²/h",b:"mimaki",s:"UV-LED print & cut",l:[mmMan("print-cut/ucjv150-160"),mm("print-cut/ucjv150-160"),L.rl6p,L.mmVideos,L.mmFaq],t:["UCJV150","All Mimaki inkjets"]},
+ {n:"UCJV300",th:"1.0 mm or less",hd:"2, staggered",ink:"4-colour · ink bottles 1–8: C M Y K Y K M C",pc:"USB 2.0 · Ethernet 1000BASE-T · Windows PC (RasterLink)",sp:"Print width 800–1,610 mm · up to 25.8 m²/h",b:"mimaki",s:"UV-LED print & cut",l:[mmMan("print-cut/ucjv300-series"),mm("print-cut/ucjv300-series"),L.rl7,L.mmVideos,L.mmFaq],t:["UCJV300","UCJV300-160","All Mimaki inkjets"]},
+ {n:"UCJV330",th:"1.0 mm or less",hd:"2, staggered",ink:"4-colour · ink bottles 1–8: M C Y K K Y C M",pc:"Ethernet 1000BASE-T (recommended) · USB 2.0 · Windows PC (RasterLink)",sp:"Print width 1,610 mm · up to 40 m²/h",b:"mimaki",s:"UV-LED print & cut",l:[mmMan("print-cut/ucjv330-series"),mm("print-cut/ucjv330-series"),L.rl7,L.mmVideos,L.mmFaq],t:["UCJV330","All Mimaki inkjets"]},
+ {n:"TxF150-75",th:"1.0 mm or less",hd:"1",ink:"4-colour + White · ink slots 1–6: M C Y K W W",pc:"USB 2.0 · Ethernet 1000BASE-T · Windows PC (RasterLink)",sp:"Print width 800 mm · up to 3.3 m²/h",b:"mimaki",s:"DTF printer",l:[mmMan("dtf/txf150-75"),mm("dtf/txf150-75"),L.rl7,L.mmVideos,L.mmFaq],t:["TxF150-75","TxF","All Mimaki inkjets"]},
+ {n:"TxF300-75",th:"1.0 mm or less",hd:"2, staggered",ink:"4-colour + White · ink slots 1–8: M C Y K W W W W",pc:"USB 2.0 · Ethernet 1000BASE-T · Windows PC (RasterLink)",sp:"Print width 800 mm · up to 10 m²/h",b:"mimaki",s:"DTF printer",l:[mmMan("dtf/txf300-75"),mm("dtf/txf300-75"),L.rl7,L.mmVideos,L.mmFaq],t:["TxF300-75","TxF","All Mimaki inkjets"]},
+ {n:"UJV300DTF-75",hd:"2",ink:"4-colour + White + Clear · ELS-170 flexible C M Y K + ELH-100 hard W W Cl Cl · 1 L bottles, white ink circulation",pc:"USB 2.0 · Ethernet 1000BASE-T · Windows PC (RasterLink)",sp:"Print width 640 mm · media up to 650 mm, 45 kg rolls",b:"mimaki",s:"UV-DTF printer",l:[mmMan("dtf/ujv300dtf-75"),mm("dtf/ujv300dtf-75"),L.rl7,L.mmVideos,L.mmFaq],t:["UJV300DTF-75","UJV300DTF","All Mimaki inkjets"]},
+ {n:"Tx300P-1800",th:"1.0 mm or less",hd:"4",ink:"4-colour · ink slots 1–8: M M C C Y Y K K (with Sb420 sublimation ink: M M Bl Bl Y Y K K)",pc:"USB 2.0 · Ethernet 1000BASE-T (MkII) · Windows PC (RasterLink)",sp:"Print width 1,920 mm · up to 68 m²/h (draft)",b:"mimaki",s:"Textile printer",l:[mmMan("textile/tx300p-1800"),mm("textile/tx300p-1800"),L.rl6p,L.mmFaq],t:["Tx300P-1800","Tx300P","Tx300P-1800 MkII","All Mimaki inkjets"]},
+ {n:"TS300P-1800",th:"1.0 mm or less",hd:"4, in line",sp:"Print width 1,940 mm · up to 115 m²/h (draft)",b:"mimaki",s:"Sublimation printer",l:[mmMan("textile/ts300p-1800"),mm("textile/ts300p-1800"),L.rl6p,L.mmFaq],t:["TS300P-1800","All Mimaki inkjets"]},
+ {n:"JFX200-2513 EX",th:"Up to 50 mm standard · 52–102 mm with the optional Lift-Up Block (OPT-J0513)",hd:"3 (2 staggered for colour, 1 in line for special colours)",ink:"4-colour + White + Clear (+ Primer) · bottles 1–8: C M W W Y K Cl/Pr Cl",pc:"Ethernet 1000BASE-T (recommended) · USB 2.0 · Windows PC (RasterLink)",sp:"Print area 2,500 × 1,300 mm · up to 35 m²/h (draft)",b:"mimaki",s:"UV flatbed",l:[mmMan("i-flat/jfx200-2513-ex"),mm("i-flat/jfx200-2513-ex"),L.rl7,L.mmFaq],t:["JFX200-2513 EX","JFX200 EX","All Mimaki inkjets"]},
+ {n:"JFX200-1213 EX",th:"Up to 50 mm standard · 52–102 mm with the optional Lift-Up Block (OPT-J0513)",hd:"3 (2 staggered for colour, 1 in line for special colours)",ink:"4-colour + White + Clear (+ Primer) · bottles 1–8: C M W W Y K Cl/Pr Cl",pc:"Ethernet 1000BASE-T (recommended) · USB 2.0 · Windows PC (RasterLink)",sp:"Print area 1,270 × 1,300 mm · up to 25 m²/h",b:"mimaki",s:"UV flatbed",l:[mmMan("i-flat/jfx200-1213-ex"),mm("i-flat/jfx200-1213-ex"),L.rl7,L.mmFaq],t:["JFX200 EX","All Mimaki inkjets"]},
+ {n:"UJF-3042MkII e",th:"153 mm (53 mm table travel + up to two 50 mm spacers)",hd:"3, staggered",ink:"White circulation line connected as shipped · 4-head model bottles: Y C M K + 4 special-colour slots (W, Cl or Pr, chosen at first fill)",pc:"USB 2.0 · Ethernet 1000BASE-T · Windows PC (RasterLink)",sp:"Print area 300 × 420 mm · up to 342 objects/h",b:"mimaki",s:"UV flatbed",l:[mmMan("i-flat/ujf-3042mkII-e"),mm("i-flat/ujf-3042mkII-e"),L.rl7,L.mmVideos,L.mmFaq],t:["UJF series","All Mimaki inkjets"]},
+ {n:"UJF-7151 plusII e",th:"153 mm or less",hd:"8 (2-6 or 4-4 stagger)",ink:"Heads in 2-6 stagger layout · heads 3–8: Lm Lc M C Y K · heads 1–2: White, Clear, Primer or Silver, chosen at first fill",pc:"USB 2.0 · Ethernet 1000BASE-T · Windows PC (RasterLink)",sp:"Print area 710 × 510 mm · up to 8.0 m²/h",b:"mimaki",s:"UV flatbed · up to 153 mm thick",l:[mmMan("i-flat/ujf-7151plusII-e"),mm("i-flat/ujf-7151plusII-e"),L.rl7,L.mmVideos,L.mmFaq],t:["UJF series","All Mimaki inkjets"]},
+ {n:"UJF-7151 plusII",th:"153 mm or less",hd:"8 (2-6 or 4-4 stagger)",ink:"8 heads, 2-6 or 4-4 stagger (factory layout not stated) · in 2-6 stagger, heads 3–8: Lm Lc M C Y K and heads 1–2: White, Clear, Primer or Silver, chosen at first fill",pc:"USB 2.0 · Ethernet 1000BASE-T · Windows PC (RasterLink)",sp:"Print area 710 × 510 mm · up to 8.0 m²/h",b:"mimaki",s:"UV flatbed · up to 153 mm thick",l:[mmMan("i-flat/ujf-7151plusII"),mm("i-flat/ujf-7151plusII"),L.rl7,L.mmVideos,L.mmFaq],t:["UJF series","All Mimaki inkjets"]},
+ {n:"UJF-7151 plus",th:"153 mm or less",hd:"6",ink:"6 heads · heads 3–6: M C Y K · heads 1–2: White, Clear, Primer or Silver, chosen at first fill",pc:"USB 2.0 · Ethernet 1000BASE-T · Windows PC (RasterLink)",sp:"Print area 710 × 510 mm",b:"mimaki",s:"UV flatbed · up to 153 mm thick",l:[mmMan("i-flat/ujf-7151plus"),mm("i-flat/ujf-7151plus"),L.rl6p,L.mmVideos,L.mmFaq],t:["UJF series","All Mimaki inkjets"]},
+ {n:"XPJ-1641SR",sp:"Print width 1,615 mm · up to 8 m²/h (15.5 m²/h SR Pro)",b:"mutoh",s:"Eco-solvent roll printer",l:[L.mtPortal,L.mtFw],t:["XPJ-1641SR"]},
+ {n:"XPJ-1682SR",sp:"Print width 1,615 mm · dual print heads",b:"mutoh",s:"Eco-solvent roll printer",l:[L.mtPortal],t:["XPJ-1682SR"]},
+ {n:"GTX-422",sp:"Print area 406 × 533 mm (16 × 21 in)",b:"gtx",s:"GTX",l:[L.gtxMan,L.gtxDrv,L.gtxTools,L.gtxMaint],t:["GTX","GTX-422"]},
+ {n:"GTX Pro",sp:"Print area 406 × 533 mm · up to 57 light / 42 dark shirts/h",b:"gtx",s:"GTX-423 / GTX-424",l:[["Brother Australia GTX-423: drivers & firmware","https://www.brother.com.au/en/support/gtx-423/downloads","Downloads"],["Brother Australia GTX-423: manuals","https://www.brother.com.au/en/support/gtx-423/manuals","Manual"],["Brother Australia GTX-424: drivers & firmware","https://www.brother.com.au/en/support/gtx-424/downloads","Downloads"],["Brother Australia GTX-424: manuals","https://www.brother.com.au/en/support/gtx-424/manuals","Manual"],L.gtxTools,L.gtxMaint],t:["GTX","GTX Pro","GTX Pro (GTX-423 / 424)"]},
+ {n:"Fusion Pro",sp:"Work area 610 × 610 to 1,219 × 914 mm · 4.2 m/s (165 IPS)",b:"epilog",s:"24 / 32 / 36 / 48",l:[L.epMan,L.epDrv],t:["Fusion Pro","Fusion Pro 24","Fusion Pro 36","Fusion Pro Dual","All Epilog"]},
+ {n:"Fusion Edge",sp:"Work area 610 × 305 to 914 × 610 mm · 3.0 m/s (120 IPS)",b:"epilog",s:"12 / 24 / 36",l:[L.epMan,L.epDrv],t:["Fusion Edge","Fusion Edge 24","Fusion Edge 36","All Epilog"]},
+ {n:"Fusion Maker",sp:"Work area 610 × 305 to 914 × 610 mm · 1.5 m/s (60 IPS)",b:"epilog",s:"12 / 24 / 36",l:[L.epMan,L.epDrv],t:["Fusion Maker","Fusion Maker 24","All Epilog"]},
+ {n:"Fusion M2",sp:"Work area 812 × 508 / 1,016 × 711 mm",b:"epilog",s:"32 / 40, single and dual source",l:[L.epMan,L.epDrv],t:["Fusion M2","Fusion M2 60W","Fusion M2 Dual","All Epilog"]},
+ {n:"Fusion 32 / 40",sp:"Work area 812 × 508 / 1,016 × 711 mm",b:"epilog",s:"Original Fusion",l:[L.epMan,L.epDrv],t:["Fusion","Fusion 32","Fusion 40","Fusion 32/40","All Epilog"]},
+ {n:"Helix",sp:"Work area 610 × 457 mm",b:"epilog",s:"Helix 24",l:[L.epMan,L.epDrv],t:["Helix","Helix CO2","All Epilog"]},
+ {n:"Mini 18 / 24",sp:"Work area 457 × 305 / 610 × 305 mm",b:"epilog",s:"Mini",l:[L.epMan,L.epDrv],t:["Mini","Mini 18","Mini 24","All Epilog"]},
+ {n:"Zing 16 / 24",sp:"Work area 406 × 305 / 610 × 305 mm",b:"epilog",s:"Zing",l:[L.epMan,L.epDrv],t:["Zing","Zing 16","Zing 24","All Epilog"]},
+ {n:"Legend 36EXT",sp:"Work area 914 × 609 mm",b:"epilog",s:"Legend",l:[L.epMan,L.epDrv],t:["Legend 36EXT","All Epilog"]}
+];
+/* office lasers: every Brother / Kyocera model named in the catalogue */
+const OFF_ATTR=new Set(["A3","A4","Colour","Mono","Duplex","Duplex scan","Network","Wi-Fi","Touchscreen","Printer","Print / copy / scan","Print / copy / scan / fax","25 ppm"]);
+const brotherL=m=>{const s=m.toLowerCase();return [["Brother Australia: drivers & downloads",`https://www.brother.com.au/en/support/${s}/downloads`,"Drivers"],["Brother Australia: manuals",`https://www.brother.com.au/en/support/${s}/manuals`,"Manual"]]};
+const OFFICE=[];
+for(const t of OFF_TAGS){
+  if(OFF_ATTR.has(t)) continue;
+  if(/^(HL|DCP|MFC|FAX)-/.test(t)) OFFICE.push({n:t,b:"brother",s:"Brother office laser",l:brotherL(t),t:[t]});
+  else if(/^(FS-|M\d|P\d|PA\d|MA\d|TASKalfa|MZ\d)/.test(t)) OFFICE.push({n:t,b:"kyocera",s:"Kyocera ECOSYS / TASKalfa",l:[L.kyHelp,L.kySetup,L.kyDc],t:[t]});
+}
+const natural=(a,b)=>a.n.localeCompare(b.n,"en",{numeric:true});
+OFFICE.sort(natural);
+const ALL=[...M,...OFFICE];
+const BRAND={mimaki:"Mimaki",mutoh:"Mutoh",gtx:"Brother GTX",epilog:"Epilog",brother:"Brother",kyocera:"Kyocera"};
+
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const money=n=>"$"+n.toLocaleString("en-AU",{minimumFractionDigits:2,maximumFractionDigits:2});
+const linkList=l=>`<ul class="links">${l.map(([t,u,k])=>`<li><a href="${esc(u)}" target="_blank" rel="noopener">${esc(t)}<span class="k">${esc(k)}</span></a></li>`).join("")}</ul>`;
+const CMY={C:"Cyan",M:"Magenta",Y:"Yellow"};
+function card(m){
+  return `<div class="card"><h3>${esc(m.n)}</h3><div class="sub">${esc(m.s)}</div>${m.sp?`<div class="spec">${esc(m.sp).split(" · ").map(s=>s[0].toUpperCase()+s.slice(1)).join("<br>")}</div>`:""}${inkPc(m)}${linkList(m.l)}<button type="button" class="mbtn" data-m="${esc(m.n)}">Details</button></div>`;
+}
+function showDetail(name){
+  const m=ALL.find(x=>x.n===name); if(!m) return;
+  const d=document.getElementById("detail");
+  d.innerHTML=`<div class="dh"><div><div class="brandtag">${esc(BRAND[m.b])} · ${esc(m.s)}</div><h3>${esc(m.n)}</h3>${m.sp?`<div class="dspec">${esc(m.sp)}</div>`:""}${m.hd?`<div class="dspec">Print heads: ${esc(m.hd)}</div>`:""}${m.th?`<div class="dspec">Max media thickness: ${esc(m.th)}</div>`:""}${m.ink?`<div class="dspec">Default ink set: ${esc(m.ink)}</div>`:""}${m.pc?`<div class="dspec">PC connection: ${esc(m.pc)}</div>`:""}</div><button type="button" id="dclose">Close</button></div>
+  <div class="dbody" style="grid-template-columns:minmax(0,1fr)"><div><h4>Downloads &amp; guides</h4>${linkList(m.l)}<p class="note" style="margin-top:10px">Need more information? Email hello@highwaydigital.com.au. Parts and consumables for this model are in the <a href="../catalogue/">Parts Catalogue</a>.</p></div></div>`;
+  d.hidden=false;
+  document.getElementById("dclose").onclick=()=>{d.hidden=true;};
+  d.scrollIntoView({behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"start"});
+}
+function grid(id,list){document.getElementById(id).innerHTML=list.map(card).join("");}
+grid("g-mimaki",M.filter(m=>m.b==="mimaki"));
+grid("g-mutoh",M.filter(m=>m.b==="mutoh"));
+grid("g-gtx",M.filter(m=>m.b==="gtx"));
+grid("g-epilog",M.filter(m=>m.b==="epilog"));
+const offCard=(b,title,links)=>{const ms=OFFICE.filter(m=>m.b===b);return `<div class="card"><h3>${title}</h3><div class="sub">${ms.length} models</div>${linkList(links)}<div class="modelchips">${ms.map(m=>`<button type="button" data-m="${esc(m.n)}">${esc(m.n)}</button>`).join("")}</div></div>`};
+document.getElementById("g-office").innerHTML=offCard("brother","Brother",[["Brother Australia support (search your model)","https://www.brother.com.au/en/support","Drivers"]])+offCard("kyocera","Kyocera",[L.kyHelp,L.kyDc]);
+document.addEventListener("click",e=>{const b=e.target.closest("[data-m]");if(b)showDetail(b.dataset.m);});
+
+/* finder */
+const norm=s=>s.toLowerCase().replace(/[^a-z0-9]/g,"");
+const q=document.getElementById("q"),hits=document.getElementById("hits");
+q.addEventListener("input",()=>{
+  const v=norm(q.value); if(!v){hits.innerHTML="";return;}
+  const r=ALL.filter(m=>norm(m.n).includes(v)||m.t.some(t=>norm(t).includes(v))).slice(0,24);
+  hits.innerHTML=r.length?r.map(m=>`<button type="button" class="chipbtn" data-m="${esc(m.n)}">${esc(m.n)} <span style="color:var(--muted);font-weight:500">${esc(BRAND[m.b])}</span></button>`).join(""):`<span class="empty">No match. Try fewer characters, or email hello@highwaydigital.com.au with your model.</span>`;
+});
+q.addEventListener("keydown",e=>{if(e.key==="Enter"){const f=hits.querySelector("[data-m]");if(f){e.preventDefault();showDetail(f.dataset.m);}}});
+
+/* cleaning supplies */
+const CLEAN=[
+ {h:"Cleaning tools",p:"Clean caps, wiper blades, the carriage underside and ink spills with lint-free wipes and foam-tipped swabs, dampened with the washing liquid made for your ink.",u:["Never wipe rubber parts dry","Never use cotton buds, tissues or household cleaners: fibres stick to nozzles and caps","Use each swab or wipe once, then throw it away"]},
+ {h:"Mimaki daily and weekly cleaning",p:"Clean the caps, wipers and the area around the heads with the washing or maintenance liquid that matches your ink type.",u:["Use it for the daily and weekly cleaning of the caps, wipers and head surround","Not sure which liquid matches your ink? Ask us before you clean"]},
+ {h:"Mimaki UV flatbed (UJF MkII series)",p:"Mimaki's UV printers use four different maintenance liquids, each for one job. Using the right one for the right task is the single biggest factor in avoiding missing or deflected nozzles. From Mimaki's UJF-MkII maintenance guide (D203936).",u:["Maintenance Liquid 11: head nozzle surface only. Wipe 1 to 2 times during work and again after work, every day. For LH-100, LUS-120, ELH-100 and ELS-120 inks","Maintenance Liquid 15: daily cleaning of the cap, wiper and the area around the heads after work; also fills the suction wiper and the cap for a discharge-path wash. Normal nozzle washes use this liquid","PR-200 Maintenance Liquid: nozzle wash for the PR-200 (primer) head, twice a week if PR-200 is loaded","Maintenance Liquid 16: powerful nozzle wash for missing or deflected nozzles only, when Liquid 15 hasn't fixed it. Never use it for routine cleaning","LED lamp glass: wipe weekly with alcohol. Mist filter and table: clean after work. Antifreeze: check and top up monthly"]},
+ {h:"Missing or deflected nozzles (UV flatbed)",p:"The most common UV flatbed fault. If the head is 2 mm or more above the work, ink turns to mist and reflected UV light cures it onto the nozzle plate.",u:["Prevent it: use a jig so the print edge is level with the table, enter the correct media thickness, and keep the head gap within 2.0 mm","Do the daily maintenance above, especially cleaning the nozzle surface with Liquid 11","Still missing? Clean wiper, cap and around the head with Liquid 15, then run a normal head cleaning and nozzle wash","Only then, Liquid 16: fill the affected cap with the dropper, run MAINTENANCE > STATION > NOZZLE WASH with a 10-minute wait, then a hard head cleaning and a test print. Repeat up to three times","Warning: Liquid 16 is strong enough to melt rubber and plastic. Call us before using it for the first time, and wear the supplied glasses and gloves","If it still doesn't recover, contact us. Scratched nozzle plates or ink cured inside the head can't be fixed by cleaning"]},
+ {h:"Flushing before storage or an ink change",p:"Ink channels are flushed before a machine is stored, moved or changed to a different ink.",u:["This is usually done with us on site","Call us before you store or move a printer"]},
+ {h:"Mutoh head & valve cleaning",p:"Clean the valve head as shown in the Mutoh user guide for your model.",u:["Follow the cleaning steps in the Mutoh user guide","Wear gloves; keep the liquid off painted covers"]},
+ {h:"Brother GTX cleaning",p:"Clean the cap, wiper and head surround with Brother's cleaning solution and swabs, as shown in Brother's maintenance videos.",u:["The wiper cleaner, flushing foam and capping pouch are replaced on a schedule","Shake white ink daily as Brother recommends"]},
+ {h:"Laser optics cleaning (Epilog)",p:"Lens and mirrors must be kept clean or cutting power drops and optics can crack.",u:["Use lens cleaning solution or 99% isopropyl alcohol on a lens tissue or soft cotton swab","Wipe gently in one direction; never touch optics with bare fingers","Clean optics weekly, more often with acrylic or wood"]},
+ {h:"Office lasers",p:"Toner printers need very little user cleaning.",u:["Use a dry, lint-free cloth on the exterior and paper path only","Never use solvents or alcohol on drums or rollers","Clean up spilled toner with a toner vacuum, not a household vacuum"]},
+ {h:"Personal protection",p:"Inks and washing liquids can irritate skin and eyes.",u:["Nitrile gloves for all ink and liquid handling","Safety glasses when flushing or refilling","Good ventilation for solvent and UV printers"]}
+];
+document.getElementById("g-clean").innerHTML=CLEAN.map(x=>`<div class="card">${x.img?`<img class="cimg" src="${x.img}" alt="${esc(x.alt||x.h)}" loading="lazy">`:""}<h3>${esc(x.h)}</h3><p>${esc(x.p)}</p><ul>${x.u.map(u=>`<li>${esc(u)}</li>`).join("")}</ul></div>`).join("");
+if(location.hash==="#find")q.focus();
+
+/* test prints */
+const TP=[
+ {f:"https://netorgft6773677-my.sharepoint.com/:b:/g/personal/hello_highwaydigital_com_au/IQDhd8SX-cszQ4sD5M4VbERJAdsw1jNgWQtLcDA62U9Rffk?download=1",img:"onyx.jpg",t:"ONYX quality evaluation chart",m:"Any printer · ONYX RIP",d:"Photos, skin tones, gradients, greys and colour patches for judging a profile or a new ink set.",z:"584 × 445 mm · PDF · 12.4 MB"},
+ {f:"https://netorgft6773677-my.sharepoint.com/:b:/g/personal/hello_highwaydigital_com_au/IQBJYOBOChX7QKbweXF16YEzAcYcL3DLgyRcUI8HgG7T-OM?download=1",img:"jfx.jpg",t:"JFX200 print chart",m:"Mimaki JFX200 · UV flatbed",d:"Mimaki's colour, nozzle and fine-detail chart for UV flatbeds.",z:"610 × 457 mm (24 × 18 in) · PDF/X · 10.9 MB"},
+ {f:"https://netorgft6773677-my.sharepoint.com/:b:/g/personal/hello_highwaydigital_com_au/IQCWwkxzgfSTS4aADHc-IsCaAQTXwUbHtn3ikv_K7eK34z8?download=1",img:"ucjv.jpg",t:"UCJV sticker kit",m:"Mimaki UCJV · print & cut",d:"Ink-label stickers for LUS-170 and LUS-200 cartridges with cut lines, a quick print-and-cut check.",z:"620 × 320 mm · PDF · 1 MB"},
+ {f:"",img:"testprintv2.jpg",t:"Test print v2",m:"Roll printers · RIP check",d:"Nozzle, colour bar, gradient and grey-balance strip. The original CMYK image at full 300 ppi resolution in a PDF.",z:"601 × 211 mm · PDF · 8.8 MB"},
+ {f:"",img:"leopard.jpg",t:"Leopard engraving test",m:"Epilog · laser engraving",d:"Photo-engraving test for checking dithering, power and speed settings.",z:"CorelDRAW (.cdr) · 8.8 MB"},
+ {f:"https://netorgft6773677-my.sharepoint.com/:b:/g/personal/hello_highwaydigital_com_au/IQDU9fuQCuNTS7bI4XLPRMRPAb4XrNQIKdyFKyfSU4jyU10?download=1",img:"standard.jpg",t:"Standard test file",m:"Roll and UV printers",d:"Full-colour, spot, white and fine-text test layout.",z:"600 × 400 mm · Illustrator PDF · 151 MB"},
+ {f:"https://netorgft6773677-my.sharepoint.com/:u:/g/personal/hello_highwaydigital_com_au/IQAl8guskeQNToExtzDIleoIAc8-OialsSvgiLshynOJAms?download=1",img:"car.jpg",t:"Four-layer car (UCJV300-160)",m:"Mimaki UCJV · white & clear",d:"Layered colour, white and clear varnish test for UV print & cut.",z:"EPS · 178 MB"},
+ {f:"https://netorgft6773677-my.sharepoint.com/:b:/g/personal/hello_highwaydigital_com_au/IQBMeb7pgHk6TK6h07-rrGPVAXpe4opixQEnrvKY9zKrvp8?download=1",img:"coffeedog.jpg",t:"CJV/JV200 Coffee Dog",m:"Mimaki CJV200 / JV200",d:"Mimaki's sample image for the 200 series.",z:"A4 · Illustrator PDF · 38 MB"}
+];
+const TPB="testprints/";
+document.getElementById("g-tp").innerHTML=TP.map((x,i)=>`<div class="tp"><div class="thumb"><img src="${TPB}thumbs/${x.img}" alt="Preview of ${esc(x.t)}" loading="lazy" width="320" height="240"></div><div class="tb"><div class="for">${esc(x.m)}</div><h3>${esc(x.t)}</h3><p>${esc(x.d)}</p><div class="meta2">${esc(x.z)}</div><div class="acts">${x.f?(/^https?:/.test(x.f)?`<a class="dlbtn" href="${x.f}" target="_blank" rel="noopener">Download</a>`:`<a class="dlbtn" href="${TPB}${encodeURIComponent(x.f)}" download>Download</a>`):`<span class="reqtag">On request</span>`}</div></div></div>`).join("");
+</script>
+
+
+
+</body>
+</html>
