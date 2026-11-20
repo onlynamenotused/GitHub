@@ -303,6 +303,11 @@
               <label>Offset (mm)<input type="number" id="stOffset" value="2" min="-20" max="50" step="0.5"></label>
               <label>Join gaps (mm)<input type="number" id="stBridge" value="0" min="0" max="50" step="0.5"></label>
             </div>
+            <div class="row2 sfxrow" id="stCSfxRow" hidden>
+              <label>Cut pass suffix<input type="text" id="stCSuffix" list="sfxList" maxlength="12" placeholder="none" spellcheck="false"></label>
+              <span class="hint" style="flex:2 1 180px;margin:0" id="stCSfxName"></span>
+            </div>
+            <datalist id="sfxList"><option value="1"><option value="2"><option value="3"><option value="_A"><option value="_B"><option value="_C"></datalist>
             <p class="hint">Offset moves the cut outside the artwork; use a minus number (e.g. −1) to cut inside the edge so no white shows. “Join gaps” wraps nearby pieces in one cut, for example separate letters.</p>
           </div>
           <div class="addrow">
@@ -1306,6 +1311,10 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
     return (c && String(c).trim()) || BRANDS[brand].spots[role] || "";
   }
   function brandHas(brand, role){ return !!BRANDS[brand].spots[role]; }
+  // Mutoh VerteLith accepts suffixes on cut spot colours (CutContour1, CutThrough_A) to keep cut passes / tool pressures apart.
+  function sfxOk(brand){ return brand==="mutoh"; }
+  function cleanSfx(v){ return String(v||"").replace(/[^A-Za-z0-9_\-]/g,"").slice(0,12); }
+  function cutName(brand, role, sfx){ var n=spotName(brand, role); return n && sfxOk(brand) ? n+cleanSfx(sfx) : n; }
 
   var S = {
     ready:false, svg:"", vw:0, vh:0, name:"design",
@@ -1724,6 +1733,7 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
     $("stRoleHint").textContent = S.brand==="brother" ? "On the GTX, RGB 255 white prints no ink; RGB 254 prints white ink." : "Special inks are sent as named spot colours the RIP recognises.";
     $("stCutSec").hidden = S.brand==="brother";
     $("stMarkSec").hidden = S.brand==="brother";
+    sfxSync();
     $("stLaySec").hidden = S.brand==="brother";
     $("stSendRip").hidden = S.brand==="brother";
     $("stSendGtx").hidden = S.brand!=="brother";
@@ -1759,12 +1769,14 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
       }
       h+='<div class="row2"><label>X<input type="number" data-k="x" value="'+n3(o.x)+'" step="0.5"></label><label>Y<input type="number" data-k="y" value="'+n3(o.y)+'" step="0.5"></label></div>';
       h+='<div class="row2"><label>Use as<select data-k="role">'+fillOpts(S.brand,o.role,true)+'</select></label>'+
-         (isLineObj(o)&&S.brand!=="brother"?'<label class="check inl"><input type="checkbox" data-k="cutOn"'+(o.cutOff?'':' checked')+'><span>Cut on</span></label>':'')+'</div>';
+         (isLineObj(o)&&S.brand!=="brother"?'<label class="check inl"><input type="checkbox" data-k="cutOn"'+(o.cutOff?'':' checked')+'><span>Cut on</span></label>':'')+'</div>'+
+         (isLineObj(o)&&sfxOk(S.brand)?'<div class="row2"><label>Cut pass suffix<input type="text" data-k="suffix" list="sfxList" maxlength="12" placeholder="none" spellcheck="false" value="'+esc(o.suffix||"")+'"></label><span class="hint" style="flex:2 1 160px;margin:0" data-sfxname>Spot colour: <b>'+esc(cutName(S.brand,o.role,o.suffix))+'</b></span></div>':'');
       if(o.role==="fill") h+='<div class="row2"><label style="flex:0 0 40px">Colour<input type="color" data-k="color" value="'+o.color+'"></label><label>Print<select data-k="ink">'+inkOpts(S.brand,o.ink)+'</select></label></div>';
       el.innerHTML=h;
       el.addEventListener("input",function(e){
         var k=e.target.dataset.k; if(!k) return;
         if(k==="cutOn"){ o.cutOff=!e.target.checked; render(); return; }
+        if(k==="suffix"){ o.suffix=cleanSfx(e.target.value); var sn=el.querySelector("[data-sfxname]"); if(sn) sn.innerHTML="Spot colour: <b>"+esc(cutName(S.brand,o.role,o.suffix))+"</b>"; render(); return; }
         if(k==="bold"||k==="italic") o[k]=e.target.checked;
         else if(k==="text"||k==="family"||k==="color"||k==="ink"||k==="role") o[k]=e.target.value; else { var v=parseFloat(e.target.value); if(!isNaN(v)) o[k]=v; }
         if(k==="role"||k==="family"){ buildObjs(); }
@@ -2017,7 +2029,7 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
     var L=layout(); if(!L.fits || !L.pages.length) throw new Error("nofit");
     var box=L.box, TW=box.w*MM2PT, TH=box.h*MM2PT;
     var spots={}, spotList=[];
-    function spotCS(role){ var name=spotName(brand,role); if(!name) return null; if(!spots[role]){ spots[role]="/CS"+spotList.length; spotList.push({role:role,name:name}); } return spots[role]; }
+    function spotCS(role, sfx){ var name=(role==="cut"||role==="perf")?cutName(brand,role,sfx):spotName(brand,role); if(!name) return null; if(!spots[name]){ spots[name]="/CS"+spotList.length; spotList.push({role:role,name:name}); } return spots[name]; }
     var c=[], fonts={}, fontList=[];
     function fontRes(o){ var f=fontInfo(o).pdf; if(!fonts[f]){ fonts[f]="/F"+fontList.length; fontList.push(f); } return fonts[f]; }
     var OUT={}, fallback=[];
@@ -2040,22 +2052,22 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
       if(isLine && !lineActive(o)) return;
       if(!isLine && effRole(o.ink||"normal",brand)==="hide") return;
       if(o.kind==="text" && OUT[o.id]){
-        if(isLine){ c.push("q /GSop gs "+spotCS(o.role)+" CS 1 SCN 0.25 w "+opsToPdf(OUT[o.id])+"\nS Q"); }
+        if(isLine){ c.push("q /GSop gs "+spotCS(o.role,o.suffix)+" CS 1 SCN 0.25 w "+opsToPdf(OUT[o.id])+"\nS Q"); }
         else { c.push("q"); setFill(effRole(o.ink||"normal",brand)==="normal"?"normal":effRole(o.ink,brand), o.color); c.push(opsToPdf(OUT[o.id])+"\nf Q"); }
       } else if(o.kind==="text"){
         c.push("q");
-        if(isLine){ var cs=spotCS(o.role); c.push("/GSop gs "+cs+" CS 1 SCN 0.25 w 1 Tr"); }
+        if(isLine){ var cs=spotCS(o.role,o.suffix); c.push("/GSop gs "+cs+" CS 1 SCN 0.25 w 1 Tr"); }
         else { setFill(effRole(o.ink||"normal",brand)==="normal"?"normal":effRole(o.ink,brand), o.color); }
         c.push("1 0 0 -1 "+n3(o.x*MM2PT)+" "+n3(o.y*MM2PT)+" cm BT "+fontRes(o)+" "+n3(o.pt)+" Tf 0 0 Td "+pdfStr(o.text||"")+" Tj ET Q");
       } else if(isLine){
-        var cs2=spotCS(o.role); c.push("q /GSop gs "+cs2+" CS 1 SCN 0.25 w "+opsToPdf(shapeOps(o))+"\nS Q");
+        var cs2=spotCS(o.role,o.suffix); c.push("q /GSop gs "+cs2+" CS 1 SCN 0.25 w "+opsToPdf(shapeOps(o))+"\nS Q");
       } else {
         c.push("q"); var ir=effRole(o.ink||"normal",brand); setFill(ir==="normal"?"normal":ir, o.color); c.push(opsToPdf(shapeOps(o))+"\nf Q");
       }
     });
     var mcP=mk();
     if(mcP.on && mcP.scope==="each"){ marksFor(contentBox(), mcP).forEach(function(mm){ c.push("q 0 0 0 1 k "+opsToPdf(mm.ops)+"\n"+(mm.eo?"f*":"f")+" Q"); }); }
-    if(contourActive()){ var cs3=spotCS(S.contour.type); c.push("q /GSop gs "+cs3+" CS 1 SCN 0.25 w "+opsToPdf(S.contour.ops)+"\nS Q"); }
+    if(contourActive()){ var cs3=spotCS(S.contour.type, $("stCSuffix").value); c.push("q /GSop gs "+cs3+" CS 1 SCN 0.25 w "+opsToPdf(S.contour.ops)+"\nS Q"); }
     c.push("Q");
     var formContent=c.join("\n");
 
@@ -2217,6 +2229,9 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
   ["stPage","stPW","stPH","stMode","stQty","stLen","stGap","stMargin","stRotate"].forEach(function(id){
     $(id).addEventListener(id==="stPage"||id==="stMode"||id==="stRotate"?"change":"input",function(){ syncLayoutFields(); render(); });
   });
+  function sfxSync(){ $("stCSfxRow").hidden=!sfxOk(S.brand); $("stCSfxName").innerHTML=sfxOk(S.brand)?"Spot colour: <b>"+esc(cutName(S.brand,$("stCType").value,$("stCSuffix").value))+"</b>":""; }
+  $("stCSuffix").addEventListener("input",function(){ var v=cleanSfx(this.value); if(v!==this.value) this.value=v; sfxSync(); render(); });
+  $("stCType").addEventListener("change",sfxSync);
   function mkSync(){ $("mkOpts").hidden=!$("mkOn").checked; }
   $("mkOn").addEventListener("change",function(){ if(this.checked && !mkSync.done){ mkSync.done=true; $("mkStyle").value=mkBrandDefault(); var b=contentBox(); mkApplyPreset($("mkStyle").value, Math.max(b.w,b.h)); } mkSync(); render(); });
   $("mkStyle").addEventListener("change",function(){ if(this.value!=="custom"){ var b=contentBox(); mkApplyPreset(this.value, Math.max(b.w,b.h)); } else $("mkNote").textContent="Custom marks: set the shape, size, line and positions to match your cutter."; render(); });
@@ -2269,7 +2284,7 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
 (function(){
   "use strict";
   var IDS=["colors","thresh","detail","speck","blur","removeBg","cutout","upscale","angle","outW","outH","outU","outLock",
-    "stBrand","stUnder","stOver","stCutsOn","stContour","stCType","stOffset","stBridge","mkOn","mkStyle","mkShape","mkSize","mkThick","mkOff","mkDir","mkPts","mkScope","mkMid","stPage","stPW","stPH","stMode","stQty","stLen","stGap","stMargin","stRotate","stGtx254","stDpi"];
+    "stBrand","stUnder","stOver","stCutsOn","stContour","stCType","stOffset","stBridge","stCSuffix","mkOn","mkStyle","mkShape","mkSize","mkThick","mkOff","mkDir","mkPts","mkScope","mkMid","stPage","stPW","stPH","stMode","stQty","stLen","stGap","stMargin","stRotate","stGtx254","stDpi"];
   var TRACE=["colors","thresh","detail","speck","blur","removeBg","cutout","upscale","angle"];
   var stack=[], last=null, busy=false, timer=null, pending=null, btn=document.getElementById("undoBtn");
   function domSnap(){ var o={}; IDS.forEach(function(id){ var e=document.getElementById(id); if(e) o[id]=e.type==="checkbox"?e.checked:e.value; }); return o; }
