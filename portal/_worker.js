@@ -4,7 +4,7 @@
 // shared portal menu (nav.js + nav.css) added at the top, with their old cross-links removed.
 const SB_URL = "https://sfuuzcgwbbhdjqzrchvv.supabase.co";
 const SB_KEY = "sb_publishable_uu0N60ZMVjJ1kl14FW1NBA_v-cm_U3_"; // publishable key: safe, RLS protects data
-const V = "29";
+const V = "30";
 const GATED = {
   kb: { page: "/_p/kb/", flag: "kb", name: "Knowledge Base" },
   catalogue: { page: "/_p/catalogue/", flag: "cat", name: "Parts Catalogue" },
@@ -56,10 +56,61 @@ function notAvailable(name) {
 <a href="mailto:hello@highwaydigital.com.au">hello@highwaydigital.com.au</a> if you'd like access.</p></section></main></body></html>`;
 }
 
+const FN_URL = SB_URL + "/functions/v1/freshbooks";
+const jres = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { "content-type": "application/json", "Cache-Control": "no-store" } });
+async function rpc(name, body, token) {
+  const r = await fetch(SB_URL + "/rest/v1/rpc/" + name, {
+    method: "POST", headers: { apikey: SB_KEY, Authorization: "Bearer " + (token || SB_KEY), "Content-Type": "application/json" }, body: JSON.stringify(body || {})
+  });
+  const t = await r.text(); let j = null; try { j = JSON.parse(t); } catch (e) {}
+  return { ok: r.ok, status: r.status, j };
+}
+// Small JSON endpoints used by the gated pages (same-origin, signed-in cookie).
+async function apiRoute(req, env, url, p) {
+  // The edge function reads the raw catalogue (for quote prices) with the bridge key, checked by the database.
+  if (p === "/_src/catalogue") {
+    const k = req.headers.get("x-hsd-key") || "";
+    const ok = k.length >= 20 && (await rpc("bridge_key_ok", { p_key: k })).j === true;
+    if (!ok) return new Response("Not found", { status: 404 });
+    const a = await env.ASSETS.fetch(new Request(new URL("/_p/catalogue/", url.origin)));
+    return new Response(await a.text(), { status: a.status, headers: { "content-type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });
+  }
+  const token = readCookie(req, "hd_at");
+  if (!token) return jres({ ok: false, error: "Please sign in again." }, 401);
+  if (p === "/vector/log" && req.method === "POST") {
+    const b = await req.json().catch(() => ({}));
+    await rpc("log_vector_export", { p_kind: String(b.kind || "file").slice(0, 40) }, token);
+    return jres({ ok: true });
+  }
+  if (p === "/catalogue/quote-machines") {
+    const r = await fetch(SB_URL + "/rest/v1/machines?select=id,brand,model,serial,site,location&status=eq.active&order=brand,model",
+      { headers: { apikey: SB_KEY, Authorization: "Bearer " + token } });
+    return jres(r.ok ? { ok: true, machines: await r.json() } : { ok: false, machines: [] });
+  }
+  if (p === "/catalogue/quote" && req.method === "POST") {
+    const b = await req.json().catch(() => null);
+    if (!b) return jres({ ok: false, error: "Bad request" }, 400);
+    const s = await rpc("portal_quote_start", { p: b }, token);
+    if (!s.ok || !s.j || !s.j.quote_id) return jres({ ok: false, error: (s.j && (s.j.message || s.j.error)) || "Couldn't start the quote." });
+    const r = await fetch(FN_URL + "/quote", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ quote_id: s.j.quote_id, token: s.j.token }) });
+    const j = await r.json().catch(() => ({ ok: false, error: "The quote service didn't answer." }));
+    return jres(j);
+  }
+  return null;
+}
+function quoteBlock(f) {
+  const q = JSON.stringify({ customer: !!f.customer, email: f.email || "" });
+  return `<script>window.HDQ=${q.replace(/</g, "\\u003c")};</script><link rel="stylesheet" href="/quote.css?v=${V}"><script src="/quote.js?v=${V}" defer></script>`;
+}
+
 export default {
   async fetch(req, env) {
     const url = new URL(req.url);
     const p = url.pathname;
+    if (p === "/_src/catalogue" || p === "/vector/log" || p.startsWith("/catalogue/quote")) {
+      const r = await apiRoute(req, env, url, p);
+      if (r) return r;
+    }
     if (p.startsWith("/_p/")) return new Response("Not found", { status: 404 });
     const key = /^\/kb(\/|$)/.test(p) ? "kb" : /^\/catalogue(\/|$)/.test(p) ? "catalogue" : /^\/vector(\/|$)/.test(p) ? "vector" : null;
     if (!key) return env.ASSETS.fetch(req);
@@ -84,7 +135,7 @@ export default {
 
     const out = new HTMLRewriter()
       .on("head", { element(e) { e.append(`<link rel="stylesheet" href="/nav.css?v=${V}">`, { html: true }); } })
-      .on("body", { element(e) { e.prepend(navBlock(f, key), { html: true }); } })
+      .on("body", { element(e) { e.prepend(navBlock(f, key), { html: true }); if (key === "catalogue" && page.ok) e.append(quoteBlock(f), { html: true }); } })
       // the pages' own links back to the portal / to each other: the shared menu replaces them
       .on("header.band .meta > div:nth-child(2)", { element(e) { e.remove(); } })
       .on("header.band a.kblink", { element(e) { e.remove(); } })

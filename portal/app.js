@@ -352,9 +352,10 @@ async function renderCustomers() {
   if (!state.staff) { body.replaceChildren(); return; }
   if (!renderCustomers.sup) { renderCustomers.sup = true; renderSupervisorsAdmin($("#supAdmin")); }
   if (!state.access) {
-    body.replaceChildren(el("tr", {}, el("td", { colspan: "6", class: "muted" }, "Loading…")));
-    const { data, error } = await sb.from("portal_access").select("client_id,email");
-    if (error) { body.replaceChildren(el("tr", {}, el("td", { colspan: "6", class: "msg err" }, "Couldn't load customers."))); return; }
+    body.replaceChildren(el("tr", {}, el("td", { colspan: "7", class: "muted" }, "Loading…")));
+    const [{ data, error }, vx] = await Promise.all([sb.from("portal_access").select("client_id,email"), sb.rpc("vector_export_counts")]);
+    state.vexp = (vx && vx.data) || {};
+    if (error) { body.replaceChildren(el("tr", {}, el("td", { colspan: "7", class: "msg err" }, "Couldn't load customers."))); return; }
     state.access = data;
   }
   const q = norm($("#custSearch").value);
@@ -387,9 +388,10 @@ async function renderCustomers() {
       el("td", {}, acount[c.id] || 0),
       tick("kb_access", "Knowledge Base"),
       tick("vector_access", "Vector Converter"),
+      el("td", { class: "num", title: vexpTitle(c.id) }, String(((state.vexp || {})[c.id] || {}).n || 0)),
       el("td", {}, catPicker(c, "clients", c.name))));
     if (open) {
-      const cell = el("td", { colspan: "6", class: "panelcell" }, el("p", { class: "muted small" }, "Loading…"));
+      const cell = el("td", { colspan: "7", class: "panelcell" }, el("p", { class: "muted small" }, "Loading…"));
       rows.push(el("tr", { class: "panelrow" }, cell));
       renderManage(c, cell);
     }
@@ -397,6 +399,11 @@ async function renderCustomers() {
   body.replaceChildren(...rows);
 }
 
+function vexpTitle(id) {
+  const v = (state.vexp || {})[id]; if (!v) return "No Vector Converter exports yet";
+  const kinds = Object.entries(v.kinds || {}).sort((a, b) => b[1] - a[1]).map(([k, n]) => n + " " + k.replace(/^studio-/, "").toUpperCase()).join(", ");
+  return v.n + " export" + (v.n === 1 ? "" : "s") + (kinds ? ": " + kinds : "") + (v.last ? ". Last on " + new Date(v.last).toLocaleDateString("en-AU") : "");
+}
 // ---------- staff: Parts Catalogue access by brand group ----------
 const CAT_GROUPS = ["Mimaki", "Mutoh", "Brother", "Epilog", "Others"];
 const CAT_HINT = { Epilog: "includes laser accessories", Others: "Kyocera, PC sales, network gear" };

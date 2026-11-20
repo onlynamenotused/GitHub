@@ -1260,8 +1260,11 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
   $("outLock").addEventListener("change",function(){ resize("w"); });
 
   // ---- export
+  // Counts exports per customer (shown to staff in the portal). Only on the portal; silent if it fails.
+  window.hdLog = function(kind){ try{ if(!/^\/vector\/?$/.test(location.pathname)) return; fetch("/vector/log",{method:"POST",credentials:"same-origin",keepalive:true,headers:{"content-type":"application/json"},body:JSON.stringify({kind:String(kind||"file")})}).catch(function(){}); }catch(e){} };
   $("dl").addEventListener("click",function(){
     if(!state.svg) return;
+    hdLog("svg");
     var fname=state.name+".svg";
     if(dlCap){
       dlCap.save({filename:fname, data:state.svg}).then(function(){ toast("Saved "+fname); })
@@ -1273,6 +1276,7 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
   $("dlEps").addEventListener("click",function(){
     var api=window.__vcStudioApi, eps=api && api.eps && api.eps();
     if(!eps){ status("Couldn't make the EPS.","err"); return; }
+    hdLog("eps");
     var fname=state.name+".eps";
     if(dlCap){
       dlCap.save({filename:fname, data:eps}).then(function(){ toast("Saved "+fname); })
@@ -1284,6 +1288,7 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
   $("dlDxf").addEventListener("click",function(){
     var api=window.__vcStudioApi, dxf=api && api.dxf && api.dxf();
     if(!dxf){ status("Couldn't make the DXF.","err"); return; }
+    hdLog("dxf");
     var fname=state.name+".dxf";
     if(dlCap){
       dlCap.save({filename:fname, data:dxf}).then(function(){ toast("Saved "+fname); })
@@ -2426,6 +2431,7 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
 
   // ---- saving
   function saveBlob(blob, fname){
+    try{ var ext=(String(fname).split(".").pop()||"file").toLowerCase(), rip=(String(fname).match(/-(VersaWorks|RasterLink|VerteLith|GTX)\./)||[])[1]; window.hdLog && window.hdLog("studio-"+ext+(rip?"-"+rip.toLowerCase():"")); }catch(e){}
     var a=document.createElement("a"), url=URL.createObjectURL(blob);
     a.href=url; a.download=fname; a.style.display="none"; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function(){ URL.revokeObjectURL(url); }, 5000);
