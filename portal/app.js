@@ -60,7 +60,7 @@ async function signOut() { await sb.auth.signOut(); setAccessCookie(null); histo
 const navHost = () => $("#hd-nav");
 function drawNav(active) {
   window.HDNav?.render(navHost(), state.user
-    ? { signedIn: true, email: state.user.email, staff: state.staff, intranet: state.intranet, kb: state.kbAccess || isSupervisor(), cat: state.catAccess, supervisor: isSupervisor() || (state.staff && (state.supervisors || []).length > 0), active }
+    ? { signedIn: true, email: state.user.email, staff: state.staff, intranet: state.intranet, kb: state.kbAccess || isSupervisor(), cat: state.catAccess, vector: state.vectorAccess, supervisor: isSupervisor() || (state.staff && (state.supervisors || []).length > 0), active }
     : { signedIn: false });
 }
 
@@ -89,7 +89,7 @@ sb.auth.onAuthStateChange((evt, session) => {
 // ---------- data ----------
 async function loadCore() {
   const [c, m, k, s, g, it, ...rest] = await Promise.all([
-    sb.from("clients").select("id,name,kb_access,catalogue_access,catalogue_brands").order("name"),
+    sb.from("clients").select("id,name,kb_access,vector_access,catalogue_access,catalogue_brands").order("name"),
     sb.from("machines").select("*").eq("status", "active").order("brand").order("model"),
     sb.rpc("has_kb_access"),
     sb.rpc("is_staff"),
@@ -98,9 +98,11 @@ async function loadCore() {
     sb.from("machine_files").select("id,kind,name,machine_id,param_date,modified,size,fw").order("param_date", { ascending: false }),
     sb.from("fb_invoices").select("*").order("issued", { ascending: false }).limit(60),
     sb.from("fb_estimates").select("*").order("issued", { ascending: false }).limit(60),
-    sb.from("supervisors").select("id,name,bill_to")
+    sb.from("supervisors").select("id,name,bill_to"),
+    sb.rpc("has_vector_access")
   ]);
-  const [mf, inv, est, sv] = rest;
+  const [mf, inv, est, sv, va] = rest;
+  state.vectorAccess = va?.data === true;
   state.supervisors = sv?.data || [];
   if (c.error) throw c.error;
   if (m.error) throw m.error;
@@ -347,9 +349,9 @@ async function renderCustomers() {
   if (!state.staff) { body.replaceChildren(); return; }
   if (!renderCustomers.sup) { renderCustomers.sup = true; renderSupervisorsAdmin($("#supAdmin")); }
   if (!state.access) {
-    body.replaceChildren(el("tr", {}, el("td", { colspan: "5", class: "muted" }, "Loading…")));
+    body.replaceChildren(el("tr", {}, el("td", { colspan: "6", class: "muted" }, "Loading…")));
     const { data, error } = await sb.from("portal_access").select("client_id,email");
-    if (error) { body.replaceChildren(el("tr", {}, el("td", { colspan: "5", class: "msg err" }, "Couldn't load customers."))); return; }
+    if (error) { body.replaceChildren(el("tr", {}, el("td", { colspan: "6", class: "msg err" }, "Couldn't load customers."))); return; }
     state.access = data;
   }
   const q = norm($("#custSearch").value);
@@ -381,9 +383,10 @@ async function renderCustomers() {
       el("td", {}, mcount[c.id] || 0),
       el("td", {}, acount[c.id] || 0),
       tick("kb_access", "Knowledge Base"),
+      tick("vector_access", "Vector Converter"),
       el("td", {}, catPicker(c, "clients", c.name))));
     if (open) {
-      const cell = el("td", { colspan: "5", class: "panelcell" }, el("p", { class: "muted small" }, "Loading…"));
+      const cell = el("td", { colspan: "6", class: "panelcell" }, el("p", { class: "muted small" }, "Loading…"));
       rows.push(el("tr", { class: "panelrow" }, cell));
       renderManage(c, cell);
     }
@@ -539,7 +542,7 @@ $("#addCustForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const name = $("#newCustName").value.trim(); if (!name) return;
   const msg = $("#addCustMsg");
-  const { data, error } = await sb.from("clients").insert({ name }).select("id,name,kb_access,catalogue_access,catalogue_brands").single();
+  const { data, error } = await sb.from("clients").insert({ name }).select("id,name,kb_access,vector_access,catalogue_access,catalogue_brands").single();
   if (error) return flash(msg, "Customer not added", false);
   state.clients.push(data); state.clients.sort((x, y) => x.name.localeCompare(y.name));
   $("#newCustName").value = ""; $("#custSearch").value = name; state.openClient = data.id;
