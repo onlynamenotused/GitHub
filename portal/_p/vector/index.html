@@ -140,6 +140,11 @@
   .vtabs{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
   .vtabs button{padding:7px 12px;border:1px solid var(--line);background:rgba(255,255,255,.06);color:var(--ink);border-radius:8px;cursor:pointer;font:inherit;font-size:13px}
   .vtabs button[aria-selected=true]{border-color:var(--accent);color:var(--accent);font-weight:600}
+  .zoombar{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:8px;padding:2px}
+  .zoombar button{all:unset;cursor:pointer;min-width:28px;text-align:center;padding:4px 8px;border-radius:6px;font-weight:600;color:var(--ink)}
+  .zoombar button:hover{background:rgba(255,255,255,.1)} .zoombar button:focus-visible{outline:2px solid var(--accent)}
+  .zoombar span{min-width:46px;text-align:center;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .stcanvas.panning{cursor:grabbing} .stcanvas{cursor:grab}
   .legend{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--muted);margin-left:auto}
   .legend i{display:inline-block;width:14px;height:0;border-top:2px solid;vertical-align:middle;margin-right:4px}
   .legend i.sw{height:10px;border:1px solid #888}
@@ -308,6 +313,34 @@
           </div>
         </details>
 
+        <details open id="stMarkSec">
+          <summary>Crop marks</summary>
+          <label class="check"><input type="checkbox" id="mkOn"><span>Add crop marks<small>Printed registration marks for print-and-cut. If your RIP already adds its own crop marks, leave this off so they aren't doubled.</small></span></label>
+          <div id="mkOpts" hidden>
+            <div class="row2">
+              <label style="flex:2 1 160px">Mark style<select id="mkStyle">
+                <option value="roland">Roland</option><option value="mimaki">Mimaki</option><option value="mutoh">Mutoh</option><option value="epilog">Epilog</option><option value="custom">Custom</option>
+              </select></label>
+              <button type="button" class="mini" id="mkReset">Reset to default</button>
+            </div>
+            <div class="row2">
+              <label>Shape<select id="mkShape"><option value="L">L corner</option><option value="dot">Solid circle</option><option value="ring">Circle outline</option><option value="cross">Circle + cross</option><option value="square">Solid square</option></select></label>
+              <label>Size (mm)<input type="number" id="mkSize" min="2" max="60" step="0.5" value="10"></label>
+              <label>Line (mm)<input type="number" id="mkThick" min="0.1" max="5" step="0.1" value="1"></label>
+            </div>
+            <div class="row2">
+              <label>Offset (mm)<input type="number" id="mkOff" min="0" max="100" step="0.5" value="5"></label>
+              <label>Direction<select id="mkDir"><option value="out">Corners point out (Type 1)</option><option value="in">Corners point in (Type 2)</option></select></label>
+            </div>
+            <div class="row2">
+              <label>Positions<select id="mkPts"><option value="4">4 corners</option><option value="3">3 corners (no top right)</option></select></label>
+              <label>Apply to<select id="mkScope"><option value="each">Each copy</option><option value="whole">Whole sheet</option></select></label>
+              <label>Extra marks per side<input type="number" id="mkMid" min="0" max="10" step="1" value="0"></label>
+            </div>
+            <p class="hint" id="mkNote"></p>
+          </div>
+        </details>
+
         <details open>
           <summary>Text</summary>
           <div class="row2">
@@ -377,10 +410,11 @@
         <div class="vtabs" role="tablist">
           <button type="button" role="tab" id="tabDesign" aria-selected="true">Design</button>
           <button type="button" role="tab" id="tabSheet" aria-selected="false">Sheet layout</button>
+          <span class="zoombar" role="group" aria-label="Zoom"><button type="button" id="zmOut" title="Zoom out">−</button><span id="zmPct">100%</span><button type="button" id="zmIn" title="Zoom in">+</button><button type="button" id="zmFit" title="Fit to view">Fit</button></span>
           <span class="legend" id="stLegend"></span>
         </div>
         <div class="stcanvas" id="stCanvas"></div>
-        <p class="hint">Drag shapes and text to move them. Measurements are in millimetres.</p>
+        <p class="hint">Scroll or use + / − to zoom, drag an empty area to move around, and drag shapes and text to move them. Measurements are in millimetres.</p>
       </div>
     </div>
   </section>
@@ -1491,7 +1525,67 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
     list.forEach(function(ops){ ops.forEach(function(o){ for(var k=1;k<o.length;k+=2){ var X=o[k],Y=o[k+1]; if(X<b.x0)b.x0=X; if(X>b.x1)b.x1=X; if(Y<b.y0)b.y0=Y; if(Y>b.y1)b.y1=Y; } }); });
     return b;
   }
-  function designBox(){
+
+  // ---- crop / registration marks (solid black, 100% K)
+  var MK_PRESET={
+    roland:{ shape:"dot", size:10, thick:1, off:5, dir:"out", pts:"4", scope:"whole", mid:0,
+      note:"Roland: solid black 10 mm circles at 90° to each other, printed at 100% size. Keep marks under 500 mm apart along the feed (add extra marks for long jobs). Use 3 corners for a 3-point read." },
+    mimaki:{ shape:"L", size:10, thick:0.5, off:5, dir:"out", pts:"4", scope:"each", mid:0,
+      note:"Mimaki: L-shaped register marks. Type 1 sits outside the job, Type 2 inside. Mimaki's minimum length is 4 mm up to 200 mm jobs, 8 mm to 500 mm, 15 mm to 1 m, 25 mm to 2 m, 35–40 mm above; line 0.5 mm up to 200 mm, 1–2 mm above. Extra marks need 50 mm or more between them." },
+    mutoh:{ shape:"L", size:10, thick:1, off:5, dir:"out", pts:"3", scope:"whole", mid:0,
+      note:"Mutoh ValueCut reads asymmetric marks so the media direction is known; 3 corners keeps them asymmetric. Check the first job against a mark sheet from your RIP." },
+    epilog:{ shape:"dot", size:6, thick:1, off:5, dir:"out", pts:"4", scope:"each", mid:0,
+      note:"Epilog: printed black circles at the corners of the design for the camera to find. In Job Manager you can register on 2 or more of them." }
+  };
+  function mkBrandDefault(){ return S.brand==="brother" ? "roland" : S.brand; }
+  function mkApplyPreset(name, jobLen){
+    var p=Object.assign({}, MK_PRESET[name]||MK_PRESET.roland);
+    if(name==="mimaki" && jobLen){ p.size = jobLen<=500?10 : jobLen<=1000?15 : jobLen<=2000?25 : 35; p.thick = jobLen<=200?0.5:1; }
+    $("mkShape").value=p.shape; $("mkSize").value=p.size; $("mkThick").value=p.thick; $("mkOff").value=p.off; $("mkDir").value=p.dir; $("mkPts").value=p.pts; $("mkScope").value=p.scope; $("mkMid").value=p.mid;
+    $("mkNote").textContent=p.note;
+  }
+  function mk(){
+    var on=$("mkOn").checked && S.brand!=="brother";
+    return { on:on, shape:$("mkShape").value, size:Math.max(1,+$("mkSize").value||10), t:Math.max(0.05,+$("mkThick").value||1), off:Math.max(0,+$("mkOff").value||0),
+      dir:$("mkDir").value, pts:+$("mkPts").value||4, scope:$("mkScope").value, mid:Math.max(0,Math.min(10,Math.round(+$("mkMid").value||0))) };
+  }
+  function circleOps(cx,cy,r,rev){
+    var k=r*KAPPA, o=[["M",cx+r,cy]];
+    if(!rev) o.push(["C",cx+r,cy+k,cx+k,cy+r,cx,cy+r],["C",cx-k,cy+r,cx-r,cy+k,cx-r,cy],["C",cx-r,cy-k,cx-k,cy-r,cx,cy-r],["C",cx+k,cy-r,cx+r,cy-k,cx+r,cy]);
+    else o.push(["C",cx+r,cy-k,cx+k,cy-r,cx,cy-r],["C",cx-k,cy-r,cx-r,cy-k,cx-r,cy],["C",cx-r,cy+k,cx-k,cy+r,cx,cy+r],["C",cx+k,cy+r,cx+r,cy+k,cx+r,cy]);
+    o.push(["Z"]); return o;
+  }
+  function rectOps(x0,y0,x1,y1){ var a=Math.min(x0,x1), b=Math.min(y0,y1), c=Math.max(x0,x1), d=Math.max(y0,y1); return [["M",a,b],["L",c,b],["L",c,d],["L",a,d],["Z"]]; }
+  // one mark at point (x,y) = the mark's anchor; (dx,dy) points away from the artwork
+  function markAt(c, x, y, dx, dy){
+    var s=c.size, t=Math.min(c.t, s/2), ops=[];
+    if(c.shape==="L"){
+      var sx=(c.dir==="out"?-dx:dx), sy=(c.dir==="out"?-dy:dy);  // arms run back towards the art (out) or away from it (in)
+      ops=ops.concat(rectOps(x, y, x+sx*s, y+sy*t), rectOps(x, y, x+sx*t, y+sy*s));
+      return {ops:ops, eo:false};
+    }
+    var cx=x+dx*s/2, cy=y+dy*s/2, r=s/2;
+    if(c.shape==="dot") return {ops:circleOps(cx,cy,r), eo:false};
+    if(c.shape==="square") return {ops:rectOps(cx-r,cy-r,cx+r,cy+r), eo:false};
+    if(c.shape==="ring") return {ops:circleOps(cx,cy,r).concat(circleOps(cx,cy,Math.max(0.01,r-t),true)), eo:true};
+    // circle + cross
+    return {ops:circleOps(cx,cy,r).concat(circleOps(cx,cy,Math.max(0.01,r-t),true), rectOps(cx-r,cy-t/2,cx+r,cy+t/2), rectOps(cx-t/2,cy-r,cx+t/2,cy+r)), eo:false, cross:true};
+  }
+  // marks around a box {x,y,w,h} (mm, y down)
+  function marksFor(b, c){
+    var o=c.off, L=b.x-o, T=b.y-o, R=b.x+b.w+o, B=b.y+b.h+o, out=[];
+    out.push(markAt(c,L,T,-1,-1), markAt(c,L,B,-1,1), markAt(c,R,B,1,1));
+    if(c.pts!==3) out.push(markAt(c,R,T,1,-1));
+    if(c.mid>0){ var longV=b.h>=b.w;
+      for(var i=1;i<=c.mid;i++){ var f=i/(c.mid+1);
+        if(longV){ var yy=T+(B-T)*f; out.push(markAt(c,L,yy,-1,0), markAt(c,R,yy,1,0)); }
+        else { var xx=L+(R-L)*f; out.push(markAt(c,xx,T,0,-1), markAt(c,xx,B,0,1)); } } }
+    return out;
+  }
+  function markExtent(c){ return c.off + (c.shape==="L" ? 0 : c.size); }   // how far marks reach beyond the box
+  function marksSvg(list){ return list.map(function(m){ return '<path d="'+opsToD(m.ops)+'" fill="#000"'+(m.eo?' fill-rule="evenodd"':'')+' pointer-events="none"/>'; }).join(""); }
+  function marksBox(b, c){ var bx=opsBox(marksFor(b,c).map(function(m){ return m.ops; })); return bx; }
+  function contentBox(){
     var a=artSize(), b={x0:0,y0:0,x1:a.w,y1:a.h};
     function inc(bb){ if(bb.x0<b.x0)b.x0=bb.x0; if(bb.y0<b.y0)b.y0=bb.y0; if(bb.x1>b.x1)b.x1=bb.x1; if(bb.y1>b.y1)b.y1=bb.y1; }
     if(S.contour.on && S.contour.ops.length) inc(opsBox([S.contour.ops]));
@@ -1500,6 +1594,12 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
       else inc({x0:o.x,y0:o.y,x1:o.x+o.w,y1:o.y+o.h});
     });
     return {x:b.x0, y:b.y0, w:b.x1-b.x0, h:b.y1-b.y0};
+  }
+  function designBox(){
+    var b=contentBox(), c=mk();
+    if(!c.on || c.scope!=="each") return b;
+    var m=marksBox(b,c), x0=Math.min(b.x,m.x0), y0=Math.min(b.y,m.y0), x1=Math.max(b.x+b.w,m.x1), y1=Math.max(b.y+b.h,m.y1);
+    return {x:x0, y:y0, w:x1-x0, h:y1-y0};
   }
 
   // ---- automatic contour cut: rasterise the printed artwork, grow by the offset, keep the outside edge, trace it
@@ -1617,6 +1717,7 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
     $("stOverName").textContent = b.glossLabel || "Gloss";
     $("stRoleHint").textContent = S.brand==="brother" ? "On the GTX, RGB 255 white prints no ink; RGB 254 prints white ink." : "Special inks are sent as named spot colours the RIP recognises.";
     $("stCutSec").hidden = S.brand==="brother";
+    $("stMarkSec").hidden = S.brand==="brother";
     $("stLaySec").hidden = S.brand==="brother";
     $("stSendRip").hidden = S.brand==="brother";
     $("stSendGtx").hidden = S.brand!=="brother";
@@ -1734,6 +1835,7 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
     if(S.contour.on && S.contour.ops.length && S.brand!=="brother"){
       var t=S.contour.type; parts.push('<path d="'+opsToD(S.contour.ops)+'" fill="none" stroke="'+SCREEN[t]+'" stroke-width="'+n3(sw)+'"'+(t==="perf"?' stroke-dasharray="'+n3(sw*4)+' '+n3(sw*2)+'"':'')+' pointer-events="none"/>');
     }
+    var mc=mk(); if(mc.on && mc.scope==="each") parts.push(marksSvg(marksFor(contentBox(), mc)));
     return parts.join("");
   }
   function render(){
@@ -1753,10 +1855,46 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
       }).join("");
       svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="'+n3(-mm)+' '+n3(-mm)+' '+n3(P.w+2*mm)+' '+n3(P.h+2*mm)+'" preserveAspectRatio="xMidYMid meet">'+DEFS+tile+
           '<rect width="'+n3(P.w)+'" height="'+n3(P.h)+'" fill="#d9dcdf"/>'+
-          '<rect x="'+n3(L.margin)+'" y="'+n3(L.margin)+'" width="'+n3(Math.max(0,P.w-2*L.margin))+'" height="'+n3(Math.max(0,P.h-2*L.margin))+'" fill="none" stroke="#9aa1a8" stroke-width="'+n3(Math.max(P.w,P.h)/600)+'" stroke-dasharray="'+n3(Math.max(P.w,P.h)/120)+'"/>'+uses+'</svg>';
+          '<rect x="'+n3(L.margin)+'" y="'+n3(L.margin)+'" width="'+n3(Math.max(0,P.w-2*L.margin))+'" height="'+n3(Math.max(0,P.h-2*L.margin))+'" fill="none" stroke="#9aa1a8" stroke-width="'+n3(Math.max(P.w,P.h)/600)+'" stroke-dasharray="'+n3(Math.max(P.w,P.h)/120)+'"/>'+uses+
+          (P.marks?marksSvg(P.marks):"")+'</svg>';
     }
     box.innerHTML=svg;
+    applyZoom();
   }
+  // ---- zoom & pan of the preview (changes only the view, never the design)
+  var Z={k:1, cx:null, cy:null, view:null};
+  function zBase(){ var svg=$("stCanvas").querySelector("svg"); if(!svg) return null; var b=svg.getAttribute("data-base"); if(!b){ b=svg.getAttribute("viewBox"); svg.setAttribute("data-base",b); } var a=b.split(/\s+/).map(Number); return {svg:svg,x:a[0],y:a[1],w:a[2],h:a[3]}; }
+  function applyZoom(){
+    var B=zBase(); if(!B) return;
+    if(Z.view!==S.view){ Z.view=S.view; Z.k=1; Z.cx=null; }
+    if(Z.k<=1.0001 || Z.cx===null){ Z.k=Math.max(1,Z.k); if(Z.k<=1.0001){ Z.cx=B.x+B.w/2; Z.cy=B.y+B.h/2; } }
+    var w=B.w/Z.k, h=B.h/Z.k;
+    Z.cx=Math.min(Math.max(Z.cx, B.x+w/2), B.x+B.w-w/2); Z.cy=Math.min(Math.max(Z.cy, B.y+h/2), B.y+B.h-h/2);
+    B.svg.setAttribute("viewBox", [Z.cx-w/2, Z.cy-h/2, w, h].map(n3).join(" "));
+    $("zmPct").textContent=Math.round(Z.k*100)+"%";
+  }
+  function zoomTo(k, px, py){
+    var B=zBase(); if(!B) return; k=Math.min(40, Math.max(1, k));
+    if(px==null){ px=Z.cx; py=Z.cy; }
+    Z.cx=px-(px-Z.cx)*(Z.k/k); Z.cy=py-(py-Z.cy)*(Z.k/k); Z.k=k; applyZoom();
+  }
+  function svgPoint(e){ var svg=$("stCanvas").querySelector("svg"), pt=svg.createSVGPoint(); pt.x=e.clientX; pt.y=e.clientY; return pt.matrixTransform(svg.getScreenCTM().inverse()); }
+  $("zmIn").addEventListener("click",function(){ zoomTo(Z.k*1.5); });
+  $("zmOut").addEventListener("click",function(){ zoomTo(Z.k/1.5); });
+  $("zmFit").addEventListener("click",function(){ Z.k=1; applyZoom(); });
+  $("stCanvas").addEventListener("wheel",function(e){ if(!$("stCanvas").querySelector("svg")) return; e.preventDefault(); var p=svgPoint(e); zoomTo(Z.k*(e.deltaY<0?1.2:1/1.2), p.x, p.y); },{passive:false});
+  var pan=null;
+  $("stCanvas").addEventListener("pointerdown",function(e){
+    if(e.button!==0 && e.button!==1) return;
+    var t=e.target.closest && e.target.closest("[data-oi]"); if(t && S.view==="design" && e.button===0) return;   // object drag handles this
+    var svg=$("stCanvas").querySelector("svg"); if(!svg) return;
+    var r=svg.getBoundingClientRect(), B=zBase();
+    pan={x:e.clientX, y:e.clientY, cx:Z.cx, cy:Z.cy, s:Math.max((B.w/Z.k)/r.width, (B.h/Z.k)/r.height)};
+    $("stCanvas").classList.add("panning"); $("stCanvas").setPointerCapture(e.pointerId); e.preventDefault();
+  });
+  $("stCanvas").addEventListener("pointermove",function(e){ if(!pan) return; Z.cx=pan.cx-(e.clientX-pan.x)*pan.s; Z.cy=pan.cy-(e.clientY-pan.y)*pan.s; applyZoom(); });
+  function endPan(){ if(pan){ pan=null; $("stCanvas").classList.remove("panning"); } }
+  $("stCanvas").addEventListener("pointerup",endPan); $("stCanvas").addEventListener("pointercancel",endPan);
 
   // ---- dragging shapes/text in the design view
   var drag=null;
@@ -1792,7 +1930,8 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
     var p=PAGES[v]; return {w:p[0], h:p[1], roll:!p[1]};
   }
   function layout(){
-    var box=designBox(), g=Math.max(0,+$("stGap").value||0), m=Math.max(0,+$("stMargin").value||0), spec=pageSpec();
+    var box=designBox(), g=Math.max(0,+$("stGap").value||0), m=Math.max(0,+$("stMargin").value||0), spec=pageSpec(), mc=mk(), whole=mc.on&&mc.scope==="whole";
+    var m0=m; if(whole) m+=markExtent(mc)+0.5;
     var mode=$("stMode").value, qty=Math.max(1,Math.round(+$("stQty").value||1)), rot=$("stRotate").checked;
     var uw=spec.w-2*m;
     function grid(tw,th,H){ var cols=Math.max(0,Math.floor((uw+g)/(tw+g))); var rows=H==null?Infinity:Math.max(0,Math.floor((H-2*m+g)/(th+g))); return {cols:cols, rows:rows, tw:tw, th:th}; }
@@ -1823,6 +1962,8 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
     for(var pg=0; pg<best.pages; pg++){
       var P={w:spec.w, h:best.H, items:[]}, perP=spec.roll?left:Math.min(left,best.perPage);
       for(var k=0;k<perP;k++){ var c=k%cols, r=Math.floor(k/cols); P.items.push({x:m+c*(tw+g), y:m+r*(th+g), rot:best.r}); }
+      if(whole && P.items.length){ var ex=P.items.reduce(function(a,it){ return {x0:Math.min(a.x0,it.x), y0:Math.min(a.y0,it.y), x1:Math.max(a.x1,it.x+tw), y1:Math.max(a.y1,it.y+th)}; },{x0:1e9,y0:1e9,x1:-1e9,y1:-1e9});
+        P.marks=marksFor({x:ex.x0, y:ex.y0, w:ex.x1-ex.x0, h:ex.y1-ex.y0}, mc); }
       left-=perP; L.pages.push(P);
     }
     return L;
@@ -1901,6 +2042,8 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
         c.push("q"); var ir=effRole(o.ink||"normal",brand); setFill(ir==="normal"?"normal":ir, o.color); c.push(opsToPdf(shapeOps(o))+"\nf Q");
       }
     });
+    var mcP=mk();
+    if(mcP.on && mcP.scope==="each"){ marksFor(contentBox(), mcP).forEach(function(mm){ c.push("q 0 0 0 1 k "+opsToPdf(mm.ops)+"\n"+(mm.eo?"f*":"f")+" Q"); }); }
     if(S.contour.on && S.contour.ops.length){ var cs3=spotCS(S.contour.type); c.push("q /GSop gs "+cs3+" CS 1 SCN 0.25 w "+opsToPdf(S.contour.ops)+"\nS Q"); }
     c.push("Q");
     var formContent=c.join("\n");
@@ -1933,6 +2076,7 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
           pc.push("q 0 -1 1 0 "+n3(x)+" "+n3(PH-yTop)+" cm /Fm0 Do Q");
         }
       });
+      if(P.marks){ P.marks.forEach(function(mm){ pc.push("q 1 0 0 -1 0 "+n3(PH)+" cm 0 0 0 1 k "+opsToPdf(mm.ops)+"\n"+(mm.eo?"f*":"f")+" Q"); }); }
       var cid=await streamObj("", pc.join("\n"));
       var pid=add("<< /Type /Page /Parent "+pagesId+" 0 R /MediaBox [0 0 "+n3(P.w*MM2PT)+" "+n3(PH)+"] /TrimBox [0 0 "+n3(P.w*MM2PT)+" "+n3(PH)+"] /Resources << /XObject << /Fm0 "+formId+" 0 R >> >> /Contents "+cid+" 0 R >>");
       pageIds.push(pid);
@@ -2061,6 +2205,11 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
   ["stPage","stPW","stPH","stMode","stQty","stLen","stGap","stMargin","stRotate"].forEach(function(id){
     $(id).addEventListener(id==="stPage"||id==="stMode"||id==="stRotate"?"change":"input",function(){ syncLayoutFields(); render(); });
   });
+  function mkSync(){ $("mkOpts").hidden=!$("mkOn").checked; }
+  $("mkOn").addEventListener("change",function(){ if(this.checked && !mkSync.done){ mkSync.done=true; $("mkStyle").value=mkBrandDefault(); var b=contentBox(); mkApplyPreset($("mkStyle").value, Math.max(b.w,b.h)); } mkSync(); render(); });
+  $("mkStyle").addEventListener("change",function(){ if(this.value!=="custom"){ var b=contentBox(); mkApplyPreset(this.value, Math.max(b.w,b.h)); } else $("mkNote").textContent="Custom marks: set the shape, size, line and positions to match your cutter."; render(); });
+  $("mkReset").addEventListener("click",function(){ var v=$("mkStyle").value==="custom"?mkBrandDefault():$("mkStyle").value; $("mkStyle").value=v; var b=contentBox(); mkApplyPreset(v, Math.max(b.w,b.h)); render(); });
+  ["mkShape","mkSize","mkThick","mkOff","mkDir","mkPts","mkScope","mkMid"].forEach(function(id){ $(id).addEventListener(/^(mkSize|mkThick|mkOff|mkMid)$/.test(id)?"input":"change", function(){ if($("mkStyle").value!=="custom"){ $("mkStyle").value="custom"; } render(); }); });
   function syncLayoutFields(){
     var v=$("stPage").value, roll=pageSpec().roll, fill=$("stMode").value==="fill";
     $("stPWl").hidden=!(v==="custom"||v==="customroll"); $("stPHl").hidden=v!=="custom";
@@ -2094,7 +2243,7 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
       $("stContourOpts").hidden=!o.contour.on;
       var cOn=S.contour.on!==o.contour.on || S.contour.type!==o.contour.type;
       S.contour.on=o.contour.on; S.contour.type=o.contour.type;
-      buildColors(); buildObjs(); buildNames(); syncLayoutFields(); syncTabs(); render();
+      mkSync(); buildColors(); buildObjs(); buildNames(); syncLayoutFields(); syncTabs(); render();
       if(S.contour.on) buildContour(); else { S.contour.ops=[]; render(); }
     }
   };
@@ -2108,7 +2257,7 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
 (function(){
   "use strict";
   var IDS=["colors","thresh","detail","speck","blur","removeBg","cutout","upscale","angle","outW","outH","outU","outLock",
-    "stBrand","stUnder","stOver","stContour","stCType","stOffset","stBridge","stPage","stPW","stPH","stMode","stQty","stLen","stGap","stMargin","stRotate","stGtx254","stDpi"];
+    "stBrand","stUnder","stOver","stContour","stCType","stOffset","stBridge","mkOn","mkStyle","mkShape","mkSize","mkThick","mkOff","mkDir","mkPts","mkScope","mkMid","stPage","stPW","stPH","stMode","stQty","stLen","stGap","stMargin","stRotate","stGtx254","stDpi"];
   var TRACE=["colors","thresh","detail","speck","blur","removeBg","cutout","upscale","angle"];
   var stack=[], last=null, busy=false, timer=null, pending=null, btn=document.getElementById("undoBtn");
   function domSnap(){ var o={}; IDS.forEach(function(id){ var e=document.getElementById(id); if(e) o[id]=e.type==="checkbox"?e.checked:e.value; }); return o; }
