@@ -1238,8 +1238,8 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
                spots:{ cut:"CutContour", perf:"PerfCutContour", white:"RDG_WHITE", gloss:"RDG_Gloss", primer:"RDG_PRIMER", silver:"RDG_MetallicSilver" },
                glossLabel:"Gloss" },
     mimaki:  { name:"Mimaki RasterLink", rip:"RasterLink",
-               spots:{ cut:"CutContour", perf:"CutContourPerf", white:"RDG_WHITE", gloss:"RDG_Gloss", primer:"RDG_PRIMER" },
-               glossLabel:"Clear / gloss" },
+               spots:{ cut:"CutContour", perf:"CutContourPerf", white:"RDG_WHITE" },   // RasterLink only takes these three
+               glossLabel:"" },
     mutoh:   { name:"Mutoh VerteLith", rip:"VerteLith",
                spots:{ cut:"CutContour", perf:"PerfCutContour", white:"Spot_White", gloss:"Spot_Varnish" },
                glossLabel:"Varnish" },
@@ -1389,8 +1389,86 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
                 timesb:{pdf:"Times-Bold", css:"'Times New Roman', Times, serif", w:"700", st:"normal"},
                 cour:{pdf:"Courier", css:"'Courier New', Courier, monospace", w:"400", st:"normal"},
                 courb:{pdf:"Courier-Bold", css:"'Courier New', Courier, monospace", w:"700", st:"normal"} };
+
+  // ---- fonts: standard Windows + Microsoft Office fonts, plus any font installed on this computer.
+  // The preview uses the font installed here; PDFs convert the text to outlines from the real font file
+  // (Chrome/Edge local font access), so the RIP never needs the font. Otherwise a standard PDF font is used.
+  var WIN_FONTS = ["Arial","Arial Black","Arial Narrow","Arial Rounded MT Bold","Aptos","Aptos Display","Aptos Narrow","Bahnschrift","Calibri","Calibri Light","Cambria","Candara","Cascadia Code","Century Gothic","Comic Sans MS","Consolas","Constantia","Corbel","Courier New","Ebrima","Franklin Gothic Medium","Gabriola","Gadugi","Georgia","Grandview","Impact","Ink Free","Javanese Text","Leelawadee UI","Lucida Console","Lucida Sans Unicode","Malgun Gothic","Microsoft Himalaya","Microsoft JhengHei","Microsoft New Tai Lue","Microsoft PhagsPa","Microsoft Sans Serif","Microsoft Tai Le","Microsoft YaHei","Microsoft Yi Baiti","MingLiU-ExtB","Mongolian Baiti","MS Gothic","MV Boli","Myanmar Text","Nirmala UI","Palatino Linotype","Segoe Print","Segoe Script","Segoe UI","Segoe UI Black","Segoe UI Historic","Segoe UI Light","Segoe UI Semibold","Segoe UI Semilight","Segoe UI Symbol","SimSun","Sitka Text","Sylfaen","Tahoma","Times New Roman","Trebuchet MS","Verdana","Yu Gothic",
+    "Agency FB","Algerian","Baskerville Old Face","Bauhaus 93","Bell MT","Berlin Sans FB","Berlin Sans FB Demi","Bernard MT Condensed","Bierstadt","Blackadder ITC","Bodoni MT","Bodoni MT Black","Book Antiqua","Bookman Old Style","Bradley Hand ITC","Britannic Bold","Broadway","Brush Script MT","Calisto MT","Castellar","Centaur","Century","Century Schoolbook","Chiller","Colonna MT","Cooper Black","Copperplate Gothic Bold","Copperplate Gothic Light","Curlz MT","Dubai","Edwardian Script ITC","Elephant","Engravers MT","Eras Bold ITC","Eras Demi ITC","Eras Light ITC","Eras Medium ITC","Felix Titling","Footlight MT Light","Forte","Franklin Gothic Book","Franklin Gothic Demi","Franklin Gothic Heavy","Freestyle Script","French Script MT","Garamond","Gigi","Gill Sans MT","Gill Sans MT Condensed","Gill Sans Ultra Bold","Gloucester MT Extra Condensed","Goudy Old Style","Goudy Stout","Haettenschweiler","Harlow Solid Italic","Harrington","High Tower Text","Imprint MT Shadow","Informal Roman","Jokerman","Juice ITC","Kristen ITC","Kunstler Script","Lucida Bright","Lucida Calligraphy","Lucida Fax","Lucida Handwriting","Lucida Sans","Lucida Sans Typewriter","Magneto","Maiandra GD","Matura MT Script Capitals","Mistral","Modern No. 20","Monotype Corsiva","Niagara Engraved","Niagara Solid","OCR A Extended","Old English Text MT","Onyx","Palace Script MT","Papyrus","Parchment","Perpetua","Perpetua Titling MT","Playbill","Poor Richard","Pristina","Rage Italic","Ravie","Rockwell","Rockwell Condensed","Rockwell Extra Bold","Script MT Bold","Seaford","Showcard Gothic","Skeena","Snap ITC","Stencil","Tempus Sans ITC","Tenorite","Tw Cen MT","Tw Cen MT Condensed","Viner Hand ITC","Vivaldi","Vladimir Script","Wide Latin"];
+  var LEGACY = { helv:["Arial",false], helvb:["Arial",true], times:["Times New Roman",false], timesb:["Times New Roman",true], cour:["Courier New",false], courb:["Courier New",true] };
+  function fontNorm(o){ if(!o.family){ var l=LEGACY[o.font]||LEGACY.helvb; o.family=l[0]; o.bold=l[1]; o.italic=false; } return o; }
+  var SERIF=/times|georgia|garamond|cambria|book antiqua|bookman|century(?! gothic)|palatino|constantia|bodoni|baskerville|perpetua|rockwell|bell mt|goudy|sylfaen|sitka|calisto|centaur|high tower|lucida bright|lucida fax|modern no|footlight|elephant|cooper|poor richard|imprint|harrington|castellar|engravers|felix|seaford|mingliu|simsun/i;
+  var MONO=/courier|consolas|lucida console|cascadia|ocr|typewriter|ms gothic/i;
+  function fontInfo(o){
+    fontNorm(o);
+    var fam=o.family, kind=MONO.test(fam)?"mono":SERIF.test(fam)?"serif":"sans";
+    var fb=kind==="mono"?"'Courier New', monospace":kind==="serif"?"'Times New Roman', serif":"Arial, Helvetica, sans-serif";
+    var base=kind==="mono"?"Courier":kind==="serif"?"Times":"Helvetica";
+    var pdf = base==="Times" ? (o.bold&&o.italic?"Times-BoldItalic":o.bold?"Times-Bold":o.italic?"Times-Italic":"Times-Roman")
+            : (o.bold&&o.italic?base+"-BoldOblique":o.bold?base+"-Bold":o.italic?base+"-Oblique":base);
+    return { family:fam, css:"'"+fam.replace(/'/g,"")+"', "+fb, w:o.bold?"700":"400", st:o.italic?"italic":"normal", pdf:pdf };
+  }
+  var installedCache={};
+  function fontInstalled(fam){
+    if(fam in installedCache) return installedCache[fam];
+    var t="mmmmmmmmmmlliWWQ@#08", r=false;
+    ["monospace","serif","sans-serif"].forEach(function(gen){ mctx.font="72px "+gen; var a=mctx.measureText(t).width; mctx.font="72px '"+fam.replace(/'/g,"")+"', "+gen; if(Math.abs(mctx.measureText(t).width-a)>0.5) r=true; });
+    return installedCache[fam]=r;
+  }
+  var LF={ list:null, fams:null, asked:false, parsed:{} };
+  async function loadLocalFonts(){
+    if(LF.list) return LF.list;
+    if(!window.queryLocalFonts) return null;
+    try{ LF.list=await window.queryLocalFonts(); LF.fams=[...new Set(LF.list.map(function(f){ return f.family; }))].sort(function(a,b){ return a.localeCompare(b); }); }
+    catch(e){ LF.list=null; }
+    return LF.list;
+  }
+  var otPromise=null;
+  function loadOpentype(){
+    if(window.opentype) return Promise.resolve(window.opentype);
+    if(!otPromise) otPromise=new Promise(function(res,rej){ var sc=document.createElement("script"); sc.src="https://cdnjs.cloudflare.com/ajax/libs/opentype.js/1.3.4/opentype.min.js"; sc.onload=function(){ res(window.opentype); }; sc.onerror=function(){ otPromise=null; rej(new Error("opentype")); }; document.head.appendChild(sc); });
+    return otPromise;
+  }
+  function pickFace(fam, bold, italic){
+    var faces=(LF.list||[]).filter(function(f){ return f.family.toLowerCase()===fam.toLowerCase(); });
+    if(!faces.length) return null;
+    function score(f){ var st=(f.style||"").toLowerCase(), b=/bold|black|heavy|semibold|demi/.test(st), i=/italic|oblique/.test(st);
+      return (b===!!bold?2:0)+(i===!!italic?2:0)+(/^(regular|normal|roman|book)$/.test(st)&&!bold&&!italic?1:0)+(st==="bold"&&bold&&!italic?1:0); }
+    faces.sort(function(a,b){ return score(b)-score(a); });
+    return faces[0];
+  }
+  // Text as outline paths in design mm (y down). Returns null when the font file isn't available here.
+  async function textOutline(o){
+    fontNorm(o); if(!LF.list) return null;
+    var face=pickFace(o.family, o.bold, o.italic); if(!face) return null;
+    try{
+      var ot=await loadOpentype(), key=face.postscriptName;
+      if(!LF.parsed[key]){ var buf=await (await face.blob()).arrayBuffer(); LF.parsed[key]=ot.parse(buf); }
+      var path=LF.parsed[key].getPath(o.text||"", o.x, o.y, o.pt/MM2PT), ops=[], cx=0, cy=0;
+      path.commands.forEach(function(c){
+        if(c.type==="M"){ ops.push(["M",c.x,c.y]); cx=c.x; cy=c.y; }
+        else if(c.type==="L"){ ops.push(["L",c.x,c.y]); cx=c.x; cy=c.y; }
+        else if(c.type==="C"){ ops.push(["C",c.x1,c.y1,c.x2,c.y2,c.x,c.y]); cx=c.x; cy=c.y; }
+        else if(c.type==="Q"){ ops.push(["C",cx+2/3*(c.x1-cx),cy+2/3*(c.y1-cy),c.x+2/3*(c.x1-c.x),c.y+2/3*(c.y1-c.y),c.x,c.y]); cx=c.x; cy=c.y; }
+        else if(c.type==="Z") ops.push(["Z"]);
+      });
+      return ops.length?ops:null;
+    }catch(e){ console.warn("outline failed", o.family, e); return null; }
+  }
+  function fontOptions(cur){
+    var mine=LF.fams||[], set={};
+    var win=WIN_FONTS.slice().sort(function(a,b){ return a.localeCompare(b); });
+    var inst=win.filter(fontInstalled), miss=win.filter(function(f){ return !fontInstalled(f); });
+    function opt(f, note){ set[f]=1; return '<option value="'+esc(f)+'"'+(f===cur?" selected":"")+' style="font-family:\''+esc(f.replace(/'/g,""))+'\'">'+esc(f)+(note||"")+'</option>'; }
+    var h='<optgroup label="Windows & Office fonts on this computer">'+inst.map(function(f){ return opt(f); }).join("")+'</optgroup>';
+    var extra=mine.filter(function(f){ return !WIN_FONTS.some(function(w){ return w.toLowerCase()===f.toLowerCase(); }); });
+    if(extra.length) h+='<optgroup label="Other fonts on this computer">'+extra.map(function(f){ return opt(f); }).join("")+'</optgroup>';
+    if(miss.length) h+='<optgroup label="Not installed on this computer">'+miss.map(function(f){ return opt(f," (not installed)"); }).join("")+'</optgroup>';
+    if(cur && !set[cur]) h='<option value="'+esc(cur)+'" selected>'+esc(cur)+'</option>'+h;
+    return h;
+  }
   function textBox(o){
-    var f=FONTS[o.font]||FONTS.helv; mctx.font=f.w+" 100px "+f.css;
+    var f=fontInfo(o); mctx.font=f.st+" "+f.w+" 100px "+f.css;
     var wpt=mctx.measureText(o.text||" ").width/100*o.pt, hmm=o.pt/MM2PT;
     return { x:o.x, y:o.y-hmm*0.72, w:wpt/MM2PT, h:hmm*0.94 };   // baseline at o.y
   }
@@ -1415,7 +1493,7 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
     var a=artSize(), parts=[];
     artOps().forEach(function(p){ var c=S.colors[p.hex]; if(c && (c.role==="hide"||c.role==="noink")) return; parts.push('<path d="'+opsToD(p.ops)+'"/>'); });
     S.objs.forEach(function(o){
-      if(o.kind==="text" && o.role!=="cut" && o.role!=="perf"){ var f=FONTS[o.font]||FONTS.helv; parts.push('<text x="'+n3(o.x)+'" y="'+n3(o.y)+'" font-family="'+esc(f.css)+'" font-weight="'+f.w+'" font-size="'+n3(o.pt/MM2PT)+'">'+esc(o.text)+'</text>'); }
+      if(o.kind==="text" && o.role!=="cut" && o.role!=="perf"){ var f=fontInfo(o); parts.push('<text x="'+n3(o.x)+'" y="'+n3(o.y)+'" font-family="'+esc(f.css)+'" font-weight="'+f.w+'" font-style="'+f.st+'" font-size="'+n3(o.pt/MM2PT)+'">'+esc(o.text)+'</text>'); }
       else if(o.kind!=="text" && o.role==="fill") parts.push('<path d="'+opsToD(shapeOps(o))+'"/>');
     });
     var W=Math.ceil((a.w+2*pad)*scale), H=Math.ceil((a.h+2*pad)*scale);
@@ -1549,8 +1627,11 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
       var h='<div class="oh"><span>'+title+'</span><button type="button" class="mini del" data-k="del">Remove</button></div>';
       if(o.kind==="text"){
         h+='<div class="row2"><input type="text" data-k="text" value="'+esc(o.text)+'" aria-label="Text" maxlength="200"></div>'+
-           '<div class="row2"><label>Font<select data-k="font">'+Object.keys(FONTS).map(function(k){ return '<option value="'+k+'"'+(k===o.font?" selected":"")+'>'+FONTS[k].pdf.replace("-"," ")+'</option>'; }).join("")+'</select></label>'+
-           '<label>Size (pt)<input type="number" data-k="pt" value="'+n3(o.pt)+'" min="4" max="2000" step="1"></label></div>';
+           '<div class="row2"><label style="flex:2 1 160px">Font<select data-k="family">'+fontOptions(fontNorm(o).family)+'</select></label>'+
+           '<label>Size (pt)<input type="number" data-k="pt" value="'+n3(o.pt)+'" min="4" max="2000" step="1"></label></div>'+
+           '<div class="row2"><label class="check inl"><input type="checkbox" data-k="bold"'+(o.bold?" checked":"")+'><span>Bold</span></label><label class="check inl"><input type="checkbox" data-k="italic"'+(o.italic?" checked":"")+'><span>Italic</span></label>'+
+           (window.queryLocalFonts && !LF.list ? '<button type="button" class="mini" data-k="localfonts">Use all fonts on this computer</button>' : '')+'</div>'+
+           (!fontInstalled(o.family)?'<p class="hint">'+esc(o.family)+' isn\'t installed on this computer, so it previews in a similar font and the PDF uses '+esc(fontInfo(o).pdf.split("-")[0])+'.</p>':'');
       } else {
         h+='<div class="row2"><label>Width<input type="number" data-k="w" value="'+n3(o.w)+'" min="1" step="0.5"></label><label>Height<input type="number" data-k="h" value="'+n3(o.h)+'" min="1" step="0.5"></label>'+
            (o.kind==="round"?'<label>Corner<input type="number" data-k="r" value="'+n3(o.r)+'" min="0" step="0.5"></label>':'')+'</div>';
@@ -1561,11 +1642,13 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
       el.innerHTML=h;
       el.addEventListener("input",function(e){
         var k=e.target.dataset.k; if(!k) return;
-        if(k==="text"||k==="font"||k==="color"||k==="ink"||k==="role") o[k]=e.target.value; else { var v=parseFloat(e.target.value); if(!isNaN(v)) o[k]=v; }
-        if(k==="role"){ buildObjs(); }
+        if(k==="bold"||k==="italic") o[k]=e.target.checked;
+        else if(k==="text"||k==="family"||k==="color"||k==="ink"||k==="role") o[k]=e.target.value; else { var v=parseFloat(e.target.value); if(!isNaN(v)) o[k]=v; }
+        if(k==="role"||k==="family"){ buildObjs(); }
         render(); if(S.contour.on && (o.kind==="text"||o.role==="fill")) scheduleContour();
       });
       el.addEventListener("click",function(e){
+        if(e.target.dataset.k==="localfonts"){ loadLocalFonts().then(function(l){ if(l){ toast(LF.fams.length+" fonts found on this computer"); } else stStatus("This browser didn't allow access to your computer's fonts.","err"); buildObjs(); }); return; }
         if(e.target.dataset.k==="del"){ S.objs.splice(idx,1); S.sel=-1; buildObjs(); render(); if(S.contour.on) scheduleContour(); return; }
         if(S.sel!==idx){ S.sel=idx; [].forEach.call(box.children,function(c,i){ c.classList.toggle("sel", i===idx); }); render(); }
       });
@@ -1623,10 +1706,10 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
       var attrs=forTile?'':' data-oi="'+idx+'"', sel=(!forTile && idx===S.sel);
       if(S.brand==="brother" && (o.role==="cut"||o.role==="perf") && !sel) return;
       if(o.kind==="text"){
-        var f=FONTS[o.font]||FONTS.helv, fill=o.ink==="normal"?o.color:(PAT[o.ink]||o.color);
+        var f=fontInfo(o), fill=o.ink==="normal"?o.color:(PAT[o.ink]||o.color);
         if(o.role==="cut"||o.role==="perf") fill="none";
         var strokeAttr = (o.role==="cut"||o.role==="perf") ? ' stroke="'+SCREEN[o.role]+'" stroke-width="'+n3(sw)+'"' : '';
-        parts.push('<text'+attrs+' x="'+n3(o.x)+'" y="'+n3(o.y)+'" font-family="'+esc(f.css)+'" font-weight="'+f.w+'" font-size="'+n3(o.pt/MM2PT)+'" fill="'+fill+'"'+strokeAttr+'>'+esc(o.text)+'</text>');
+        parts.push('<text'+attrs+' x="'+n3(o.x)+'" y="'+n3(o.y)+'" font-family="'+esc(f.css)+'" font-weight="'+f.w+'" font-style="'+f.st+'" font-size="'+n3(o.pt/MM2PT)+'" fill="'+fill+'"'+strokeAttr+'>'+esc(o.text)+'</text>');
         if(sel){ var tb=textBox(o); parts.push('<rect x="'+n3(tb.x)+'" y="'+n3(tb.y)+'" width="'+n3(tb.w)+'" height="'+n3(tb.h)+'" fill="none" stroke="#e8b923" stroke-width="'+n3(sw/2)+'" stroke-dasharray="'+n3(sw*3)+'" pointer-events="none"/>'); }
       } else {
         var d=opsToD(shapeOps(o));
@@ -1771,7 +1854,9 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
     var spots={}, spotList=[];
     function spotCS(role){ var name=spotName(brand,role); if(!name) return null; if(!spots[role]){ spots[role]="/CS"+spotList.length; spotList.push({role:role,name:name}); } return spots[role]; }
     var c=[], fonts={}, fontList=[];
-    function fontRes(key){ var f=(FONTS[key]||FONTS.helv).pdf; if(!fonts[f]){ fonts[f]="/F"+fontList.length; fontList.push(f); } return fonts[f]; }
+    function fontRes(o){ var f=fontInfo(o).pdf; if(!fonts[f]){ fonts[f]="/F"+fontList.length; fontList.push(f); } return fonts[f]; }
+    var OUT={}, fallback=[];
+    for(var ti=0; ti<S.objs.length; ti++){ var to=S.objs[ti]; if(to.kind!=="text") continue; var ol=await textOutline(to); if(ol) OUT[to.id]=ol; else fallback.push(fontNorm(to).family); }
     function setFill(role, hex){
       if(role==="normal"||role==="fill"){ var r=rgbOf(hex); c.push(r.map(n3).join(" ")+" rg"); return true; }
       var cs=spotCS(role); if(!cs){ var r2=rgbOf(hex); c.push(r2.map(n3).join(" ")+" rg"); return true; }
@@ -1788,11 +1873,14 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
     S.objs.forEach(function(o){
       var isLine = o.role==="cut"||o.role==="perf";
       if(!isLine && effRole(o.ink||"normal",brand)==="hide") return;
-      if(o.kind==="text"){
+      if(o.kind==="text" && OUT[o.id]){
+        if(isLine){ c.push("q /GSop gs "+spotCS(o.role)+" CS 1 SCN 0.25 w "+opsToPdf(OUT[o.id])+"\nS Q"); }
+        else { c.push("q"); setFill(effRole(o.ink||"normal",brand)==="normal"?"normal":effRole(o.ink,brand), o.color); c.push(opsToPdf(OUT[o.id])+"\nf Q"); }
+      } else if(o.kind==="text"){
         c.push("q");
         if(isLine){ var cs=spotCS(o.role); c.push("/GSop gs "+cs+" CS 1 SCN 0.25 w 1 Tr"); }
         else { setFill(effRole(o.ink||"normal",brand)==="normal"?"normal":effRole(o.ink,brand), o.color); }
-        c.push("1 0 0 -1 "+n3(o.x*MM2PT)+" "+n3(o.y*MM2PT)+" cm BT "+fontRes(o.font)+" "+n3(o.pt)+" Tf 0 0 Td "+pdfStr(o.text||"")+" Tj ET Q");
+        c.push("1 0 0 -1 "+n3(o.x*MM2PT)+" "+n3(o.y*MM2PT)+" cm BT "+fontRes(o)+" "+n3(o.pt)+" Tf 0 0 Td "+pdfStr(o.text||"")+" Tj ET Q");
       } else if(isLine){
         var cs2=spotCS(o.role); c.push("q /GSop gs "+cs2+" CS 1 SCN 0.25 w "+opsToPdf(shapeOps(o))+"\nS Q");
       } else {
@@ -1855,7 +1943,7 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
     for(var j=1;j<=objs.length;j++) x+=("0000000000"+offsets[j]).slice(-10)+" 00000 n \n";
     put(x+"trailer\n<< /Size "+(objs.length+1)+" /Root "+catalogId+" 0 R /Info "+infoId+" 0 R >>\nstartxref\n"+xref+"\n%%EOF\n");
     var blob=new Blob(chunks,{type:"application/pdf"});
-    return { blob:blob, pages:L.pages.length, copies:L.count, spots:spotList.map(function(s){return s.name;}) };
+    return { blob:blob, pages:L.pages.length, copies:L.count, spots:spotList.map(function(s){return s.name;}), fallback:[...new Set(fallback)] };
   }
 
   // ---- Brother GTX PNG
@@ -1867,7 +1955,7 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
       if(o.role==="cut"||o.role==="perf") return;
       var r=effRole(o.ink||"normal","brother"), fill=r==="w254"?"rgb(254,254,254)":r==="noink"?"rgb(255,255,255)":o.color;
       if(r==="hide") return;
-      if(o.kind==="text"){ var f=FONTS[o.font]||FONTS.helv; parts.push('<text x="'+n3(o.x)+'" y="'+n3(o.y)+'" font-family="'+esc(f.css)+'" font-weight="'+f.w+'" font-size="'+n3(o.pt/MM2PT)+'" fill="'+fill+'">'+esc(o.text)+'</text>'); }
+      if(o.kind==="text"){ var f=fontInfo(o); parts.push('<text x="'+n3(o.x)+'" y="'+n3(o.y)+'" font-family="'+esc(f.css)+'" font-weight="'+f.w+'" font-style="'+f.st+'" font-size="'+n3(o.pt/MM2PT)+'" fill="'+fill+'">'+esc(o.text)+'</text>'); }
       else parts.push('<path d="'+opsToD(shapeOps(o))+'" fill="'+fill+'"/>');
     });
     var W=Math.max(1,Math.round(b.w/25.4*dpi)), H=Math.max(1,Math.round(b.h/25.4*dpi));
@@ -1918,7 +2006,12 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
     toast("Downloading "+fname);
   }
   async function makePdf(brand){
-    try{ stStatus("Building the PDF…"); var r=await buildPdf(brand); stStatus("PDF ready: "+r.copies+" cop"+(r.copies===1?"y":"ies")+", "+r.pages+" page"+(r.pages===1?"":"s")+(r.spots.length?". Spot colours: "+r.spots.join(", "):"")+".","ok"); return r; }
+    try{
+      if(S.objs.some(function(o){ return o.kind==="text"; }) && window.queryLocalFonts && !LF.list) await loadLocalFonts();   // asks once, during the click
+      stStatus("Building the PDF…"); var r=await buildPdf(brand);
+      stStatus("PDF ready: "+r.copies+" cop"+(r.copies===1?"y":"ies")+", "+r.pages+" page"+(r.pages===1?"":"s")+(r.spots.length?". Spot colours: "+r.spots.join(", "):"")+"."+
+        (r.fallback.length?" Text in "+r.fallback.join(", ")+" uses a standard PDF font because the font file couldn't be read here (Chrome or Edge on the computer with the font installed converts it to outlines).":" Text is converted to outlines."), r.fallback.length?"err":"ok");
+      return r; }
     catch(e){ console.error(e); stStatus(e.message==="nofit"?"The design doesn't fit the media. Make it smaller or pick wider media.":"Couldn't build the PDF.","err"); return null; }
   }
   function fileName(brand){ return (S.name||"design")+"-"+BRANDS[brand].rip.replace(/\s+/g,"")+".pdf"; }
@@ -1947,7 +2040,7 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
   $("stAddText").addEventListener("click",function(){
     var t=$("stText").value.trim(); if(!t){ $("stText").focus(); return; }
     var a=artSize(), pt=Math.max(8, Math.round(a.h*0.12*MM2PT));
-    var o={id:S.nextId++, kind:"text", text:t, font:"helvb", pt:pt, x:0, y:a.h+pt/MM2PT*1.1, role:"fill", color:"#000000", ink:"normal"};
+    var o={id:S.nextId++, kind:"text", text:t, family:"Arial", bold:true, italic:false, pt:pt, x:0, y:a.h+pt/MM2PT*1.1, role:"fill", color:"#000000", ink:"normal"};
     S.objs.push(o); S.sel=S.objs.length-1; $("stText").value=""; buildObjs(); render(); if(S.contour.on) scheduleContour();
   });
   $("stText").addEventListener("keydown",function(e){ if(e.key==="Enter"){ e.preventDefault(); $("stAddText").click(); } });
