@@ -591,7 +591,17 @@ const PERTH = "Australia/Perth";
 const fmtWhen = (iso, o) => new Date(iso).toLocaleString("en-AU", { timeZone: PERTH, ...o });
 const dayKey = (iso) => fmtWhen(iso, { year: "numeric", month: "2-digit", day: "2-digit" });
 const timeLbl = (iso) => fmtWhen(iso, { hour: "numeric", minute: "2-digit" }).replace(" ", "").toLowerCase();
-const bk = { slot: null, ready: false };
+const bk = { slot: null, ready: false, moving: null, earliest: null };
+const perthDate = (iso) => new Date(iso).toLocaleDateString("en-CA", { timeZone: PERTH });   // YYYY-MM-DD
+/* Scheduled services need 5 business days' notice (parts): the database works out the first day that's allowed. */
+async function earliestService() {
+  const today = perthDate(new Date().toISOString());
+  if (bk.earliest && bk.earliest.today === today) return bk.earliest.date;
+  const { data, error } = await sb.rpc("earliest_service_date");
+  if (error || !data) return null;
+  bk.earliest = { today, date: String(data).slice(0, 10) };
+  return bk.earliest.date;
+}
 
 async function renderBook(machineId) {
   const sel = $("#bkMachine");
@@ -612,22 +622,31 @@ async function renderBook(machineId) {
   }
   loadBookings();
 }
-const bkKind = () => (document.querySelector('input[name="bkKind"]:checked') || {}).value || "service";
+const bkKind = () => bk.moving ? bk.moving.kind : (document.querySelector('input[name="bkKind"]:checked') || {}).value || "service";
 async function loadSlots() {
   const box = $("#bkSlots");
   bk.slot = null; $("#bkSubmit").disabled = true; $("#bkPicked").hidden = true;
   box.replaceChildren(el("p", { class: "muted small" }, "Loading available times…"));
-  const since = new Date(Date.now() + 12 * 3600e3).toISOString();
+  let since = new Date(Date.now() + 12 * 3600e3).toISOString(), notice = null;
+  if (bkKind() === "service") {
+    const first = await earliestService();
+    if (first) {
+      const from = new Date(first + "T00:00:00+08:00").toISOString();
+      if (from > since) since = from;
+      notice = el("p", { class: "muted small", style: "grid-column:1/-1;margin:0 0 6px" }, "Scheduled services need at least 5 business days' notice so we can have parts on hand. The first day you can book is ",
+        el("b", {}, new Date(first + "T12:00:00+08:00").toLocaleDateString("en-AU", { timeZone: PERTH, weekday: "long", day: "numeric", month: "long" })), ".");
+    }
+  }
   const { data, error } = await sb.from("portal_slots").select("slot_start,slot_end").eq("hours", KIND_HOURS[bkKind()]).gt("slot_start", since).order("slot_start").limit(40);
   if (error) { box.replaceChildren(el("p", { class: "msg err" }, "Couldn't load available times. Please try again shortly.")); return; }
   if (!data.length) {
-    box.replaceChildren(el("p", { class: "muted" }, "No online times are available right now. Please call ", el("a", { href: "tel:1300880815" }, "1300 880 815"),
-      " or email ", el("a", { href: "mailto:" + cfg.contactEmail }, cfg.contactEmail), " and we'll find a time."));
+    box.replaceChildren(...[notice, el("p", { class: "muted" }, "No online times are available right now. Please call ", el("a", { href: "tel:1300880815" }, "1300 880 815"),
+      " or email ", el("a", { href: "mailto:" + cfg.contactEmail }, cfg.contactEmail), " and we'll find a time.")].filter(Boolean));
     return;
   }
   const days = new Map();
   for (const s of data) { const k = dayKey(s.slot_start); if (!days.has(k)) days.set(k, []); days.get(k).push(s); }
-  box.replaceChildren(...[...days.values()].map((list) => el("div", { class: "sday" },
+  box.replaceChildren(...(notice ? [notice] : []), ...[...days.values()].map((list) => el("div", { class: "sday" },
     el("div", { class: "sdate" }, fmtWhen(list[0].slot_start, { weekday: "short", day: "numeric", month: "short" })),
     el("div", { class: "stimes" }, ...list.map((s) => el("button", { type: "button", class: "slot", "aria-pressed": "false", onclick: (e) => {
       for (const b of box.querySelectorAll(".slot")) b.setAttribute("aria-pressed", "false");
@@ -646,15 +665,54 @@ async function loadBookings() {
   box.replaceChildren(...data.map((b) => {
     const m = state.machines.find((x) => x.id === b.machine_id);
     const [t, cls] = lbl[b.status] || [b.status, "none"];
-    return el("div", { class: "bkitem" },
+    const live = ["pending", "booked", "clash"].includes(b.status);
+    const changeable = !state.staff && live && (b.status === "clash" || new Date(b.slot_start).getTime() > Date.now() + 24 * 3600e3);
+    return el("div", { class: "bkitem" + (bk.moving && bk.moving.id === b.id ? " moving" : "") },
       el("b", {}, fmtWhen(b.slot_start, { weekday: "short", day: "numeric", month: "short" }) + ", " + timeLbl(b.slot_start)),
       el("div", { class: "muted small" }, [KIND_LABEL[b.kind], m && machineName(m)].filter(Boolean).join(" · ")),
-      el("span", { class: "pill " + cls }, t + (b.ticket_num && b.status === "booked" ? " · job " + b.ticket_num : "")));
+      el("span", { class: "pill " + cls }, t + (b.ticket_num && b.status === "booked" ? " · job " + b.ticket_num : "")),
+      changeable ? el("button", { type: "button", class: "btn ghost small", onclick: () => startMove(b) }, b.status === "clash" ? "Pick a new time" : "Change date or time")
+        : (live && !state.staff && new Date(b.slot_start).getTime() > Date.now() ? el("span", { class: "muted small" }, "Less than 24 hours away: call 1300 880 815 to change it.") : null));
   }));
+}
+/* Moving an existing booking: the same slot picker, for that booking's kind of visit. */
+function startMove(b) {
+  bk.moving = b;
+  const m = state.machines.find((x) => x.id === b.machine_id);
+  let bar = $("#bkMoving");
+  if (!bar) { bar = el("div", { id: "bkMoving", class: "movebar" }); $("#bkSlots").before(bar); }
+  bar.hidden = false;
+  bar.replaceChildren(el("span", {}, "Changing your " + (KIND_LABEL[b.kind] || "booking").toLowerCase() + (m ? " for " + machineName(m) : "") + " on ",
+    el("b", {}, fmtWhen(b.slot_start, { weekday: "long", day: "numeric", month: "long" }) + ", " + timeLbl(b.slot_start)), ". Pick a new time below."),
+    el("button", { type: "button", class: "btn ghost small", onclick: endMove }, "Keep the current time"));
+  for (const x of document.querySelectorAll("#bookForm .kinds, #bookForm .f, #bookForm .row2")) x.hidden = true;
+  $("#bkSubmit").textContent = "Move my booking to this time";
+  $("#bkMsg").textContent = ""; $("#bkMsg").className = "msg";
+  loadSlots(); loadBookings();
+  $("#bookForm").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+function endMove() {
+  bk.moving = null;
+  const bar = $("#bkMoving"); if (bar) bar.hidden = true;
+  for (const x of document.querySelectorAll("#bookForm .kinds, #bookForm .f, #bookForm .row2")) x.hidden = false;
+  $("#bkSubmit").textContent = "Book this time";
+  loadSlots(); loadBookings();
 }
 $("#bookForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const msg = $("#bkMsg"), btn = $("#bkSubmit");
+  if (bk.moving) {
+    if (!bk.slot) { msg.className = "msg err"; msg.textContent = "Pick a new time first."; return; }
+    btn.disabled = true; msg.className = "msg"; msg.textContent = "Moving your booking…";
+    const was = bk.moving, to = bk.slot;
+    const { error } = await sb.rpc("reschedule_booking", { p_id: was.id, p_slot: to.slot_start });
+    if (error) { msg.className = "msg err"; msg.textContent = error.message || "Couldn't move the booking."; btn.disabled = false; loadSlots(); return; }
+    endMove();
+    msg.className = "msg ok";
+    msg.textContent = "Done. Your booking is now " + fmtWhen(to.slot_start, { weekday: "long", day: "numeric", month: "long" }) + " at " + timeLbl(to.slot_start) +
+      (was.status === "pending" ? ". We'll confirm it shortly." : ". We've updated our calendar.");
+    return;
+  }
   const name = $("#bkName").value.trim(), phone = $("#bkPhone").value.trim();
   if (!bk.slot) { msg.className = "msg err"; msg.textContent = "Pick a time first."; return; }
   if (!name || !phone) { msg.className = "msg err"; msg.textContent = "Please add a contact name and phone number."; return; }

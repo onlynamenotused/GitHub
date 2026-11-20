@@ -247,3 +247,6 @@ table.billing td.act{text-align:right;white-space:nowrap}
 .catpick{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;font-size:12.5px}
 .catpick label{display:inline-flex;gap:4px;align-items:center;white-space:nowrap;cursor:pointer}
 .catpick input{accent-color:var(--accent,#e8b923)}
+.movebar{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between;border:1px solid var(--accent);border-radius:10px;padding:10px 12px;background:var(--sunk);font-size:14px}
+.bkitem.moving{border-left:3px solid var(--accent);padding-left:8px}
+.bkitem .btn.small{align-self:flex-start}
