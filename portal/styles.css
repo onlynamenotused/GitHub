@@ -251,5 +251,7 @@ table.billing td.act{text-align:right;white-space:nowrap}
 .bkitem.moving{border-left:3px solid var(--accent);padding-left:8px}
 .bkitem .btn.small{align-self:flex-start}
 .mhint{margin:0 0 10px;padding:10px 14px;border-left:3px solid var(--accent);background:var(--sunk);border-radius:8px;font-size:14px}
-.mcard .mcta{margin-top:auto;padding-top:8px;border-top:1px solid var(--line);color:var(--accent);font-weight:600;font-size:14px}
-.mcard:hover .mcta,.mcard:focus-visible .mcta{text-decoration:underline}
+.mcard{position:relative}
+.mcard .mbook{position:absolute;top:12px;right:12px;padding:4px 14px;border-radius:999px;background:var(--accent);color:var(--accent-ink,#161616);font:600 13px var(--body);cursor:pointer}
+.mcard .mbook:hover{filter:brightness(1.08)}
+.mcard .model{padding-right:64px}

@@ -191,7 +191,8 @@ function renderMachines() {
       el("span", { class: "pill " + s.cls }, s.label + (m.pm_next_due ? " · " + fmtDate(m.pm_next_due) : "")),
       m.added_via === "portal" && m.desk_seen === false ? el("span", { class: "muted small" }, "Added by you · we'll check the details") : null,
       filesFor(m).length ? el("span", { class: "muted small" }, "📄 " + filesFor(m).length + " parameter/log file" + (filesFor(m).length > 1 ? "s" : "")) : null,
-      el("span", { class: "mcta" }, state.staff ? "View details ›" : "View details · Book a job ›")
+      state.staff ? null : el("span", { class: "mbook", role: "link", title: "Book a service or log a job for this machine",
+        onclick: (e) => { e.stopPropagation(); location.hash = "#book/" + encodeURIComponent(m.id); } }, "Book")
     );
   }));
 }
