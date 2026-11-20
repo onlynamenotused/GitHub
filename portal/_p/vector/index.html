@@ -957,10 +957,11 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
   // ---- tracing
   function schedule(ms){ if(!state.img) return; clearTimeout(state.timer); state.timer=setTimeout(run, ms); }
 
+  function T(k, d){ var t=window.__vcTune; return t && (k in t) ? t[k] : d; }
   function prepCanvas(){
-    var img=state.img, w=img.naturalWidth, h=img.naturalHeight, maxSide=Math.max(w,h), s=1;
-    if($("upscale").checked && maxSide<1000) s=Math.min(4, 1000/maxSide);
-    if(maxSide*s>1600) s=1600/maxSide;
+    var img=state.img, w=img.naturalWidth, h=img.naturalHeight, maxSide=Math.max(w,h), s=1, up=T("upTarget",2000), cap=T("maxCap",2400);
+    if($("upscale").checked && maxSide<up) s=Math.min(T("upMax",4), up/maxSide);
+    if(maxSide*s>cap) s=cap/maxSide;
     var cw=Math.max(1,Math.round(w*s)), ch=Math.max(1,Math.round(h*s));
     var c=document.createElement("canvas"); c.width=cw; c.height=ch;
     var x=c.getContext("2d"); x.imageSmoothingEnabled=true; x.imageSmoothingQuality="high";
@@ -1034,6 +1035,19 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
     return pal;
   }
 
+  // Clean single-pixel noise on colour edges: a pixel takes the colour most of its 8 neighbours share (5+ of 8).
+  function majorityFilter(imgd){
+    var w=imgd.width, h=imgd.height, d=imgd.data, src=new Uint32Array(d.buffer.slice(0)), out=new Uint32Array(d.buffer);
+    var nb=[-w-1,-w,-w+1,-1,1,w-1,w,w+1], vals=new Uint32Array(8);
+    for(var y=1;y<h-1;y++) for(var x=1;x<w-1;x++){
+      var i=y*w+x, me=src[i];
+      if(src[i-1]===me && src[i+1]===me && src[i-w]===me && src[i+w]===me) continue;   // not on an edge
+      for(var k=0;k<8;k++) vals[k]=src[i+nb[k]];
+      var best=me, bn=0;
+      for(var a=0;a<8;a++){ var v=vals[a], c=0; if(v===me) continue; for(var b=0;b<8;b++) if(vals[b]===v) c++; if(c>bn){ bn=c; best=v; } }
+      if(bn>=5) out[i]=best;
+    }
+  }
   function dist(p,q){ return Math.abs(p.r-q.r)+Math.abs(p.g-q.g)+Math.abs(p.b-q.b); }
 
   function borderColor(imgd){
@@ -1071,8 +1085,9 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
     var cfg = {
       binary: o.bw, mode: "spline", hierarchical: o.cutout ? "cutout" : "stacked",
       cornerThreshold: o.corner*deg, lengthThreshold: o.length, maxIterations: 10, spliceThreshold: 45*deg,
-      filterSpeckle: o.speckle, colorPrecision: 1, layerDifference: 8, pathPrecision: 2
+      filterSpeckle: o.speckle, colorPrecision: T("colorPrecision",1), layerDifference: T("layerDifference",8), pathPrecision: T("pathPrecision",2)
     };
+    cfg.spliceThreshold=T("splice",45)*deg; cfg.maxIterations=T("iters",10);
     var svg = vt.to_svg(new Uint8Array(imgd.data.buffer.slice(0)), imgd.width, imgd.height, cfg);
     // snap every fill back to the chosen palette (VTracer averages colours when it merges small regions)
     var solid = o.pal.filter(function(p){ return p.a>=128; });
@@ -1122,7 +1137,7 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
         var bgColor = (!bw && $("removeBg").checked) ? borderColor(imgd) : null;
         var pal;
         if(bw){ toBW(imgd, +$("thresh").value); pal=[{r:0,g:0,b:0,a:255},{r:255,g:255,b:255,a:255}]; }
-        else { pal=quantize(imgd, +$("colors").value); if(!pal) throw new Error("Image is fully transparent"); }
+        else { pal=quantize(imgd, +$("colors").value); if(!pal) throw new Error("Image is fully transparent"); for(var mp=0; mp<T("majority",1); mp++) majorityFilter(imgd); }
         if(bgColor){ // snap the detected background to its palette colour
           var best=null, bd=1e9; pal.forEach(function(p){ if(p.a<128) return; var dd=dist(p,bgColor); if(dd<bd){bd=dd;best=p;} });
           bgColor = (best && bd<90) ? best : null;
@@ -1130,8 +1145,8 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
         var detail=+$("detail").value, s=Math.max(1,prep.scale);
         var o={
           bw:bw, cutout:$("cutout").checked, bgColor:bgColor, pal:pal,
-          corner: 118 - detail*7,                                  // 111° (smooth) .. 48° (sharp corners)
-          length: (3.5 + (10-detail)*0.7) * Math.sqrt(s),
+          corner: 118 - detail*7 + T("cornerAdd",0),               // 111° (smooth) .. 48° (sharp corners)
+          length: (3.5 + (10-detail)*0.7) * Math.sqrt(s) * T("lenMul",1),
           speckle: Math.max(1, Math.round((+$("speck").value/4 + 1) * Math.sqrt(s))),
           tol: (0.25 + (10-detail)*0.35) * Math.sqrt(s)
         };
