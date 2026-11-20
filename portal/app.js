@@ -6,7 +6,7 @@ const sb = createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, {
 });
 
 const $ = (s) => document.querySelector(s);
-const views = ["loading", "login", "view-machines", "view-machine", "view-kb", "view-contact", "view-customers", "view-book"];
+const views = ["loading", "login", "view-machines", "view-machine", "view-add", "view-kb", "view-contact", "view-customers", "view-book"];
 const state = { user: null, clients: [], machines: [], kb: null, resources: null, kbAccess: false, intranet: false, staff: false, access: null };
 
 // ---------- helpers ----------
@@ -163,9 +163,11 @@ function renderMachines() {
   );
 
   const box = $("#machineList");
+  $("#addMachineBtn").hidden = !isCustomer();
   if (!state.machines.length) {
     box.replaceChildren(el("div", { class: "card empty" },
-      "No machines are linked to this email address yet. Contact ",
+      ...(isCustomer() ? ["No machines on your account yet. ", el("a", { href: "#add-machine" }, "Add your first machine"), " (you can scan its serial plate), or contact "]
+        : ["No machines are linked to this email address yet. Contact "]),
       el("a", { href: "mailto:" + cfg.contactEmail }, cfg.contactEmail), " and we'll set it up."));
     return;
   }
@@ -178,6 +180,7 @@ function renderMachines() {
       el("span", { class: "muted small" }, [m.sub_category || m.category, m.serial && "SN " + m.serial].filter(Boolean).join(" · ")),
       el("span", { class: "muted small" }, m.location || m.site || ""),
       el("span", { class: "pill " + s.cls }, s.label + (m.pm_next_due ? " · " + fmtDate(m.pm_next_due) : "")),
+      m.added_via === "portal" && m.desk_seen === false ? el("span", { class: "muted small" }, "Added by you · we'll check the details") : null,
       filesFor(m).length ? el("span", { class: "muted small" }, "📄 " + filesFor(m).length + " parameter/log file" + (filesFor(m).length > 1 ? "s" : "")) : null
     );
   }));
@@ -264,8 +267,10 @@ async function renderMachine(id) {
   const relKb = el("div", { class: "stack" }, el("p", { class: "muted small" }, "Loading…"));
   const relRes = el("ul", { class: "links" }, el("li", { class: "muted small" }, "Loading…"));
 
+  const flashMsg = state.flash; state.flash = "";
   v.replaceChildren(
     el("button", { class: "btn back", onclick: () => (location.hash = "#machines") }, "← All machines"),
+    flashMsg ? el("p", { class: "msg ok", role: "status" }, flashMsg) : "",
     el("div", { class: "detail" },
       el("div", { class: "card" },
         el("h1", {}, machineName(m)),
@@ -279,16 +284,19 @@ async function renderMachine(id) {
           el("dt", {}, "Last service"), el("dd", {}, fmtDate(m.pm_last_done)),
           el("dt", {}, "Next service due"), el("dd", {}, fmtDate(m.pm_next_due)),
           m.pm_interval_months && el("dt", {}, "Service interval"), m.pm_interval_months && el("dd", {}, "Every " + m.pm_interval_months + " months"),
-          m.warranty_end && el("dt", {}, "Warranty until"), m.warranty_end && el("dd", {}, fmtDate(m.warranty_end))
+          m.warranty_end && el("dt", {}, "Warranty until"), m.warranty_end && el("dd", {}, fmtDate(m.warranty_end)),
+          m.added_via === "portal" && el("dt", {}, "Added"), m.added_via === "portal" && el("dd", {}, m.desk_seen === false ? "By you, waiting for us to check" : "By you, checked by Highway Digital")
         ),
         el("p", { style: "display:flex;gap:8px;flex-wrap:wrap" }, el("a", { class: "btn primary", href: state.staff ? cfg.bookingUrl : "#book/" + encodeURIComponent(m.id), target: state.staff ? "_blank" : null, rel: state.staff ? "noopener" : null }, "Book a service"), el("a", { class: "btn", href: mailtoFor(m) }, "Email us about this machine"))
       ),
       el("div", { class: "card" }, el("h2", {}, "Manuals, drivers & software"), relRes)
     ),
     filesCard(m),
+    el("div", { id: "mExtras" }),
     ...(state.intranet ? [el("div", { class: "card", style: "margin-top:14px" }, el("h2", {}, "Intranet Knowledge for this machine"), relKb)] : [])
   );
 
+  machineExtras(m, $("#mExtras"));
   try {
     const [kb, res] = await Promise.all([state.intranet ? loadKb() : Promise.resolve([]), loadResources()]);
     const arts = kbForMachine(kb, m);
@@ -386,10 +394,11 @@ const MFIELDS = [
   ["pm_interval_months", "Service every (months)", "number"], ["pm_last_done", "Last service", "date"],
   ["pm_next_due", "Next service due", "date"], ["install_date", "Install date", "date"], ["warranty_end", "Warranty ends", "date"]
 ];
+const localIso = (d = new Date()) => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 function addMonths(iso, n) {
   const d = new Date(iso + "T00:00:00"); if (isNaN(d) || !n) return null;
   d.setMonth(d.getMonth() + Number(n));
-  return d.toISOString().slice(0, 10);
+  return localIso(d);
 }
 function flash(node, text, ok = true) {
   node.className = ok ? "saved" : "saved msg err"; node.textContent = text;
@@ -626,15 +635,260 @@ $("#bookForm").addEventListener("submit", async (e) => {
   loadSlots(); loadBookings();
 });
 
+// ---------- customers add their own machines, scan the serial plate, set a service schedule, log jobs ----------
+const PLATE_BRANDS = ["Mimaki", "Mutoh", "Roland", "Epilog", "Brother", "Kyocera", "Graphtec", "Summa", "Epson", "Canon", "HP", "Ricoh", "Lanier", "Trotec", "Tajima", "Alfex", "Agfa", "Fujifilm", "Ricoh", "Gerber", "Zund", "Stika"];
+const PLATE_MODELS = ["UCJV300-160", "UCJV330-160", "CJV150-160", "CJV150-130", "CJV150-107", "CJV300-160", "CJV330-160", "JV300-160", "JV330-160", "JV150-160", "JV100-160", "TS100-1600", "TS330-1600", "TS55-1800", "TxF150-75", "TxF300-75", "UJF-3042MkII", "UJF-3042MkIIe", "UJF-6042MkII", "UJF-7151plusII", "JFX200-2513", "JFX200-2513EX", "JFX600-2513", "UJV100-160", "UJV55-320", "CG-60AR", "CG-130AR", "CG-130FXII", "CG-160FXII", "CG-75FXII", "CFL-605RT", "XpertJet 1641SR", "XpertJet 1682SR", "XpertJet 1462UF", "XPJ-661", "VJ-1638", "VJ-1624X", "VJ-628", "TrueVIS VG2-540", "TrueVIS SG2-540", "VersaUV LEF2-200", "Helix 24", "Fusion Pro 32", "Fusion Pro 48", "Fusion Edge", "Zing 24", "Mini 24", "GTX-422", "GTXpro", "PR1055X", "PR680W", "PR1050X"];
+const MACHINE_TYPES = ["Sign printer", "Print & cut", "Flatbed UV printer", "Direct-to-film / textile printer", "Cutter / plotter", "Laser engraver", "Embroidery machine", "CNC router", "Office printer / copier", "Other"];
+const compact = (s) => String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+const JOB_KINDS = [["fault", "Fault or repair"], ["service", "Scheduled service"], ["install", "Installation"], ["other", "Something else"]];
+const isCustomer = () => !state.staff && state.clients.length > 0;
+
+function knownModels() {
+  return [...new Set([...PLATE_MODELS, ...state.machines.map((m) => m.model).filter(Boolean)])];
+}
+/* Read the plate text: brand, model and serial. Labels first (MODEL / SERIAL No. / S/N), then known model names. */
+function parsePlate(text, codes = []) {
+  const raw = String(text || "").replace(/[|]/g, "I");
+  const lines = raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const out = { brand: "", model: "", serial: "", found: [] };
+  const up = raw.toUpperCase();
+  for (const b of PLATE_BRANDS) if (new RegExp("\\b" + b.toUpperCase() + "\\b").test(up)) { out.brand = b; break; }
+  const clean = (v) => String(v || "").replace(/^[\s.:#=\-–]+/, "").replace(/[\s.,;:]+$/, "").trim();
+  const grab = (re) => { for (const l of lines) { const m = l.match(re); if (m && clean(m[1]).length >= 3) return clean(m[1]); } return ""; };
+  out.serial = grab(/(?:SERIAL\s*(?:NO|NUMBER|N[O0]\.?|#)?|S\s*\/\s*N|SER\.?\s*NO|MFG\.?\s*NO|PRODUCT\s*NO)\b\.?\s*[:.#]?\s*([A-Z0-9][A-Z0-9\-\/]{3,24})/i);
+  out.model = grab(/(?:MODEL|MOD\.|TYPE)\s*(?:NO\.?|NAME|NUMBER)?\s*[:.#]?\s*([A-Z0-9][A-Z0-9\-\/+ ]{1,26}?)(?=\s{2,}|\s+(?:SERIAL|S\/N|INPUT|POWER|RATED|\d+\s*V)|$)/i);
+  // A known model name anywhere on the plate beats a guess
+  const cu = compact(raw);
+  const hits = knownModels().filter((m) => compact(m).length >= 4 && cu.includes(compact(m))).sort((a, b) => compact(b).length - compact(a).length);
+  if (hits.length && (!out.model || !compact(hits[0]).includes(compact(out.model)) || compact(hits[0]).length > compact(out.model).length)) out.model = hits[0];
+  if (!out.brand && out.model) { const m = state.machines.find((x) => compact(x.model) === compact(out.model)); if (m) out.brand = m.brand || ""; }
+  if (!out.brand && /^(UCJV|CJV|JV|TS\d|TXF|UJF|JFX|UJV|CG-)/i.test(out.model)) out.brand = "Mimaki";
+  if (!out.brand && /^(XPERTJET|XPJ|VJ-)/i.test(out.model)) out.brand = "Mutoh";
+  if (!out.brand && /^(HELIX|FUSION|ZING|MINI \d)/i.test(out.model)) out.brand = "Epilog";
+  // Barcodes on the plate usually hold the serial number
+  const bc = codes.map((c) => String(c).trim()).filter((c) => /^[A-Z0-9\-\/]{5,24}$/i.test(c));
+  if (bc.length) {
+    const s = bc.find((c) => out.serial && (compact(c).includes(compact(out.serial)) || compact(out.serial).includes(compact(c)))) || bc[0];
+    if (!out.serial || compact(s).length >= compact(out.serial).length) out.serial = s;
+  }
+  if (out.model && out.serial && compact(out.model) === compact(out.serial)) out.serial = "";
+  for (const k of ["brand", "model", "serial"]) if (out[k]) out.found.push(k);
+  return out;
+}
+async function loadOcr() {
+  if (window.Tesseract) return window.Tesseract;
+  await new Promise((ok, no) => { const s = el("script", { src: "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js" }); s.onload = ok; s.onerror = no; document.head.append(s); });
+  return window.Tesseract;
+}
+async function prepImage(file) {
+  const bmp = await createImageBitmap(file);
+  const scale = Math.min(1, 1800 / Math.max(bmp.width, bmp.height));
+  const c = document.createElement("canvas"); c.width = Math.round(bmp.width * scale); c.height = Math.round(bmp.height * scale);
+  const x = c.getContext("2d"); x.drawImage(bmp, 0, 0, c.width, c.height);
+  const d = x.getImageData(0, 0, c.width, c.height), p = d.data;
+  for (let i = 0; i < p.length; i += 4) { const g = 0.299 * p[i] + 0.587 * p[i + 1] + 0.114 * p[i + 2]; const v = Math.max(0, Math.min(255, (g - 128) * 1.5 + 128)); p[i] = p[i + 1] = p[i + 2] = v; }
+  x.putImageData(d, 0, 0);
+  return { canvas: c, bmp };
+}
+async function readPlate(file, onStatus) {
+  const { canvas, bmp } = await prepImage(file);
+  let codes = [];
+  if ("BarcodeDetector" in window) {
+    try { const det = new window.BarcodeDetector(); codes = (await det.detect(bmp)).map((b) => b.rawValue).filter(Boolean); } catch (e) {}
+  }
+  onStatus("Reading the plate…");
+  const T = await loadOcr();
+  const r = await T.recognize(canvas, "eng", { logger: (m) => { if (m.status === "recognizing text") onStatus("Reading the plate… " + Math.round((m.progress || 0) * 100) + "%"); } });
+  return { ...parsePlate(r?.data?.text || "", codes), text: r?.data?.text || "", codes };
+}
+
+function scheduleFields(m = {}) {
+  const iv = el("select", { class: "field", id: "amIv" },
+    el("option", { value: "" }, "Not sure yet: suggest one for me"),
+    ...[3, 4, 6, 12, 24].map((n) => el("option", { value: n }, "Every " + n + " months")));
+  iv.value = m.pm_interval_months || "";
+  const last = el("input", { class: "field", type: "date", id: "amLast", value: m.pm_last_done || "" });
+  const next = el("input", { class: "field", type: "date", id: "amNext", value: m.pm_next_due || "" });
+  const hint = el("p", { class: "muted small" });
+  let nextTouched = !!m.pm_next_due;
+  const calc = () => {
+    const n = Number(iv.value);
+    if (!n) { hint.textContent = "We'll recommend a schedule for this model when we check it."; if (!nextTouched) next.value = ""; return; }
+    if (!nextTouched) {
+      const base = last.value || $("#amInst")?.value || localIso();
+      let d = addMonths(base, n); const today = localIso();
+      while (d && d < today) d = addMonths(d, n);
+      next.value = d || "";
+    }
+    hint.textContent = next.value ? "First service due " + fmtDate(next.value) + ", then every " + n + " months. We'll remind you and you can book it here." : "";
+  };
+  iv.addEventListener("change", () => { nextTouched = false; calc(); }); last.addEventListener("change", () => { nextTouched = false; calc(); });
+  next.addEventListener("input", () => { nextTouched = !!next.value; calc(); });
+  setTimeout(calc, 0);
+  return { node: el("div", { class: "stack" },
+    el("div", { class: "row3" },
+      el("label", { class: "f" }, el("span", {}, "How often should it be serviced?"), iv),
+      el("label", { class: "f" }, el("span", {}, "Last serviced (if known)"), last),
+      el("label", { class: "f" }, el("span", {}, "Next service due"), next)),
+    hint), get: () => ({ pm_interval_months: iv.value || null, pm_last_done: last.value || null, pm_next_due: next.value || null }), recalc: calc };
+}
+function jobFields(prefix) {
+  const kind = el("select", { class: "field", id: prefix + "Kind" }, ...JOB_KINDS.map(([k, l]) => el("option", { value: k }, l)));
+  const desc = el("textarea", { class: "field", id: prefix + "Desc", rows: 4, placeholder: "What's happening? Symptoms, when it started, anything we should bring" });
+  const code = el("input", { class: "field mono", id: prefix + "Code", placeholder: "e.g. 302 or C6600" });
+  const name = el("input", { class: "field", id: prefix + "Name", autocomplete: "name" });
+  const phone = el("input", { class: "field", id: prefix + "Phone", type: "tel", autocomplete: "tel" });
+  try { const c = JSON.parse(localStorage.getItem("hd_contact") || "{}"); name.value = c.name || ""; phone.value = c.phone || ""; } catch (e) {}
+  return { node: el("div", { class: "stack" },
+    el("div", { class: "row2" }, el("label", { class: "f" }, el("span", {}, "What do you need?"), kind), el("label", { class: "f" }, el("span", {}, "Error code (if any)"), code)),
+    el("label", { class: "f" }, el("span", {}, "Details*"), desc),
+    el("div", { class: "row2" }, el("label", { class: "f" }, el("span", {}, "Contact name*"), name), el("label", { class: "f" }, el("span", {}, "Phone*"), phone))),
+    get: () => ({ kind: kind.value, desc: desc.value.trim(), code: code.value.trim(), name: name.value.trim(), phone: phone.value.trim() }),
+    check: () => !desc.value.trim() ? (desc.focus(), "Tell us what's happening with the machine.") : !name.value.trim() ? (name.focus(), "Add a contact name.") : !phone.value.trim() ? (phone.focus(), "Add a phone number.") : "" };
+}
+async function logJob(machineId, j) {
+  try { localStorage.setItem("hd_contact", JSON.stringify({ name: j.name, phone: j.phone })); } catch (e) {}
+  const { data, error } = await sb.rpc("portal_log_job", { p_machine: machineId, p_kind: j.kind, p_desc: j.desc, p_code: j.code, p_name: j.name, p_phone: j.phone });
+  if (error) throw new Error(error.message || "Couldn't log the job");
+  return data;
+}
+
+function renderAddMachine() {
+  const v = $("#view-add");
+  if (!isCustomer()) { v.replaceChildren(el("div", { class: "card empty" }, "Staff add machines from Customers.")); return; }
+  const st = el("p", { class: "msg", role: "status" });
+  const f = {};
+  const inp = (k, attrs = {}) => (f[k] = el("input", { class: "field", id: "am_" + k, ...attrs }));
+  const brandList = el("datalist", { id: "amBrands" }, ...[...new Set([...PLATE_BRANDS, ...state.machines.map((m) => m.brand).filter(Boolean)])].map((b) => el("option", { value: b })));
+  const modelList = el("datalist", { id: "amModels" }, ...knownModels().map((m) => el("option", { value: m })));
+  const type = (f.category = el("select", { class: "field", id: "am_category" }, el("option", { value: "" }, "Choose…"), ...MACHINE_TYPES.map((t) => el("option", { value: t }, t))));
+  const acct = state.clients.length > 1 ? el("select", { class: "field", id: "amClient" }, ...state.clients.map((c) => el("option", { value: c.id }, c.name))) : null;
+  const sched = scheduleFields();
+  const job = jobFields("amJ");
+  const jobOn = el("input", { type: "checkbox", id: "amJobOn" });
+  const jobBox = el("div", { hidden: true }, job.node);
+  jobOn.addEventListener("change", () => { jobBox.hidden = !jobOn.checked; });
+
+  // Scan the serial plate
+  const file = el("input", { type: "file", accept: "image/*", capture: "environment", hidden: true, id: "amPlate" });
+  const prev = el("img", { class: "plateprev", alt: "Serial plate photo", hidden: true });
+  const scanMsg = el("p", { class: "muted small", role: "status" }, "Take a clear, straight-on photo of the plate (usually on the back or side of the machine). We'll fill in the brand, model and serial number for you to check.");
+  const scanBtn = el("button", { class: "btn primary", type: "button", onclick: () => file.click() }, "📷 Scan serial plate");
+  file.addEventListener("change", async () => {
+    const fl = file.files && file.files[0]; if (!fl) return;
+    prev.src = URL.createObjectURL(fl); prev.hidden = false;
+    scanBtn.disabled = true; scanMsg.className = "muted small"; scanMsg.textContent = "Getting the reader ready…";
+    try {
+      const r = await readPlate(fl, (t) => (scanMsg.textContent = t));
+      const set = [];
+      for (const k of ["brand", "model", "serial"]) if (r[k]) { f[k].value = r[k]; f[k].classList.add("filled"); set.push(k); }
+      if (r.model && !f.category.value) { const like = state.machines.find((x) => compact(x.model) === compact(r.model)); if (like?.category) f.category.value = MACHINE_TYPES.find((t) => norm(t) === norm(like.category)) || ""; }
+      scanMsg.className = set.length ? "msg ok" : "msg err";
+      scanMsg.textContent = set.length ? "Filled in " + set.join(", ") + " from the plate. Please check them against the plate before saving." : "We couldn't read the plate. Try again closer, with no glare, or type the details in.";
+      raw.textContent = r.text ? "Text read from the plate:\n" + r.text.trim() + (r.codes.length ? "\nBarcode: " + r.codes.join(", ") : "") : ""; rawWrap.hidden = !r.text;
+    } catch (e) { scanMsg.className = "msg err"; scanMsg.textContent = "The plate reader couldn't start on this device. Type the details in instead."; }
+    scanBtn.disabled = false; file.value = "";
+  });
+  const raw = el("pre", { class: "plateraw" }), rawWrap = el("details", { hidden: true }, el("summary", { class: "muted small" }, "What we read"), raw);
+  ["brand", "model", "serial"].forEach((k) => setTimeout(() => f[k].addEventListener("input", () => f[k].classList.remove("filled")), 0));
+
+  const save = el("button", { class: "btn primary send", type: "submit" }, "Add machine");
+  const form = el("form", { class: "card bookform addm", novalidate: true, onsubmit: async (e) => {
+    e.preventDefault();
+    const row = { brand: f.brand.value.trim(), model: f.model.value.trim(), serial: f.serial.value.trim(), category: f.category.value,
+      site: f.site.value.trim(), location: f.location.value.trim(), install_date: f.install_date.value || null, ink_set: f.ink_set.value.trim(), ...sched.get() };
+    if (acct) row.client_id = acct.value;
+    if (!row.model) { st.className = "msg err"; st.textContent = "Add the model (scan the plate or type it in)."; f.model.focus(); return; }
+    let j = null;
+    if (jobOn.checked) { const err = job.check(); if (err) { st.className = "msg err"; st.textContent = err; return; } j = job.get(); }
+    save.disabled = true; st.className = "msg"; st.textContent = "Saving…";
+    const { data: id, error } = await sb.rpc("portal_add_machine", { p: row });
+    if (error) { save.disabled = false; st.className = "msg err"; st.textContent = error.message || "Couldn't add the machine."; return; }
+    let jobNote = "";
+    if (j) { try { await logJob(id, j); jobNote = " and your job is logged"; } catch (er) { jobNote = ", but the job didn't go through: " + er.message; } }
+    const { data: ms } = await sb.from("machines").select("*").eq("status", "active").order("brand").order("model");
+    if (ms) state.machines = ms;
+    state.flash = "Machine added" + jobNote + ". We'll check the details and add it to your service plan.";
+    location.hash = "#machine/" + encodeURIComponent(id);
+  } },
+    el("h2", {}, "1. Machine details"),
+    el("div", { class: "scanbox" }, scanBtn, file, scanMsg, prev, rawWrap),
+    acct && el("label", { class: "f" }, el("span", {}, "Account"), acct),
+    el("div", { class: "row3" },
+      el("label", { class: "f" }, el("span", {}, "Brand"), inp("brand", { list: "amBrands", placeholder: "e.g. Mimaki", autocomplete: "off" })),
+      el("label", { class: "f" }, el("span", {}, "Model*"), inp("model", { list: "amModels", placeholder: "e.g. UCJV300-160", autocomplete: "off", required: true })),
+      el("label", { class: "f" }, el("span", {}, "Serial number"), inp("serial", { class: "field mono", placeholder: "From the plate", autocomplete: "off" }))),
+    brandList, modelList,
+    el("div", { class: "row3" },
+      el("label", { class: "f" }, el("span", {}, "Type of machine"), type),
+      el("label", { class: "f" }, el("span", {}, "Installed (if known)"), inp("install_date", { type: "date", id: "amInst" })),
+      el("label", { class: "f" }, el("span", {}, "Ink set (if a printer)"), inp("ink_set", { placeholder: "e.g. CMYK + White" }))),
+    el("div", { class: "row2" },
+      el("label", { class: "f" }, el("span", {}, "Site name"), inp("site", { placeholder: "e.g. Head office, Factory 2" })),
+      el("label", { class: "f" }, el("span", {}, "Address where the machine is"), inp("location", { placeholder: "Street, suburb", autocomplete: "street-address" }))),
+    el("h2", {}, "2. Service schedule"),
+    sched.node,
+    el("h2", {}, "3. Need a job done on it?"),
+    el("label", { class: "chk" }, jobOn, " Log a job for this machine now"),
+    jobBox,
+    save, st);
+  f.install_date.addEventListener("change", sched.recalc);
+  v.replaceChildren(el("button", { class: "btn back", type: "button", onclick: () => (location.hash = "#machines") }, "← All machines"),
+    el("div", { class: "head" }, el("h1", {}, "Add a machine")), form);
+}
+
+/* Machine page extras: log a job, your jobs, and the schedule for machines the customer added */
+async function machineExtras(m, host) {
+  if (!isCustomer()) return;
+  const jobs = el("div", { class: "stack" }, el("p", { class: "muted small" }, "Loading…"));
+  const job = jobFields("mj");
+  const st = el("p", { class: "msg", role: "status" });
+  const send = el("button", { class: "btn primary", type: "submit" }, "Log job");
+  const form = el("form", { class: "bookform", hidden: true, novalidate: true, onsubmit: async (e) => {
+    e.preventDefault(); const err = job.check(); if (err) { st.className = "msg err"; st.textContent = err; return; }
+    send.disabled = true; st.className = "msg"; st.textContent = "Sending…";
+    try { await logJob(m.id, job.get()); st.className = "msg ok"; st.textContent = "Thanks, your job is logged. We'll call you to arrange a time, and it gets a job number below."; form.querySelector("textarea").value = ""; loadJobs(); }
+    catch (er) { st.className = "msg err"; st.textContent = er.message; }
+    send.disabled = false;
+  } }, job.node, el("div", { class: "acts" }, send, el("a", { class: "btn ghost", href: "#book/" + encodeURIComponent(m.id) }, "Or pick a time instead")));
+  const open = el("button", { class: "btn primary", type: "button", onclick: () => { form.hidden = !form.hidden; if (!form.hidden) form.querySelector("textarea").focus(); } }, "Log a job");
+  const lbl = { pending: ["Waiting for us", "soon"], created: ["Job created", "ok"], cancelled: ["Cancelled", "none"] };
+  async function loadJobs() {
+    const { data, error } = await sb.from("portal_jobs").select("id,kind,description,status,ticket_num,created_at").eq("machine_id", m.id).order("created_at", { ascending: false }).limit(10);
+    if (error) { jobs.replaceChildren(el("p", { class: "msg err" }, "Couldn't load your jobs.")); return; }
+    jobs.replaceChildren(...(data.length ? data.map((j) => { const [t, c] = lbl[j.status] || [j.status, "none"];
+      return el("div", { class: "bkitem" }, el("b", {}, new Date(j.created_at).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" }) + " · " + (Object.fromEntries(JOB_KINDS)[j.kind] || j.kind)),
+        el("div", { class: "muted small" }, String(j.description || "").slice(0, 160)),
+        el("span", { class: "pill " + c }, t + (j.ticket_num ? " · job " + j.ticket_num : ""))); })
+      : [el("p", { class: "muted small" }, "No jobs logged from the portal for this machine yet.")]));
+  }
+  const cards = [el("div", { class: "card", style: "margin-top:14px" }, el("div", { class: "bhead" }, el("h2", {}, "Jobs"), open), form, st, jobs)];
+  if (m.added_via === "portal") {
+    const sched = scheduleFields(m), ss = el("p", { class: "msg", role: "status" });
+    const sv = el("button", { class: "btn", type: "submit" }, "Save schedule");
+    cards.push(el("form", { class: "card bookform", style: "margin-top:14px", onsubmit: async (e) => {
+      e.preventDefault(); const s = sched.get(); sv.disabled = true;
+      const { error } = await sb.rpc("portal_set_schedule", { p_machine: m.id, p_interval: s.pm_interval_months ? Number(s.pm_interval_months) : null, p_last: s.pm_last_done, p_next: s.pm_next_due });
+      sv.disabled = false;
+      if (error) { ss.className = "msg err"; ss.textContent = error.message; return; }
+      const { data: ms } = await sb.from("machines").select("*").eq("status", "active").order("brand").order("model"); if (ms) state.machines = ms;
+      state.flash = "Service schedule saved."; renderMachine(m.id);
+    } }, el("h2", {}, "Service schedule"), el("p", { class: "muted small" }, "You added this machine, so you can set how often it's serviced. We'll confirm it when we check the machine."), sched.node, el("div", { class: "acts" }, sv), ss));
+  }
+  host.append(...cards);
+  loadJobs();
+}
+
 // ---------- routing ----------
 function route() {
   if (!state.user) return;
   const h = location.hash.replace(/^#/, "") || "machines";
   if (h === "signout") { signOut(); return; }
   const top = h.split("/")[0];
-  window.HDNav?.setActive(navHost(), top === "machine" ? "machines" : top === "kb" ? "intranet" : top === "book" ? "contact" : top);
+  window.HDNav?.setActive(navHost(), top === "machine" || top === "add-machine" ? "machines" : top === "kb" ? "intranet" : top === "book" ? "contact" : top);
   if (h === "book" || h.startsWith("book/")) { show("view-book"); renderBook(decodeURIComponent(h.slice(5))); }
   else if (h.startsWith("machine/")) { show("view-machine"); renderMachine(decodeURIComponent(h.slice(8))); }
+  else if (h === "add-machine") { show("view-add"); renderAddMachine(); }
   else if (h === "kb" && state.intranet) { show("view-kb"); renderKb(); }
   else if (h === "customers" && state.staff) { show("view-customers"); renderCustomers(); }
   else if (h === "contact") { show("view-contact"); renderContact(); }

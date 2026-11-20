@@ -184,3 +184,17 @@ table.billing td.act{text-align:right;white-space:nowrap}
   table.billing td[data-l]::before{content:attr(data-l);display:block;font-size:11px;opacity:.6;text-transform:uppercase}
   table.billing td.act{grid-column:1/-1;text-align:left}
 }
+
+/* add a machine */
+.row3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media (max-width:720px){.row3{grid-template-columns:1fr}}
+.addm h2{margin:6px 0 0;font-size:18px}
+.scanbox{display:flex;flex-direction:column;gap:8px;align-items:flex-start;border:1px dashed var(--line,#d0d0d0);border-radius:10px;padding:12px}
+.plateprev{max-width:min(360px,100%);max-height:220px;border-radius:8px;object-fit:contain}
+.plateraw{white-space:pre-wrap;font-size:12px;max-height:180px;overflow:auto;margin:4px 0 0}
+.field.filled{box-shadow:0 0 0 2px #2e9e5b inset}
+.chk{display:flex;gap:8px;align-items:center;font-size:14px}
+.acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.head .btn{white-space:nowrap}
+.mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+.bookform[hidden]{display:none}
