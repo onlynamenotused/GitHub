@@ -250,3 +250,6 @@ table.billing td.act{text-align:right;white-space:nowrap}
 .movebar{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between;border:1px solid var(--accent);border-radius:10px;padding:10px 12px;background:var(--sunk);font-size:14px}
 .bkitem.moving{border-left:3px solid var(--accent);padding-left:8px}
 .bkitem .btn.small{align-self:flex-start}
+.mhint{margin:0 0 10px;padding:10px 14px;border-left:3px solid var(--accent);background:var(--sunk);border-radius:8px;font-size:14px}
+.mcard .mcta{margin-top:auto;padding-top:8px;border-top:1px solid var(--line);color:var(--accent);font-weight:600;font-size:14px}
+.mcard:hover .mcta,.mcard:focus-visible .mcta{text-decoration:underline}

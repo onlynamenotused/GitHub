@@ -177,8 +177,10 @@ function renderMachines() {
       el("a", { href: "mailto:" + cfg.contactEmail }, cfg.contactEmail), " and we'll set it up."));
     return;
   }
-  if (!list.length) { box.replaceChildren(el("div", { class: "empty" }, "No machines match that search.")); return; }
+  if (!list.length) { $("#machineHint").hidden = true; box.replaceChildren(el("div", { class: "empty" }, "No machines match that search.")); return; }
   renderBilling();
+  $("#machineHint").hidden = false;
+  if (state.staff) $("#machineHint").textContent = "Tap a machine to see its details, service history and files.";
   box.replaceChildren(...list.map((m) => {
     const s = pmStatus(m);
     return el("button", { class: "mcard", onclick: () => (location.hash = "#machine/" + encodeURIComponent(m.id)) },
@@ -188,7 +190,8 @@ function renderMachines() {
       el("span", { class: "muted small" }, m.location || m.site || ""),
       el("span", { class: "pill " + s.cls }, s.label + (m.pm_next_due ? " · " + fmtDate(m.pm_next_due) : "")),
       m.added_via === "portal" && m.desk_seen === false ? el("span", { class: "muted small" }, "Added by you · we'll check the details") : null,
-      filesFor(m).length ? el("span", { class: "muted small" }, "📄 " + filesFor(m).length + " parameter/log file" + (filesFor(m).length > 1 ? "s" : "")) : null
+      filesFor(m).length ? el("span", { class: "muted small" }, "📄 " + filesFor(m).length + " parameter/log file" + (filesFor(m).length > 1 ? "s" : "")) : null,
+      el("span", { class: "mcta" }, state.staff ? "View details ›" : "View details · Book a job ›")
     );
   }));
 }
