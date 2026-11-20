@@ -291,10 +291,10 @@
           <div id="stContourOpts" hidden>
             <div class="row2">
               <label>Line<select id="stCType"><option value="cut">Cut through</option><option value="perf">Perforated cut</option></select></label>
-              <label>Offset (mm)<input type="number" id="stOffset" value="2" min="0" max="50" step="0.5"></label>
+              <label>Offset (mm)<input type="number" id="stOffset" value="2" min="-20" max="50" step="0.5"></label>
               <label>Join gaps (mm)<input type="number" id="stBridge" value="0" min="0" max="50" step="0.5"></label>
             </div>
-            <p class="hint">“Join gaps” wraps nearby pieces in one cut, for example separate letters.</p>
+            <p class="hint">Offset moves the cut outside the artwork; use a minus number (e.g. −1) to cut inside the edge so no white shows. “Join gaps” wraps nearby pieces in one cut, for example separate letters.</p>
           </div>
           <div class="addrow">
             <span>Add shape</span>
@@ -1443,8 +1443,8 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
   var contourJob=0;
   function buildContour(){
     if(!S.contour.on || !S.ready){ S.contour.ops=[]; render(); return; }
-    var job=++contourJob, a=artSize(), off=Math.max(0,+$("stOffset").value||0), gap=Math.max(0,+$("stBridge").value||0);
-    var pad=off+gap+2, scale=Math.min(12, 2400/Math.max(a.w+2*pad, a.h+2*pad));
+    var job=++contourJob, a=artSize(), off=Math.max(-20,Math.min(50,+$("stOffset").value||0)), gap=Math.max(0,+$("stBridge").value||0);
+    var pad=Math.max(0,off)+gap+2, scale=Math.min(12, 2400/Math.max(a.w+2*pad, a.h+2*pad));
     var m=svgForMask(scale, pad), img=new Image();
     stStatus("Finding the outside edge…");
     img.onload=function(){
@@ -1454,12 +1454,16 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
         var x=c.getContext("2d"); x.drawImage(img,0,0);
         var d=x.getImageData(0,0,m.W,m.H).data, N=m.W*m.H, art=new Uint8Array(N), i;
         for(i=0;i<N;i++) art[i]=d[i*4+3]>100?1:0;
-        var dist=distanceTransform(art,m.W,m.H), R=(off+gap)*scale, inside=new Uint8Array(N);
+        var dist=distanceTransform(art,m.W,m.H), R=(Math.max(0,off)+gap)*scale, inside=new Uint8Array(N);
         for(i=0;i<N;i++) inside[i]=dist[i]<=R?1:0;
         inside=fillOutside(inside,m.W,m.H);
         if(gap>0){ // close: shrink back by the gap so pieces are joined but the offset stays true
           var outm=new Uint8Array(N); for(i=0;i<N;i++) outm[i]=inside[i]?0:1;
           var d2=distanceTransform(outm,m.W,m.H), G=gap*scale; for(i=0;i<N;i++) inside[i]=d2[i]>G?1:0;
+        }
+        if(off<0){ // negative offset: shrink the outline so the cut sits inside the artwork edge
+          var outn=new Uint8Array(N); for(i=0;i<N;i++) outn[i]=inside[i]?0:1;
+          var d3=distanceTransform(outn,m.W,m.H), K=-off*scale; for(i=0;i<N;i++) inside[i]=d3[i]>K?1:0;
         }
         var id=x.createImageData(m.W,m.H);
         for(i=0;i<N;i++){ var v=inside[i]?0:255; id.data[i*4]=id.data[i*4+1]=id.data[i*4+2]=v; id.data[i*4+3]=255; }
