@@ -91,6 +91,66 @@
   .pane .cap{background:rgba(255,255,255,.05)}
   .status.err{color:#f87171}
   .toast{background:#e8b923;color:#111}
+
+  /* ---- Print & Cut studio */
+  .studio [hidden],#ripDlg [hidden]{display:none!important}
+  .studio{margin-top:16px}
+  .studio h2{font:500 22px/1.2 "League Spartan",arial,sans-serif;text-transform:uppercase;letter-spacing:.02em;margin:0}
+  .sthead{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justify-content:space-between;margin-bottom:12px}
+  .sthead .sub{max-width:60ch}
+  .brand{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:600}
+  .studio select,.studio input[type=number],.studio input[type=text]{width:100%;min-width:0;padding:7px 8px;border:1px solid var(--line);border-radius:8px;background:rgba(255,255,255,.06);color:var(--ink);font:inherit;font-size:13px}
+  .studio select option{background:#111}
+  .stempty{color:var(--muted);font-size:14px;margin:4px 0}
+  .stgrid{display:grid;grid-template-columns:minmax(0,360px) minmax(0,1fr);gap:16px;align-items:start}
+  @media (max-width:860px){.stgrid{grid-template-columns:minmax(0,1fr)}}
+  .stctl{display:flex;flex-direction:column;gap:10px;min-width:0}
+  .stctl details{border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:rgba(255,255,255,.03)}
+  .stctl summary{cursor:pointer;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:2px 0}
+  .stctl details[open] summary{margin-bottom:8px}
+  .stctl .hint,.stview .hint{font-size:12px;color:var(--muted);margin:4px 0 8px}
+  .row2{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;align-items:flex-end}
+  .row2>label{flex:1 1 90px;display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted);min-width:0}
+  .row2>input[type=text]{flex:1 1 160px}
+  .check.inl{flex:1 1 140px;align-items:center;margin:0}
+  .colors{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+  .crow{display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:8px;align-items:center}
+  .crow input[type=color]{width:34px;height:30px;padding:0;border:1px solid var(--line);border-radius:6px;background:none;cursor:pointer}
+  .crow .hex{font:12px ui-monospace,Menlo,Consolas,monospace;color:var(--muted)}
+  .crow select{width:auto;max-width:150px}
+  .addrow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px;color:var(--muted);margin-top:6px}
+  .mini{padding:6px 10px;border:1px solid var(--line);background:rgba(255,255,255,.06);color:var(--ink);border-radius:7px;cursor:pointer;font:inherit;font-size:12px;font-weight:600}
+  .mini:hover{border-color:var(--accent)}
+  .mini.del{color:#f87171}
+  .objs{display:flex;flex-direction:column;gap:8px}
+  .obj{border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:rgba(232,185,35,.05)}
+  .obj.sel{border-color:var(--accent)}
+  .obj .oh{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;font-weight:600;margin-bottom:6px}
+  .obj .row2{margin-bottom:6px}
+  .names{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 10px;align-items:center;font-size:12px;margin-bottom:6px}
+  .names input{font:12px ui-monospace,Menlo,Consolas,monospace !important}
+  .sendbox{border:1px solid var(--accent);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px;background:rgba(232,185,35,.06)}
+  .sendlbl{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--accent)}
+  .sendbtns{display:flex;flex-direction:column;gap:6px}
+  .sendbtns .btn.dim{background:rgba(255,255,255,.06);color:var(--ink);border-color:var(--line)}
+  .stview{min-width:0;position:sticky;top:12px}
+  .vtabs{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+  .vtabs button{padding:7px 12px;border:1px solid var(--line);background:rgba(255,255,255,.06);color:var(--ink);border-radius:8px;cursor:pointer;font:inherit;font-size:13px}
+  .vtabs button[aria-selected=true]{border-color:var(--accent);color:var(--accent);font-weight:600}
+  .legend{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--muted);margin-left:auto}
+  .legend i{display:inline-block;width:14px;height:0;border-top:2px solid;vertical-align:middle;margin-right:4px}
+  .legend i.sw{height:10px;border:1px solid #888}
+  .stcanvas{border:1px solid var(--line);border-radius:10px;background:#2a2d31;min-height:320px;height:min(70vh,640px);overflow:hidden;display:flex;align-items:center;justify-content:center;touch-action:none}
+  .stcanvas svg{width:100%;height:100%;display:block}
+  .stcanvas [data-oi]{cursor:move}
+  dialog#ripDlg{max-width:min(560px,calc(100vw - 32px));border:1px solid var(--accent);border-radius:12px;background:#141416;color:var(--ink);padding:0}
+  dialog#ripDlg::backdrop{background:rgba(0,0,0,.6)}
+  .dlg{padding:18px 18px 16px;display:flex;flex-direction:column;gap:10px}
+  .dlg h3{margin:0;font:500 20px "League Spartan",arial,sans-serif;text-transform:uppercase}
+  .dlg ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:14px}
+  .pathbox{display:flex;gap:8px;align-items:center;background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:8px;padding:8px}
+  .pathbox code{flex:1;min-width:0;overflow-wrap:anywhere;font-size:12.5px;color:var(--accent)}
+  .dlgbtns{display:flex;flex-wrap:wrap;gap:8px}
 </style>
 </head>
 <body>
@@ -205,6 +265,145 @@
       </div>
     </div>
   </div>
+
+  <section class="card studio" id="studio" aria-labelledby="stTitle">
+    <div class="sthead">
+      <div>
+        <h2 id="stTitle">Print &amp; Cut studio</h2>
+        <p class="sub">Add cut lines, perforations, white and gloss layers, text and shapes, then lay out copies and send a print-ready PDF to your RIP.</p>
+      </div>
+      <label class="brand">Printer / RIP
+        <select id="stBrand">
+          <option value="roland">Roland · VersaWorks</option>
+          <option value="mimaki">Mimaki · RasterLink</option>
+          <option value="mutoh">Mutoh · VerteLith</option>
+          <option value="brother">Brother · GTX (DTG)</option>
+        </select>
+      </label>
+    </div>
+    <p class="stempty" id="stEmpty">Convert an image above first; the studio opens once the vector result is ready.</p>
+
+    <div class="stgrid" id="stBody" hidden>
+      <div class="stctl">
+        <details open>
+          <summary>Artwork colours</summary>
+          <p class="hint">Change any colour, or force it to print with a special ink. <span id="stRoleHint"></span></p>
+          <div id="stColors" class="colors"></div>
+          <label class="check" id="stUnderRow"><input type="checkbox" id="stUnder"><span>White underlay under all artwork<small>Prints white behind the colours, for clear or coloured media.</small></span></label>
+          <label class="check" id="stOverRow"><input type="checkbox" id="stOver"><span><b id="stOverName">Gloss</b> over all artwork</span></label>
+        </details>
+
+        <details open id="stCutSec">
+          <summary>Cut lines</summary>
+          <label class="check"><input type="checkbox" id="stContour"><span>Cut around the outside of the artwork<small>Follows the outside edge automatically. Holes inside the artwork are not cut.</small></span></label>
+          <div id="stContourOpts" hidden>
+            <div class="row2">
+              <label>Line<select id="stCType"><option value="cut">Cut through</option><option value="perf">Perforated cut</option></select></label>
+              <label>Offset (mm)<input type="number" id="stOffset" value="2" min="0" max="50" step="0.5"></label>
+              <label>Join gaps (mm)<input type="number" id="stBridge" value="0" min="0" max="50" step="0.5"></label>
+            </div>
+            <p class="hint">“Join gaps” wraps nearby pieces in one cut, for example separate letters.</p>
+          </div>
+          <div class="addrow">
+            <span>Add shape</span>
+            <button type="button" class="mini" data-add="box">Box around artwork</button>
+            <button type="button" class="mini" data-add="rect">Rectangle</button>
+            <button type="button" class="mini" data-add="round">Rounded</button>
+            <button type="button" class="mini" data-add="ellipse">Circle / oval</button>
+          </div>
+        </details>
+
+        <details open>
+          <summary>Text</summary>
+          <div class="row2">
+            <input type="text" id="stText" placeholder="Type text to add" aria-label="Text to add" maxlength="200">
+            <button type="button" class="mini" id="stAddText">Add text</button>
+          </div>
+        </details>
+
+        <div id="stObjs" class="objs"></div>
+
+        <details>
+          <summary>Spot colour names</summary>
+          <p class="hint">The names your RIP looks for. They're filled in for each brand; change them only if your RIP is set up differently.</p>
+          <div id="stNames" class="names"></div>
+          <button type="button" class="linkbtn" id="stNamesReset">Reset to defaults</button>
+        </details>
+
+        <details open id="stLaySec">
+          <summary>Copies &amp; layout</summary>
+          <div class="row2">
+            <label>Media<select id="stPage">
+              <option value="a4">A4 sheet (210 × 297)</option>
+              <option value="a3">A3 sheet (297 × 420)</option>
+              <option value="sra3">SRA3 sheet (320 × 450)</option>
+              <option value="r610">Roll 610 mm (24″)</option>
+              <option value="r762">Roll 762 mm (30″)</option>
+              <option value="r1067">Roll 1067 mm (42″)</option>
+              <option value="r1371" selected>Roll 1371 mm (54″)</option>
+              <option value="r1625">Roll 1625 mm (64″)</option>
+              <option value="custom">Custom sheet</option>
+              <option value="customroll">Custom roll width</option>
+            </select></label>
+            <label id="stPWl" hidden>Width (mm)<input type="number" id="stPW" value="600" min="20" step="1"></label>
+            <label id="stPHl" hidden>Height (mm)<input type="number" id="stPH" value="400" min="20" step="1"></label>
+          </div>
+          <div class="row2">
+            <label>Copies<select id="stMode"><option value="qty">Quantity</option><option value="fill">Fill the sheet</option></select></label>
+            <label id="stQtyl">How many<input type="number" id="stQty" value="1" min="1" max="5000" step="1"></label>
+            <label id="stLenl" hidden>Roll length (mm)<input type="number" id="stLen" value="1000" min="20" step="10"></label>
+          </div>
+          <div class="row2">
+            <label>Gap (mm)<input type="number" id="stGap" value="3" min="0" step="0.5"></label>
+            <label>Margin (mm)<input type="number" id="stMargin" value="5" min="0" step="0.5"></label>
+            <label class="check inl"><input type="checkbox" id="stRotate" checked><span>Turn copies to fit more</span></label>
+          </div>
+          <p class="hint" id="stFit"></p>
+        </details>
+
+        <div class="sendbox" id="stSendRip">
+          <div class="sendlbl">Send to RIP</div>
+          <div class="sendbtns">
+            <button type="button" class="btn primary" data-rip="roland">Send to VersaWorks</button>
+            <button type="button" class="btn primary" data-rip="mimaki">Send to RasterLink</button>
+            <button type="button" class="btn primary" data-rip="mutoh">Send to VerteLith</button>
+          </div>
+          <button type="button" class="btn" id="stPdf">Download PDF</button>
+        </div>
+        <div class="sendbox" id="stSendGtx" hidden>
+          <div class="sendlbl">Brother GTX output</div>
+          <label class="check"><input type="checkbox" id="stGtx254" checked><span>Print pure white areas with white ink<small>The GTX prints nothing for RGB 255,255,255 (the shirt shows through). This changes pure white to RGB 254,254,254 so it prints white.</small></span></label>
+          <div class="row2"><label>Resolution<select id="stDpi"><option>300</option><option selected>600</option><option>1200</option></select></label></div>
+          <button type="button" class="btn primary" id="stPng">Download PNG for GTX Graphics Lab</button>
+        </div>
+        <div class="status" id="stStatus"></div>
+      </div>
+
+      <div class="stview">
+        <div class="vtabs" role="tablist">
+          <button type="button" role="tab" id="tabDesign" aria-selected="true">Design</button>
+          <button type="button" role="tab" id="tabSheet" aria-selected="false">Sheet layout</button>
+          <span class="legend" id="stLegend"></span>
+        </div>
+        <div class="stcanvas" id="stCanvas"></div>
+        <p class="hint">Drag shapes and text to move them. Measurements are in millimetres.</p>
+      </div>
+    </div>
+  </section>
+
+  <dialog id="ripDlg" aria-labelledby="ripTitle">
+    <form method="dialog" class="dlg">
+      <h3 id="ripTitle">Send to RIP</h3>
+      <ol id="ripSteps"></ol>
+      <div class="pathbox"><code id="ripPath"></code><button type="button" class="mini" id="ripCopy">Copy path</button></div>
+      <p class="hint" id="ripNote"></p>
+      <div class="dlgbtns">
+        <button type="button" class="btn primary" id="ripSave">Save PDF…</button>
+        <button type="button" class="btn" id="ripDl">Download instead</button>
+        <button class="btn" value="close">Close</button>
+      </div>
+    </form>
+  </dialog>
 </div>
 <div class="toast" id="toast"></div>
 
@@ -924,6 +1123,7 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
         state.vw = vb ? +vb[1] : prep.w; state.vh = vb ? +vb[2] : prep.h;
         if(!vb) svg=svg.replace(/<svg /, '<svg viewBox="0 0 '+state.vw+' '+state.vh+'" ');
         state.raw=svg; svg=sizedSvg(); state.svg=svg;
+        try{ window.dispatchEvent(new CustomEvent("vc:traced",{detail:{svg:state.raw, name:state.name}})); }catch(ev){}
 
         var paths=(svg.match(/<path /g)||[]).length, kb=(svg.length/1024);
         var blob=new Blob([svg],{type:"image/svg+xml"}), url=URL.createObjectURL(blob);
@@ -1046,5 +1246,797 @@ window.VTRACER_WASM_B64='AGFzbQEAAAAB/gI4YAN/f38Bf2ACf38Bf2ACf38AYAN/f38AYAF/AGA
   applyPreset("logo");
 })();
 </script>
+<script>
+/* Print & Cut studio: spot colours, cut/perf lines, shapes, text, step-and-repeat, PDF for RIPs, PNG for Brother GTX */
+(function(){
+  "use strict";
+  var $ = function(id){ return document.getElementById(id); };
+  var MM2PT = 72/25.4;
+
+  // ---- brands: roles and the spot colour names each RIP looks for
+  var ROLE_LABEL = { cut:"Cut line", perf:"Perforated cut", white:"White ink", gloss:"Gloss", primer:"Primer", silver:"Metallic silver" };
+  var BRANDS = {
+    roland:  { name:"Roland VersaWorks", rip:"VersaWorks",
+               spots:{ cut:"CutContour", perf:"PerfCutContour", white:"RDG_WHITE", gloss:"RDG_GLOSS", primer:"RDG_PRIMER", silver:"RDG_MetallicSilver" },
+               glossLabel:"Gloss" },
+    mimaki:  { name:"Mimaki RasterLink", rip:"RasterLink",
+               spots:{ cut:"CutContour", perf:"CutContourPerf", white:"RDG_WHITE", gloss:"RDG_GLOSS", primer:"RDG_PRIMER" },
+               glossLabel:"Clear / gloss" },
+    mutoh:   { name:"Mutoh VerteLith", rip:"VerteLith",
+               spots:{ cut:"CutContour", perf:"PerfCutContour", white:"Spot_White", gloss:"Spot_Varnish" },
+               glossLabel:"Varnish" },
+    brother: { name:"Brother GTX", rip:"GTX Graphics Lab", spots:{}, glossLabel:"" }
+  };
+  // preview / PDF alternate colours for each role (CMYK 0..1) and screen colours
+  var ALT = { cut:[0,1,0,0], perf:[1,0,1,0], white:[0.15,0,0,0], gloss:[0,0,0.12,0], primer:[0,0.1,0.1,0], silver:[0,0,0,0.3] };
+  var SCREEN = { cut:"#ff2bd6", perf:"#2bd65a", white:"#ffffff", gloss:"#ffe58a", primer:"#e7c0a8", silver:"#c0c4c8" };
+
+  var LS_NAMES = "hd_vc_spotnames_v1";
+  var customNames = {};
+  try { customNames = JSON.parse(localStorage.getItem(LS_NAMES) || "{}") || {}; } catch(e) { customNames = {}; }
+  function spotName(brand, role){
+    var c = customNames[brand] && customNames[brand][role];
+    return (c && String(c).trim()) || BRANDS[brand].spots[role] || "";
+  }
+  function brandHas(brand, role){ return !!BRANDS[brand].spots[role]; }
+
+  var S = {
+    ready:false, svg:"", vw:0, vh:0, name:"design",
+    paths:[],            // [{hex, ops:[[cmd,...nums]...]}] in source units (px), transform applied
+    colors:{},           // hex -> {to:hex, role:"normal"|"white"|"gloss"|"primer"|"silver"|"hide"|"w254"|"noink"}
+    order:[],            // hex order
+    brand:"roland",
+    under:false, over:false,
+    contour:{ on:false, type:"cut", offset:2, bridge:0, ops:[] },
+    objs:[], sel:-1, nextId:1,
+    view:"design"
+  };
+  try { var lb = localStorage.getItem("hd_vc_brand"); if (lb && BRANDS[lb]) S.brand = lb; } catch(e) {}
+  $("stBrand").value = S.brand;
+
+  function stStatus(msg, cls){ var s=$("stStatus"); s.textContent=msg||""; s.className="status"+(cls?" "+cls:""); }
+  function toast(msg){ var t=$("toast"); if(!t) return; t.textContent=msg; t.classList.add("show"); clearTimeout(t._h); t._h=setTimeout(function(){t.classList.remove("show");},2400); }
+  function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+  function n3(v){ var r=Math.round(v*1000)/1000; return (Object.is(r,-0)?0:r).toString(); }
+
+  // ---- artwork size in mm, from the Output size controls above
+  function artSize(){
+    var u=$("outU").value, W=parseFloat($("outW").value), H=parseFloat($("outH").value);
+    var k = u==="mm"?1 : u==="cm"?10 : u==="in"?25.4 : 25.4/96;
+    var r = S.vh/S.vw;
+    if(!(W>0) && !(H>0)) return { w:100, h:100*r, defaulted:true };
+    if($("outLock").checked){ if(W>0) H=W*r; else W=H/r; }
+    else { if(!(W>0)) W=H/r; if(!(H>0)) H=W*r; }
+    return { w:W*k, h:H*k };
+  }
+
+  // ---- SVG path parsing: absolute M/L/C/Z with Q, S, T, H, V and relative forms; arcs become lines
+  function parseD(d, m){
+    var toks = d.match(/[a-zA-Z]|-?(?:\d*\.\d+|\d+\.?)(?:e[-+]?\d+)?/gi) || [];
+    var out=[], i=0, cmd="", x=0, y=0, sx=0, sy=0, lcx=null, lcy=null, lqx=null, lqy=null;
+    function num(){ return parseFloat(toks[i++]); }
+    function P(px,py){ return [m[0]*px+m[2]*py+m[4], m[1]*px+m[3]*py+m[5]]; }
+    function pushL(nx,ny){ var p=P(nx,ny); out.push(["L",p[0],p[1]]); }
+    function pushC(x1,y1,x2,y2,nx,ny){ var a=P(x1,y1), b=P(x2,y2), c=P(nx,ny); out.push(["C",a[0],a[1],b[0],b[1],c[0],c[1]]); }
+    while(i<toks.length){
+      if(/[a-zA-Z]/.test(toks[i])) cmd=toks[i++];
+      var rel = cmd===cmd.toLowerCase(), C=cmd.toUpperCase(), ox=rel?x:0, oy=rel?y:0;
+      if(C==="Z"){ out.push(["Z"]); x=sx; y=sy; lcx=lcy=lqx=lqy=null; if(i<toks.length && !/[a-zA-Z]/.test(toks[i])) cmd = rel?"l":"L"; continue; }
+      if(i>=toks.length) break;
+      if(C==="M"){ x=ox+num(); y=oy+num(); sx=x; sy=y; var p=P(x,y); out.push(["M",p[0],p[1]]); cmd = rel?"l":"L"; lcx=lcy=lqx=lqy=null; }
+      else if(C==="L"){ x=ox+num(); y=oy+num(); pushL(x,y); lcx=lcy=lqx=lqy=null; }
+      else if(C==="H"){ x=(rel?x:0)+num(); pushL(x,y); lcx=lcy=lqx=lqy=null; }
+      else if(C==="V"){ y=(rel?y:0)+num(); pushL(x,y); lcx=lcy=lqx=lqy=null; }
+      else if(C==="C"){ var x1=ox+num(), y1=oy+num(), x2=ox+num(), y2=oy+num(), nx=ox+num(), ny=oy+num(); pushC(x1,y1,x2,y2,nx,ny); lcx=x2; lcy=y2; lqx=lqy=null; x=nx; y=ny; }
+      else if(C==="S"){ var rx1=lcx===null?x:2*x-lcx, ry1=lcy===null?y:2*y-lcy, sx2=ox+num(), sy2=oy+num(), snx=ox+num(), sny=oy+num(); pushC(rx1,ry1,sx2,sy2,snx,sny); lcx=sx2; lcy=sy2; lqx=lqy=null; x=snx; y=sny; }
+      else if(C==="Q"){ var qx=ox+num(), qy=oy+num(), qnx=ox+num(), qny=oy+num(); pushC(x+2/3*(qx-x), y+2/3*(qy-y), qnx+2/3*(qx-qnx), qny+2/3*(qy-qny), qnx, qny); lqx=qx; lqy=qy; lcx=lcy=null; x=qnx; y=qny; }
+      else if(C==="T"){ var tqx=lqx===null?x:2*x-lqx, tqy=lqy===null?y:2*y-lqy, tnx=ox+num(), tny=oy+num(); pushC(x+2/3*(tqx-x), y+2/3*(tqy-y), tnx+2/3*(tqx-tnx), tny+2/3*(tqy-tny), tnx, tny); lqx=tqx; lqy=tqy; lcx=lcy=null; x=tnx; y=tny; }
+      else if(C==="A"){ num(); num(); num(); num(); num(); x=ox+num(); y=oy+num(); pushL(x,y); lcx=lcy=lqx=lqy=null; }
+      else { i++; }
+    }
+    return out;
+  }
+  function parseTransform(t){
+    var m=[1,0,0,1,0,0]; if(!t) return m;
+    var re=/(matrix|translate|scale)\s*\(([^)]*)\)/g, g;
+    while((g=re.exec(t))){
+      var a=g[2].split(/[\s,]+/).filter(Boolean).map(Number), n;
+      if(g[1]==="translate") n=[1,0,0,1,a[0]||0,a[1]||0];
+      else if(g[1]==="scale") n=[a[0],0,0,a.length>1?a[1]:a[0],0,0];
+      else n=a;
+      m=[m[0]*n[0]+m[2]*n[1], m[1]*n[0]+m[3]*n[1], m[0]*n[2]+m[2]*n[3], m[1]*n[2]+m[3]*n[3], m[0]*n[4]+m[2]*n[5]+m[4], m[1]*n[4]+m[3]*n[5]+m[5]];
+    }
+    return m;
+  }
+  function normHex(c){
+    if(!c) return null; c=c.trim();
+    var m=c.match(/^#([0-9a-f]{6})$/i); if(m) return "#"+m[1].toUpperCase();
+    m=c.match(/^#([0-9a-f])([0-9a-f])([0-9a-f])$/i); if(m) return ("#"+m[1]+m[1]+m[2]+m[2]+m[3]+m[3]).toUpperCase();
+    m=c.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i); if(m) return "#"+[m[1],m[2],m[3]].map(function(v){return ("0"+(+v).toString(16)).slice(-2);}).join("").toUpperCase();
+    return null;
+  }
+  function ingest(svg){
+    var doc=new DOMParser().parseFromString(svg.replace(/^<\?xml[^>]*>\s*/,""),"image/svg+xml");
+    var root=doc.documentElement, vb=(root.getAttribute("viewBox")||"").split(/[\s,]+/).map(Number);
+    S.vw = vb.length===4 && vb[2]>0 ? vb[2] : parseFloat(root.getAttribute("width"))||1;
+    S.vh = vb.length===4 && vb[3]>0 ? vb[3] : parseFloat(root.getAttribute("height"))||1;
+    var paths=[], order=[], seen={};
+    [].forEach.call(root.querySelectorAll("path"), function(p){
+      if(p.getAttribute("fill")==="none") return;
+      var op=parseFloat(p.getAttribute("opacity")); if(op===0) return;
+      var hex=normHex(p.getAttribute("fill")||"#000000"); if(!hex) return;
+      var m=[1,0,0,1,0,0], el=p;
+      var chain=[]; while(el && el!==root){ chain.unshift(el.getAttribute("transform")); el=el.parentNode; }
+      chain.forEach(function(t){ var n=parseTransform(t); m=[m[0]*n[0]+m[2]*n[1], m[1]*n[0]+m[3]*n[1], m[0]*n[2]+m[2]*n[3], m[1]*n[2]+m[3]*n[3], m[0]*n[4]+m[2]*n[5]+m[4], m[1]*n[4]+m[3]*n[5]+m[5]]; });
+      var ops=parseD(p.getAttribute("d")||"", m); if(!ops.length) return;
+      paths.push({hex:hex, ops:ops});
+      if(!seen[hex]){ seen[hex]=1; order.push(hex); }
+    });
+    var old=S.colors; S.colors={};
+    order.forEach(function(h){ S.colors[h] = old[h] || {to:h, role:"normal"}; });
+    S.paths=paths; S.order=order;
+  }
+
+  // ---- geometry helpers (design space = mm, y down, origin at artwork top-left)
+  function artOps(){
+    var a=artSize(), sx=a.w/S.vw, sy=a.h/S.vh;
+    return S.paths.map(function(p){
+      return { hex:p.hex, ops:p.ops.map(function(o){
+        if(o[0]==="Z") return o;
+        var r=[o[0]]; for(var k=1;k<o.length;k+=2){ r.push(o[k]*sx, o[k+1]*sy); } return r; }) };
+    });
+  }
+  function opsToD(ops){
+    return ops.map(function(o){ return o[0]+(o.length>1?" "+o.slice(1).map(n3).join(" "):""); }).join(" ");
+  }
+  var KAPPA=0.5522847498;
+  function shapeOps(o){
+    var x=o.x, y=o.y, w=o.w, h=o.h, ops=[];
+    if(o.kind==="ellipse"){
+      var rx=w/2, ry=h/2, cx=x+rx, cy=y+ry, kx=rx*KAPPA, ky=ry*KAPPA;
+      ops.push(["M",cx+rx,cy],["C",cx+rx,cy+ky,cx+kx,cy+ry,cx,cy+ry],["C",cx-kx,cy+ry,cx-rx,cy+ky,cx-rx,cy],["C",cx-rx,cy-ky,cx-kx,cy-ry,cx,cy-ry],["C",cx+kx,cy-ry,cx+rx,cy-ky,cx+rx,cy],["Z"]);
+    } else {
+      var r = o.kind==="round" ? Math.max(0, Math.min(o.r||0, w/2, h/2)) : 0;
+      if(!r){ ops.push(["M",x,y],["L",x+w,y],["L",x+w,y+h],["L",x,y+h],["Z"]); }
+      else { var k=r*KAPPA;
+        ops.push(["M",x+r,y],["L",x+w-r,y],["C",x+w-r+k,y,x+w,y+r-k,x+w,y+r],["L",x+w,y+h-r],["C",x+w,y+h-r+k,x+w-r+k,y+h,x+w-r,y+h],
+                 ["L",x+r,y+h],["C",x+r-k,y+h,x,y+h-r+k,x,y+h-r],["L",x,y+r],["C",x,y+r-k,x+r-k,y,x+r,y],["Z"]); }
+    }
+    return ops;
+  }
+  var mctx=document.createElement("canvas").getContext("2d");
+  var FONTS = { helv:{pdf:"Helvetica", css:"Helvetica, Arial, sans-serif", w:"400", st:"normal"},
+                helvb:{pdf:"Helvetica-Bold", css:"Helvetica, Arial, sans-serif", w:"700", st:"normal"},
+                times:{pdf:"Times-Roman", css:"'Times New Roman', Times, serif", w:"400", st:"normal"},
+                timesb:{pdf:"Times-Bold", css:"'Times New Roman', Times, serif", w:"700", st:"normal"},
+                cour:{pdf:"Courier", css:"'Courier New', Courier, monospace", w:"400", st:"normal"},
+                courb:{pdf:"Courier-Bold", css:"'Courier New', Courier, monospace", w:"700", st:"normal"} };
+  function textBox(o){
+    var f=FONTS[o.font]||FONTS.helv; mctx.font=f.w+" 100px "+f.css;
+    var wpt=mctx.measureText(o.text||" ").width/100*o.pt, hmm=o.pt/MM2PT;
+    return { x:o.x, y:o.y-hmm*0.72, w:wpt/MM2PT, h:hmm*0.94 };   // baseline at o.y
+  }
+  function opsBox(list){
+    var b={x0:Infinity,y0:Infinity,x1:-Infinity,y1:-Infinity};
+    list.forEach(function(ops){ ops.forEach(function(o){ for(var k=1;k<o.length;k+=2){ var X=o[k],Y=o[k+1]; if(X<b.x0)b.x0=X; if(X>b.x1)b.x1=X; if(Y<b.y0)b.y0=Y; if(Y>b.y1)b.y1=Y; } }); });
+    return b;
+  }
+  function designBox(){
+    var a=artSize(), b={x0:0,y0:0,x1:a.w,y1:a.h};
+    function inc(bb){ if(bb.x0<b.x0)b.x0=bb.x0; if(bb.y0<b.y0)b.y0=bb.y0; if(bb.x1>b.x1)b.x1=bb.x1; if(bb.y1>b.y1)b.y1=bb.y1; }
+    if(S.contour.on && S.contour.ops.length) inc(opsBox([S.contour.ops]));
+    S.objs.forEach(function(o){
+      if(o.kind==="text"){ var t=textBox(o); inc({x0:t.x,y0:t.y,x1:t.x+t.w,y1:t.y+t.h}); }
+      else inc({x0:o.x,y0:o.y,x1:o.x+o.w,y1:o.y+o.h});
+    });
+    return {x:b.x0, y:b.y0, w:b.x1-b.x0, h:b.y1-b.y0};
+  }
+
+  // ---- automatic contour cut: rasterise the printed artwork, grow by the offset, keep the outside edge, trace it
+  function svgForMask(scale, pad){
+    var a=artSize(), parts=[];
+    artOps().forEach(function(p){ var c=S.colors[p.hex]; if(c && (c.role==="hide"||c.role==="noink")) return; parts.push('<path d="'+opsToD(p.ops)+'"/>'); });
+    S.objs.forEach(function(o){
+      if(o.kind==="text" && o.role!=="cut" && o.role!=="perf"){ var f=FONTS[o.font]||FONTS.helv; parts.push('<text x="'+n3(o.x)+'" y="'+n3(o.y)+'" font-family="'+esc(f.css)+'" font-weight="'+f.w+'" font-size="'+n3(o.pt/MM2PT)+'">'+esc(o.text)+'</text>'); }
+      else if(o.kind!=="text" && o.role==="fill") parts.push('<path d="'+opsToD(shapeOps(o))+'"/>');
+    });
+    var W=Math.ceil((a.w+2*pad)*scale), H=Math.ceil((a.h+2*pad)*scale);
+    return { W:W, H:H, svg:'<svg xmlns="http://www.w3.org/2000/svg" width="'+W+'" height="'+H+'" viewBox="'+n3(-pad)+' '+n3(-pad)+' '+n3(W/scale)+' '+n3(H/scale)+'"><g fill="#000">'+parts.join("")+'</g></svg>' };
+  }
+  function distanceTransform(mask, W, H){ // chamfer 3-4, distance in px from nearest "1" cell
+    var INF=1e9, d=new Float32Array(W*H), i, x, y;
+    for(i=0;i<W*H;i++) d[i]=mask[i]?0:INF;
+    for(y=0;y<H;y++) for(x=0;x<W;x++){ i=y*W+x; var v=d[i];
+      if(x>0) v=Math.min(v,d[i-1]+3); if(y>0){ v=Math.min(v,d[i-W]+3); if(x>0) v=Math.min(v,d[i-W-1]+4); if(x<W-1) v=Math.min(v,d[i-W+1]+4); } d[i]=v; }
+    for(y=H-1;y>=0;y--) for(x=W-1;x>=0;x--){ i=y*W+x; var u=d[i];
+      if(x<W-1) u=Math.min(u,d[i+1]+3); if(y<H-1){ u=Math.min(u,d[i+W]+3); if(x<W-1) u=Math.min(u,d[i+W+1]+4); if(x>0) u=Math.min(u,d[i+W-1]+4); } d[i]=u; }
+    for(i=0;i<W*H;i++) d[i]/=3;
+    return d;
+  }
+  function fillOutside(inside, W, H){ // returns mask with holes filled (anything not reachable from the border is inside)
+    var out=new Uint8Array(W*H), st=[], i;
+    function push(j){ if(!inside[j] && !out[j]){ out[j]=1; st.push(j); } }
+    for(var x=0;x<W;x++){ push(x); push((H-1)*W+x); }
+    for(var y=0;y<H;y++){ push(y*W); push(y*W+W-1); }
+    while(st.length){ i=st.pop(); var x2=i%W;
+      if(x2>0) push(i-1); if(x2<W-1) push(i+1); if(i>=W) push(i-W); if(i<W*(H-1)) push(i+W); }
+    var r=new Uint8Array(W*H); for(i=0;i<W*H;i++) r[i]=out[i]?0:1; return r;
+  }
+  var contourJob=0;
+  function buildContour(){
+    if(!S.contour.on || !S.ready){ S.contour.ops=[]; render(); return; }
+    var job=++contourJob, a=artSize(), off=Math.max(0,+$("stOffset").value||0), gap=Math.max(0,+$("stBridge").value||0);
+    var pad=off+gap+2, scale=Math.min(12, 2400/Math.max(a.w+2*pad, a.h+2*pad));
+    var m=svgForMask(scale, pad), img=new Image();
+    stStatus("Finding the outside edge…");
+    img.onload=function(){
+      if(job!==contourJob) return;
+      try{
+        var c=document.createElement("canvas"); c.width=m.W; c.height=m.H;
+        var x=c.getContext("2d"); x.drawImage(img,0,0);
+        var d=x.getImageData(0,0,m.W,m.H).data, N=m.W*m.H, art=new Uint8Array(N), i;
+        for(i=0;i<N;i++) art[i]=d[i*4+3]>100?1:0;
+        var dist=distanceTransform(art,m.W,m.H), R=(off+gap)*scale, inside=new Uint8Array(N);
+        for(i=0;i<N;i++) inside[i]=dist[i]<=R?1:0;
+        inside=fillOutside(inside,m.W,m.H);
+        if(gap>0){ // close: shrink back by the gap so pieces are joined but the offset stays true
+          var outm=new Uint8Array(N); for(i=0;i<N;i++) outm[i]=inside[i]?0:1;
+          var d2=distanceTransform(outm,m.W,m.H), G=gap*scale; for(i=0;i<N;i++) inside[i]=d2[i]>G?1:0;
+        }
+        var id=x.createImageData(m.W,m.H);
+        for(i=0;i<N;i++){ var v=inside[i]?0:255; id.data[i*4]=id.data[i*4+1]=id.data[i*4+2]=v; id.data[i*4+3]=255; }
+        var td=ImageTracer.imagedataToTracedata(id,{ ltres:1, qtres:1, pathomit:Math.round(scale*1.5), colorsampling:0, numberofcolors:2, colorquantcycles:1,
+          pal:[{r:0,g:0,b:0,a:255},{r:255,g:255,b:255,a:255}], blurradius:0, rightangleenhance:false, linefilter:true, scale:1, roundcoords:2 });
+        var ops=[];
+        (td.layers[0]||[]).forEach(function(p){
+          if(p.isholepath || !p.segments.length) return;
+          var f=function(v){ return v/scale - pad; }, s0=p.segments[0];
+          ops.push(["M",f(s0.x1),f(s0.y1)]);
+          p.segments.forEach(function(s){
+            if(s.type==="Q"){ var X0=f(s.x1),Y0=f(s.y1),QX=f(s.x2),QY=f(s.y2),X=f(s.x3),Y=f(s.y3);
+              ops.push(["C",X0+2/3*(QX-X0),Y0+2/3*(QY-Y0),X+2/3*(QX-X),Y+2/3*(QY-Y),X,Y]); }
+            else ops.push(["L",f(s.x2),f(s.y2)]);
+          });
+          ops.push(["Z"]);
+        });
+        S.contour.ops=ops;
+        stStatus(ops.length? "" : "No outside edge found.", ops.length? "" : "err");
+      }catch(e){ console.error(e); S.contour.ops=[]; stStatus("Couldn't make the cut line for this artwork.","err"); }
+      render();
+    };
+    img.onerror=function(){ stStatus("Couldn't make the cut line for this artwork.","err"); };
+    img.src="data:image/svg+xml;charset=utf-8,"+encodeURIComponent(m.svg);
+  }
+
+  // ---- role handling
+  function rolesFor(brand){
+    if(brand==="brother") return [["normal","Print as is"],["w254","White ink (RGB 254)"],["noink","No ink – shirt shows (RGB 255)"],["hide","Don't print"]];
+    var r=[["normal","Print in colour (CMYK)"]];
+    ["white","gloss","primer","silver"].forEach(function(k){ if(brandHas(brand,k)) r.push([k, (k==="gloss"?BRANDS[brand].glossLabel:ROLE_LABEL[k])+" · "+spotName(brand,k)]); });
+    r.push(["hide","Don't print"]);
+    return r;
+  }
+  function effRole(role, brand){ // map a role that the target brand doesn't have
+    if(brand==="brother"){ if(role==="white") return "w254"; if(["gloss","primer","silver"].indexOf(role)>=0) return "hide"; return role; }
+    if(role==="w254") return brandHas(brand,"white")?"white":"normal";
+    if(role==="noink") return "hide";
+    if(["white","gloss","primer","silver"].indexOf(role)>=0 && !brandHas(brand,role)) return "normal";
+    return role;
+  }
+
+  // ---- UI: colour list, objects, names
+  function buildColors(){
+    var box=$("stColors"); box.innerHTML="";
+    var roles=rolesFor(S.brand);
+    S.order.forEach(function(h){
+      var c=S.colors[h], row=document.createElement("div"); row.className="crow";
+      var r=effRole(c.role,S.brand); if(r!==c.role) c.role=r;
+      row.innerHTML='<input type="color" value="'+c.to.toLowerCase()+'" aria-label="Colour '+h+'"><span class="hex">'+h+(c.to!==h?' → '+c.to:'')+'</span><select aria-label="Print '+h+' as">'+
+        roles.map(function(o){ return '<option value="'+o[0]+'"'+(o[0]===c.role?" selected":"")+'>'+esc(o[1])+'</option>'; }).join("")+'</select>';
+      row.querySelector("input").addEventListener("input",function(){ c.to=this.value.toUpperCase(); row.querySelector(".hex").textContent=h+(c.to!==h?" → "+c.to:""); render(); });
+      row.querySelector("select").addEventListener("change",function(){ c.role=this.value; render(); if(S.contour.on) buildContour(); });
+      box.appendChild(row);
+    });
+    var b=BRANDS[S.brand];
+    $("stOverRow").hidden = S.brand==="brother" || !brandHas(S.brand,"gloss");
+    $("stUnderRow").hidden = S.brand==="brother" || !brandHas(S.brand,"white");
+    $("stOverName").textContent = b.glossLabel || "Gloss";
+    $("stRoleHint").textContent = S.brand==="brother" ? "On the GTX, RGB 255 white prints no ink; RGB 254 prints white ink." : "Special inks are sent as named spot colours the RIP recognises.";
+    $("stCutSec").hidden = S.brand==="brother";
+    $("stLaySec").hidden = S.brand==="brother";
+    $("stSendRip").hidden = S.brand==="brother";
+    $("stSendGtx").hidden = S.brand!=="brother";
+    [].forEach.call(document.querySelectorAll("[data-rip]"),function(btn){ btn.classList.toggle("dim", btn.dataset.rip!==S.brand); });
+  }
+  function fillOpts(brand, cur, withCut){
+    var o=[];
+    if(withCut && brand!=="brother"){ o.push(["cut","Cut line · "+spotName(brand,"cut")],["perf","Perforated cut · "+spotName(brand,"perf")]); }
+    else if(withCut){ o.push(["cut","Cut line (not printed on GTX)"],["perf","Perforated cut (not printed on GTX)"]); }
+    o.push(["fill","Filled shape"]);
+    return o.map(function(x){ return '<option value="'+x[0]+'"'+(x[0]===cur?" selected":"")+'>'+esc(x[1])+'</option>'; }).join("");
+  }
+  function inkOpts(brand, cur){
+    return rolesFor(brand).filter(function(r){ return r[0]!=="hide"; }).map(function(r){ return '<option value="'+r[0]+'"'+(r[0]===cur?" selected":"")+'>'+esc(r[1])+'</option>'; }).join("");
+  }
+  function buildObjs(){
+    var box=$("stObjs"); box.innerHTML="";
+    S.objs.forEach(function(o, idx){
+      var el=document.createElement("div"); el.className="obj"+(idx===S.sel?" sel":""); el.dataset.idx=idx;
+      var title = o.kind==="text" ? "Text" : o.kind==="ellipse" ? "Circle / oval" : o.kind==="round" ? "Rounded rectangle" : "Rectangle";
+      o.ink=effRole(o.ink||"normal", S.brand);
+      var h='<div class="oh"><span>'+title+'</span><button type="button" class="mini del" data-k="del">Remove</button></div>';
+      if(o.kind==="text"){
+        h+='<div class="row2"><input type="text" data-k="text" value="'+esc(o.text)+'" aria-label="Text" maxlength="200"></div>'+
+           '<div class="row2"><label>Font<select data-k="font">'+Object.keys(FONTS).map(function(k){ return '<option value="'+k+'"'+(k===o.font?" selected":"")+'>'+FONTS[k].pdf.replace("-"," ")+'</option>'; }).join("")+'</select></label>'+
+           '<label>Size (pt)<input type="number" data-k="pt" value="'+n3(o.pt)+'" min="4" max="2000" step="1"></label></div>';
+      } else {
+        h+='<div class="row2"><label>Width<input type="number" data-k="w" value="'+n3(o.w)+'" min="1" step="0.5"></label><label>Height<input type="number" data-k="h" value="'+n3(o.h)+'" min="1" step="0.5"></label>'+
+           (o.kind==="round"?'<label>Corner<input type="number" data-k="r" value="'+n3(o.r)+'" min="0" step="0.5"></label>':'')+'</div>';
+      }
+      h+='<div class="row2"><label>X<input type="number" data-k="x" value="'+n3(o.x)+'" step="0.5"></label><label>Y<input type="number" data-k="y" value="'+n3(o.y)+'" step="0.5"></label></div>';
+      h+='<div class="row2"><label>Use as<select data-k="role">'+fillOpts(S.brand,o.role,true)+'</select></label></div>';
+      if(o.role==="fill") h+='<div class="row2"><label style="flex:0 0 40px">Colour<input type="color" data-k="color" value="'+o.color+'"></label><label>Print<select data-k="ink">'+inkOpts(S.brand,o.ink)+'</select></label></div>';
+      el.innerHTML=h;
+      el.addEventListener("input",function(e){
+        var k=e.target.dataset.k; if(!k) return;
+        if(k==="text"||k==="font"||k==="color"||k==="ink"||k==="role") o[k]=e.target.value; else { var v=parseFloat(e.target.value); if(!isNaN(v)) o[k]=v; }
+        if(k==="role"){ buildObjs(); }
+        render(); if(S.contour.on && (o.kind==="text"||o.role==="fill")) scheduleContour();
+      });
+      el.addEventListener("click",function(e){
+        if(e.target.dataset.k==="del"){ S.objs.splice(idx,1); S.sel=-1; buildObjs(); render(); if(S.contour.on) scheduleContour(); return; }
+        if(S.sel!==idx){ S.sel=idx; [].forEach.call(box.children,function(c,i){ c.classList.toggle("sel", i===idx); }); render(); }
+      });
+      box.appendChild(el);
+    });
+  }
+  function buildNames(){
+    var box=$("stNames"); box.innerHTML="";
+    var b=BRANDS[S.brand];
+    if(S.brand==="brother"){ box.innerHTML='<span style="grid-column:1/-1;color:var(--muted)">Brother GTX doesn\'t use spot colour names. White ink is controlled by colour: RGB 254,254,254 prints white, RGB 255,255,255 prints nothing.</span>'; return; }
+    Object.keys(b.spots).forEach(function(role){
+      var lab=document.createElement("span"); lab.textContent=role==="gloss"?b.glossLabel:ROLE_LABEL[role];
+      var inp=document.createElement("input"); inp.type="text"; inp.value=spotName(S.brand,role); inp.setAttribute("aria-label",lab.textContent+" spot colour name");
+      inp.addEventListener("change",function(){
+        customNames[S.brand]=customNames[S.brand]||{}; customNames[S.brand][role]=inp.value.trim().replace(/[^\x21-\x7e]/g,"_");
+        try{ localStorage.setItem(LS_NAMES, JSON.stringify(customNames)); }catch(e){}
+        buildColors(); buildObjs(); render();
+      });
+      box.appendChild(lab); box.appendChild(inp);
+    });
+  }
+  $("stNamesReset").addEventListener("click",function(){ delete customNames[S.brand]; try{ localStorage.setItem(LS_NAMES, JSON.stringify(customNames)); }catch(e){} buildNames(); buildColors(); buildObjs(); render(); });
+
+  // ---- preview
+  function legend(){
+    var L=[];
+    if(S.brand!=="brother"){
+      L.push('<span><i style="border-color:'+SCREEN.cut+'"></i>'+esc(spotName(S.brand,"cut"))+'</span>');
+      L.push('<span><i style="border-color:'+SCREEN.perf+';border-top-style:dashed"></i>'+esc(spotName(S.brand,"perf"))+'</span>');
+      ["white","gloss","primer","silver"].forEach(function(k){ if(brandHas(S.brand,k)) L.push('<span><i class="sw" style="background:'+SCREEN[k]+'"></i>'+esc(spotName(S.brand,k))+'</span>'); });
+    } else {
+      L.push('<span><i class="sw" style="background:#fff"></i>White ink (254)</span>');
+    }
+    $("stLegend").innerHTML=L.join("");
+  }
+  var DEFS='<defs>'+
+    '<pattern id="ptW" width="2" height="2" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="2" height="2" fill="#ffffff"/><rect width="0.5" height="2" fill="#7fb7ff"/></pattern>'+
+    '<pattern id="ptG" width="2" height="2" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)"><rect width="0.6" height="2" fill="#ffd84a" opacity=".85"/></pattern>'+
+    '<pattern id="ptP" width="2" height="2" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r=".45" fill="#d9926b"/></pattern>'+
+    '<pattern id="ptS" width="2" height="2" patternUnits="userSpaceOnUse" patternTransform="rotate(90)"><rect width="0.6" height="2" fill="#9aa3ab"/></pattern>'+
+    '</defs>';
+  var PAT={ white:"url(#ptW)", gloss:"url(#ptG)", primer:"url(#ptP)", silver:"url(#ptS)", w254:"url(#ptW)" };
+  function strokeW(){ var b=designBox(); return Math.max(0.15, Math.max(b.w,b.h)/400); }
+  function designSvg(forTile){
+    var ART=artOps(), parts=[], sw=strokeW(), wantUnder=S.under && S.brand!=="brother" && brandHas(S.brand,"white"), wantOver=S.over && S.brand!=="brother" && brandHas(S.brand,"gloss");
+    if(wantUnder){ parts.push('<g fill="url(#ptW)">'+ART.filter(function(p){ var r=S.colors[p.hex].role; return r!=="hide"&&r!=="noink"; }).map(function(p){ return '<path d="'+opsToD(p.ops)+'"/>'; }).join("")+'</g>'); }
+    ART.forEach(function(p){
+      var c=S.colors[p.hex], r=c.role;
+      if(r==="hide") return;
+      var fill = r==="normal" ? c.to : r==="noink" ? "none" : PAT[r] || c.to;
+      parts.push('<path d="'+opsToD(p.ops)+'" fill="'+fill+'"'+(r==="noink"?' stroke="#888" stroke-width="'+n3(sw/2)+'" stroke-dasharray="'+n3(sw*2)+'"':'')+'/>');
+    });
+    if(wantOver){ parts.push('<g fill="url(#ptG)">'+ART.filter(function(p){ var r=S.colors[p.hex].role; return r!=="hide"&&r!=="noink"; }).map(function(p){ return '<path d="'+opsToD(p.ops)+'"/>'; }).join("")+'</g>'); }
+    S.objs.forEach(function(o, idx){
+      var attrs=forTile?'':' data-oi="'+idx+'"', sel=(!forTile && idx===S.sel);
+      if(S.brand==="brother" && (o.role==="cut"||o.role==="perf") && !sel) return;
+      if(o.kind==="text"){
+        var f=FONTS[o.font]||FONTS.helv, fill=o.ink==="normal"?o.color:(PAT[o.ink]||o.color);
+        if(o.role==="cut"||o.role==="perf") fill="none";
+        var strokeAttr = (o.role==="cut"||o.role==="perf") ? ' stroke="'+SCREEN[o.role]+'" stroke-width="'+n3(sw)+'"' : '';
+        parts.push('<text'+attrs+' x="'+n3(o.x)+'" y="'+n3(o.y)+'" font-family="'+esc(f.css)+'" font-weight="'+f.w+'" font-size="'+n3(o.pt/MM2PT)+'" fill="'+fill+'"'+strokeAttr+'>'+esc(o.text)+'</text>');
+        if(sel){ var tb=textBox(o); parts.push('<rect x="'+n3(tb.x)+'" y="'+n3(tb.y)+'" width="'+n3(tb.w)+'" height="'+n3(tb.h)+'" fill="none" stroke="#e8b923" stroke-width="'+n3(sw/2)+'" stroke-dasharray="'+n3(sw*3)+'" pointer-events="none"/>'); }
+      } else {
+        var d=opsToD(shapeOps(o));
+        if(o.role==="fill") parts.push('<path'+attrs+' d="'+d+'" fill="'+(o.ink==="normal"?o.color:(PAT[o.ink]||o.color))+'"'+(sel?' stroke="#e8b923" stroke-width="'+n3(sw/2)+'"':'')+'/>');
+        else parts.push('<path'+attrs+' d="'+d+'" fill="'+(forTile?"none":"transparent")+'" stroke="'+SCREEN[o.role]+'" stroke-width="'+n3(sel?sw*1.8:sw)+'"'+(o.role==="perf"?' stroke-dasharray="'+n3(sw*4)+' '+n3(sw*2)+'"':'')+'/>');
+      }
+    });
+    if(S.contour.on && S.contour.ops.length && S.brand!=="brother"){
+      var t=S.contour.type; parts.push('<path d="'+opsToD(S.contour.ops)+'" fill="none" stroke="'+SCREEN[t]+'" stroke-width="'+n3(sw)+'"'+(t==="perf"?' stroke-dasharray="'+n3(sw*4)+' '+n3(sw*2)+'"':'')+' pointer-events="none"/>');
+    }
+    return parts.join("");
+  }
+  function render(){
+    if(!S.ready) return;
+    legend(); layoutInfo();
+    var box=$("stCanvas"), svg;
+    if(S.view==="design" || S.brand==="brother"){
+      var b=designBox(), m=Math.max(b.w,b.h)*0.06+2;
+      svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="'+n3(b.x-m)+' '+n3(b.y-m)+' '+n3(b.w+2*m)+' '+n3(b.h+2*m)+'" preserveAspectRatio="xMidYMid meet">'+DEFS+
+          '<rect x="'+n3(b.x-m)+'" y="'+n3(b.y-m)+'" width="'+n3(b.w+2*m)+'" height="'+n3(b.h+2*m)+'" fill="#d9dcdf"/>'+designSvg(false)+'</svg>';
+    } else {
+      var L=layout(), P=L.pages[0]||{w:100,h:100,items:[]}, bb=L.box, mm=Math.max(P.w,P.h)*0.03;
+      var tile='<symbol id="tile" viewBox="'+n3(bb.x)+' '+n3(bb.y)+' '+n3(bb.w)+' '+n3(bb.h)+'" width="'+n3(bb.w)+'" height="'+n3(bb.h)+'" overflow="visible">'+designSvg(true)+'</symbol>';
+      var uses=P.items.map(function(it){
+        var wh=' width="'+n3(bb.w)+'" height="'+n3(bb.h)+'"';
+        return it.rot ? '<use href="#tile"'+wh+' transform="translate('+n3(it.x+bb.h)+' '+n3(it.y)+') rotate(90)"/>' : '<use href="#tile"'+wh+' x="'+n3(it.x)+'" y="'+n3(it.y)+'"/>';
+      }).join("");
+      svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="'+n3(-mm)+' '+n3(-mm)+' '+n3(P.w+2*mm)+' '+n3(P.h+2*mm)+'" preserveAspectRatio="xMidYMid meet">'+DEFS+tile+
+          '<rect width="'+n3(P.w)+'" height="'+n3(P.h)+'" fill="#d9dcdf"/>'+
+          '<rect x="'+n3(L.margin)+'" y="'+n3(L.margin)+'" width="'+n3(Math.max(0,P.w-2*L.margin))+'" height="'+n3(Math.max(0,P.h-2*L.margin))+'" fill="none" stroke="#9aa1a8" stroke-width="'+n3(Math.max(P.w,P.h)/600)+'" stroke-dasharray="'+n3(Math.max(P.w,P.h)/120)+'"/>'+uses+'</svg>';
+    }
+    box.innerHTML=svg;
+  }
+
+  // ---- dragging shapes/text in the design view
+  var drag=null;
+  $("stCanvas").addEventListener("pointerdown",function(e){
+    var t=e.target.closest && e.target.closest("[data-oi]"); if(!t || S.view!=="design") return;
+    var idx=+t.dataset.oi, svg=$("stCanvas").querySelector("svg"), pt=svg.createSVGPoint(); pt.x=e.clientX; pt.y=e.clientY;
+    var p=pt.matrixTransform(svg.getScreenCTM().inverse());
+    drag={idx:idx, sx:p.x, sy:p.y, ox:S.objs[idx].x, oy:S.objs[idx].y, moved:false};
+    S.sel=idx; $("stCanvas").setPointerCapture(e.pointerId); e.preventDefault(); buildObjs(); render();
+  });
+  $("stCanvas").addEventListener("pointermove",function(e){
+    if(!drag) return;
+    var svg=$("stCanvas").querySelector("svg"), pt=svg.createSVGPoint(); pt.x=e.clientX; pt.y=e.clientY;
+    var p=pt.matrixTransform(svg.getScreenCTM().inverse()), o=S.objs[drag.idx];
+    o.x=Math.round((drag.ox+p.x-drag.sx)*10)/10; o.y=Math.round((drag.oy+p.y-drag.sy)*10)/10; drag.moved=true;
+    // keep the view frame steady while dragging: only move the element
+    var el=svg.querySelector('[data-oi="'+drag.idx+'"]');
+    if(el){ el.setAttribute("transform","translate("+n3(o.x-drag.ox)+" "+n3(o.y-drag.oy)+")"); }
+  });
+  function endDrag(){
+    if(!drag) return; var moved=drag.moved, o=S.objs[drag.idx]; drag=null;
+    if(moved){ buildObjs(); render(); if(S.contour.on && (o.kind==="text"||o.role==="fill")) scheduleContour(); }
+  }
+  $("stCanvas").addEventListener("pointerup",endDrag);
+  $("stCanvas").addEventListener("pointercancel",endDrag);
+
+  // ---- layout (step and repeat)
+  var PAGES={ a4:[210,297], a3:[297,420], sra3:[320,450], r610:[610,0], r762:[762,0], r1067:[1067,0], r1371:[1371,0], r1625:[1625,0] };
+  function pageSpec(){
+    var v=$("stPage").value;
+    if(v==="custom") return {w:+$("stPW").value||210, h:+$("stPH").value||297, roll:false};
+    if(v==="customroll") return {w:+$("stPW").value||600, h:0, roll:true};
+    var p=PAGES[v]; return {w:p[0], h:p[1], roll:!p[1]};
+  }
+  function layout(){
+    var box=designBox(), g=Math.max(0,+$("stGap").value||0), m=Math.max(0,+$("stMargin").value||0), spec=pageSpec();
+    var mode=$("stMode").value, qty=Math.max(1,Math.round(+$("stQty").value||1)), rot=$("stRotate").checked;
+    var uw=spec.w-2*m;
+    function grid(tw,th,H){ var cols=Math.max(0,Math.floor((uw+g)/(tw+g))); var rows=H==null?Infinity:Math.max(0,Math.floor((H-2*m+g)/(th+g))); return {cols:cols, rows:rows, tw:tw, th:th}; }
+    var opts=[{r:false,t:[box.w,box.h]}]; if(rot && Math.abs(box.w-box.h)>0.01) opts.push({r:true,t:[box.h,box.w]});
+    var best=null;
+    opts.forEach(function(o){
+      var G, count, H;
+      if(spec.roll){
+        G=grid(o.t[0],o.t[1],null);
+        if(!G.cols) return;
+        var n = mode==="fill" ? Math.max(1,Math.floor((Math.max(0,+$("stLen").value||0)-2*m+g)/(o.t[1]+g)))*G.cols : qty;
+        var rows=Math.ceil(n/G.cols); H=rows*(o.t[1]+g)-g+2*m; count=n;
+        var sc={G:G,count:count,H:H,r:o.r,rows:rows,pages:1,perPage:n};
+        if(!best || (mode==="fill" ? sc.count>best.count : sc.H<best.H)) best=sc;
+      } else {
+        G=grid(o.t[0],o.t[1],spec.h);
+        var per=G.cols*G.rows; if(!per) return;
+        count = mode==="fill" ? per : qty;
+        var pages=Math.ceil(count/per);
+        var sc2={G:G,count:count,H:spec.h,r:o.r,rows:G.rows,pages:pages,perPage:per};
+        if(!best || per>best.perPage) best=sc2;
+      }
+    });
+    var L={ box:box, margin:m, pages:[], count:0, fits:!!best, spec:spec, rotated:false };
+    if(!best) return L;
+    L.count=best.count; L.rotated=best.r;
+    var tw=best.G.tw, th=best.G.th, cols=best.G.cols, left=best.count;
+    for(var pg=0; pg<best.pages; pg++){
+      var P={w:spec.w, h:best.H, items:[]}, perP=spec.roll?left:Math.min(left,best.perPage);
+      for(var k=0;k<perP;k++){ var c=k%cols, r=Math.floor(k/cols); P.items.push({x:m+c*(tw+g), y:m+r*(th+g), rot:best.r}); }
+      left-=perP; L.pages.push(P);
+    }
+    return L;
+  }
+  function layoutInfo(){
+    if(S.brand==="brother"){ $("stFit").textContent=""; return; }
+    var L=layout(), b=L.box, f=function(v){ return Math.round(v*10)/10; };
+    if(!L.fits){ $("stFit").textContent="The design ("+f(b.w)+" × "+f(b.h)+" mm) is bigger than the printable area. Make it smaller or pick wider media."; return; }
+    var P=L.pages[0], s="Design "+f(b.w)+" × "+f(b.h)+" mm. "+L.count+" cop"+(L.count===1?"y":"ies");
+    if(L.spec.roll) s+=" on "+f(P.w)+" mm roll, "+f(P.h)+" mm long";
+    else s+=" on "+L.pages.length+" sheet"+(L.pages.length===1?"":"s")+" ("+P.items.length+" per sheet)";
+    if(L.rotated) s+=", turned 90°";
+    $("stFit").textContent=s+".";
+  }
+
+  // ---- PDF writer with Separation (spot) colour spaces
+  function pdfStr(s){
+    var o=""; for(var i=0;i<s.length;i++){ var c=s.charCodeAt(i);
+      if(c===40||c===41||c===92) o+="\\"+s[i];
+      else if(c>=32 && c<127) o+=s[i];
+      else if(c<256) o+="\\"+("00"+c.toString(8)).slice(-3);
+      else o+="?"; }
+    return "("+o+")";
+  }
+  function pdfName(s){ return "/"+String(s).replace(/[^\x21-\x7e]|[#()<>\[\]{}\/%]/g,function(c){ return "#"+("0"+c.charCodeAt(0).toString(16)).slice(-2); }); }
+  function rgbOf(hex){ var h=hex.replace("#",""); return [parseInt(h.substr(0,2),16)/255, parseInt(h.substr(2,2),16)/255, parseInt(h.substr(4,2),16)/255]; }
+  function opsToPdf(ops){
+    var s=[]; ops.forEach(function(o){
+      var p=o.slice(1).map(function(v){ return n3(v*MM2PT); });
+      if(o[0]==="M") s.push(p[0]+" "+p[1]+" m"); else if(o[0]==="L") s.push(p[0]+" "+p[1]+" l");
+      else if(o[0]==="C") s.push(p.join(" ")+" c"); else if(o[0]==="Z") s.push("h");
+    }); return s.join("\n");
+  }
+  async function deflate(str){
+    if(typeof CompressionStream==="undefined") return null;
+    var bytes=new TextEncoder().encode(str);
+    var cs=new Blob([bytes]).stream().pipeThrough(new CompressionStream("deflate"));
+    return new Uint8Array(await new Response(cs).arrayBuffer());
+  }
+  async function buildPdf(brand){
+    var L=layout(); if(!L.fits || !L.pages.length) throw new Error("nofit");
+    var box=L.box, TW=box.w*MM2PT, TH=box.h*MM2PT;
+    var spots={}, spotList=[];
+    function spotCS(role){ var name=spotName(brand,role); if(!name) return null; if(!spots[role]){ spots[role]="/CS"+spotList.length; spotList.push({role:role,name:name}); } return spots[role]; }
+    var c=[], fonts={}, fontList=[];
+    function fontRes(key){ var f=(FONTS[key]||FONTS.helv).pdf; if(!fonts[f]){ fonts[f]="/F"+fontList.length; fontList.push(f); } return fonts[f]; }
+    function setFill(role, hex){
+      if(role==="normal"||role==="fill"){ var r=rgbOf(hex); c.push(r.map(n3).join(" ")+" rg"); return true; }
+      var cs=spotCS(role); if(!cs){ var r2=rgbOf(hex); c.push(r2.map(n3).join(" ")+" rg"); return true; }
+      c.push("/GSop gs "+cs+" cs 1 scn"); return true;
+    }
+    c.push("q 1 0 0 -1 0 "+n3(TH)+" cm 1 0 0 1 "+n3(-box.x*MM2PT)+" "+n3(-box.y*MM2PT)+" cm");
+    var ART=artOps(), printable=ART.filter(function(p){ var r=effRole(S.colors[p.hex].role,brand); return r!=="hide"; });
+    if(S.under && brandHas(brand,"white")){ c.push("q"); setFill("white"); printable.forEach(function(p){ c.push(opsToPdf(p.ops)); }); c.push("f Q"); }
+    printable.forEach(function(p){
+      var col=S.colors[p.hex], r=effRole(col.role,brand);
+      c.push("q"); setFill(r==="normal"?"normal":r, col.to); c.push(opsToPdf(p.ops)+"\nf Q");
+    });
+    if(S.over && brandHas(brand,"gloss")){ c.push("q"); setFill("gloss"); printable.forEach(function(p){ c.push(opsToPdf(p.ops)); }); c.push("f Q"); }
+    S.objs.forEach(function(o){
+      var isLine = o.role==="cut"||o.role==="perf";
+      if(!isLine && effRole(o.ink||"normal",brand)==="hide") return;
+      if(o.kind==="text"){
+        c.push("q");
+        if(isLine){ var cs=spotCS(o.role); c.push("/GSop gs "+cs+" CS 1 SCN 0.25 w 1 Tr"); }
+        else { setFill(effRole(o.ink||"normal",brand)==="normal"?"normal":effRole(o.ink,brand), o.color); }
+        c.push("1 0 0 -1 "+n3(o.x*MM2PT)+" "+n3(o.y*MM2PT)+" cm BT "+fontRes(o.font)+" "+n3(o.pt)+" Tf 0 0 Td "+pdfStr(o.text||"")+" Tj ET Q");
+      } else if(isLine){
+        var cs2=spotCS(o.role); c.push("q /GSop gs "+cs2+" CS 1 SCN 0.25 w "+opsToPdf(shapeOps(o))+"\nS Q");
+      } else {
+        c.push("q"); var ir=effRole(o.ink||"normal",brand); setFill(ir==="normal"?"normal":ir, o.color); c.push(opsToPdf(shapeOps(o))+"\nf Q");
+      }
+    });
+    if(S.contour.on && S.contour.ops.length){ var cs3=spotCS(S.contour.type); c.push("q /GSop gs "+cs3+" CS 1 SCN 0.25 w "+opsToPdf(S.contour.ops)+"\nS Q"); }
+    c.push("Q");
+    var formContent=c.join("\n");
+
+    // objects
+    var objs=[]; function add(s){ objs.push(s); return objs.length; }
+    var catalogId=add(null), pagesId=add(null);
+    var gsId=add("<< /Type /ExtGState /OP true /op true /OPM 1 >>");
+    var csIds=spotList.map(function(sp){
+      var a=ALT[sp.role]||[0,0,0,1];
+      return add("[/Separation "+pdfName(sp.name)+" /DeviceCMYK << /FunctionType 2 /Domain [0 1] /C0 [0 0 0 0] /C1 ["+a.join(" ")+"] /N 1 >>]");
+    });
+    var fontIds=fontList.map(function(f){ return add("<< /Type /Font /Subtype /Type1 /BaseFont /"+f+(f.indexOf("Courier")===0||f.indexOf("Helvetica")===0||f.indexOf("Times")===0?" /Encoding /WinAnsiEncoding":"")+" >>"); });
+    var res="<< /ExtGState << /GSop "+gsId+" 0 R >>"+
+      (csIds.length?" /ColorSpace << "+csIds.map(function(id,i){ return "/CS"+i+" "+id+" 0 R"; }).join(" ")+" >>":"")+
+      (fontIds.length?" /Font << "+fontIds.map(function(id,i){ return "/F"+i+" "+id+" 0 R"; }).join(" ")+" >>":"")+" >>";
+    var streams=[];
+    async function streamObj(dict, data){
+      var z=await deflate(data);
+      var id=add(null); streams.push({id:id, dict:dict, data:z||data, z:!!z}); return id;
+    }
+    var formId=await streamObj("/Type /XObject /Subtype /Form /BBox [0 0 "+n3(TW)+" "+n3(TH)+"] /Resources "+res, formContent);
+    var pageIds=[];
+    for(var pi=0; pi<L.pages.length; pi++){
+      var P=L.pages[pi], PH=P.h*MM2PT, pc=[];
+      P.items.forEach(function(it){
+        var x=it.x*MM2PT, yTop=it.y*MM2PT;
+        if(!it.rot){ pc.push("q 1 0 0 1 "+n3(x)+" "+n3(PH-yTop-TH)+" cm /Fm0 Do Q"); }
+        else { // turned 90°: footprint is TH wide, TW tall
+          pc.push("q 0 -1 1 0 "+n3(x)+" "+n3(PH-yTop)+" cm /Fm0 Do Q");
+        }
+      });
+      var cid=await streamObj("", pc.join("\n"));
+      var pid=add("<< /Type /Page /Parent "+pagesId+" 0 R /MediaBox [0 0 "+n3(P.w*MM2PT)+" "+n3(PH)+"] /TrimBox [0 0 "+n3(P.w*MM2PT)+" "+n3(PH)+"] /Resources << /XObject << /Fm0 "+formId+" 0 R >> >> /Contents "+cid+" 0 R >>");
+      pageIds.push(pid);
+    }
+    objs[catalogId-1]="<< /Type /Catalog /Pages "+pagesId+" 0 R >>";
+    objs[pagesId-1]="<< /Type /Pages /Kids ["+pageIds.map(function(i){return i+" 0 R";}).join(" ")+"] /Count "+pageIds.length+" >>";
+    var infoId=add("<< /Producer (Highway Digital Vector Converter) /Title "+pdfStr(S.name)+" /CreationDate (D:"+new Date().toISOString().replace(/[-:T]/g,"").slice(0,14)+"Z) >>");
+
+    // serialise
+    var enc=new TextEncoder(), chunks=[], len=0, offsets=[];
+    function put(x){ var b=typeof x==="string"?enc.encode(x):x; chunks.push(b); len+=b.length; }
+    put("%PDF-1.6\n"); put(new Uint8Array([37,226,227,207,211,10]));
+    var smap={}; streams.forEach(function(s){ smap[s.id]=s; });
+    for(var id=1; id<=objs.length; id++){
+      offsets[id]=len;
+      var s=smap[id];
+      if(s){ var data=typeof s.data==="string"?enc.encode(s.data):s.data;
+        put(id+" 0 obj\n<< "+s.dict+" /Length "+data.length+(s.z?" /Filter /FlateDecode":"")+" >>\nstream\n"); put(data); put("\nendstream\nendobj\n"); }
+      else put(id+" 0 obj\n"+objs[id-1]+"\nendobj\n");
+    }
+    var xref=len, x="xref\n0 "+(objs.length+1)+"\n0000000000 65535 f \n";
+    for(var j=1;j<=objs.length;j++) x+=("0000000000"+offsets[j]).slice(-10)+" 00000 n \n";
+    put(x+"trailer\n<< /Size "+(objs.length+1)+" /Root "+catalogId+" 0 R /Info "+infoId+" 0 R >>\nstartxref\n"+xref+"\n%%EOF\n");
+    var blob=new Blob(chunks,{type:"application/pdf"});
+    return { blob:blob, pages:L.pages.length, copies:L.count, spots:spotList.map(function(s){return s.name;}) };
+  }
+
+  // ---- Brother GTX PNG
+  function gtxSvg(dpi){
+    var b=designBox(), ART=artOps(), parts=[];
+    ART.forEach(function(p){ var col=S.colors[p.hex], r=effRole(col.role,"brother"); if(r==="hide") return;
+      var fill = r==="w254" ? "rgb(254,254,254)" : r==="noink" ? "rgb(255,255,255)" : col.to; parts.push('<path d="'+opsToD(p.ops)+'" fill="'+fill+'"/>'); });
+    S.objs.forEach(function(o){
+      if(o.role==="cut"||o.role==="perf") return;
+      var r=effRole(o.ink||"normal","brother"), fill=r==="w254"?"rgb(254,254,254)":r==="noink"?"rgb(255,255,255)":o.color;
+      if(r==="hide") return;
+      if(o.kind==="text"){ var f=FONTS[o.font]||FONTS.helv; parts.push('<text x="'+n3(o.x)+'" y="'+n3(o.y)+'" font-family="'+esc(f.css)+'" font-weight="'+f.w+'" font-size="'+n3(o.pt/MM2PT)+'" fill="'+fill+'">'+esc(o.text)+'</text>'); }
+      else parts.push('<path d="'+opsToD(shapeOps(o))+'" fill="'+fill+'"/>');
+    });
+    var W=Math.max(1,Math.round(b.w/25.4*dpi)), H=Math.max(1,Math.round(b.h/25.4*dpi));
+    return {W:W,H:H,svg:'<svg xmlns="http://www.w3.org/2000/svg" width="'+W+'" height="'+H+'" viewBox="'+n3(b.x)+' '+n3(b.y)+' '+n3(b.w)+' '+n3(b.h)+'" shape-rendering="geometricPrecision">'+parts.join("")+'</svg>'};
+  }
+  function pngBlob(canvas, dpi){
+    return new Promise(function(res){ canvas.toBlob(function(b){ res(b); },"image/png"); }).then(function(blob){
+      // add a pHYs chunk so GTX Graphics Lab opens it at the right physical size
+      return blob.arrayBuffer().then(function(ab){
+        var u=new Uint8Array(ab), ppm=Math.round(dpi/0.0254), chunk=new Uint8Array(21), dv=new DataView(chunk.buffer);
+        dv.setUint32(0,9); chunk.set([112,72,89,115],4); dv.setUint32(8,ppm); dv.setUint32(12,ppm); chunk[16]=1;
+        var crc=crc32(chunk.subarray(4,17)); dv.setUint32(17,crc>>>0);
+        var at=33; // after IHDR
+        var out=new Uint8Array(u.length+21); out.set(u.subarray(0,at),0); out.set(chunk,at); out.set(u.subarray(at),at+21);
+        return new Blob([out],{type:"image/png"});
+      });
+    });
+  }
+  var CRC=null; function crc32(b){ if(!CRC){ CRC=new Uint32Array(256); for(var n=0;n<256;n++){ var c=n; for(var k=0;k<8;k++) c=c&1?0xEDB88320^(c>>>1):c>>>1; CRC[n]=c>>>0; } }
+    var c=0xFFFFFFFF; for(var i=0;i<b.length;i++) c=CRC[(c^b[i])&255]^(c>>>8); return (c^0xFFFFFFFF)>>>0; }
+  $("stPng").addEventListener("click",function(){
+    var dpi=+$("stDpi").value, g=gtxSvg(dpi);
+    if(g.W*g.H>80e6){ stStatus("That's too large at "+dpi+" dpi. Pick a lower resolution.","err"); return; }
+    stStatus("Making the PNG…");
+    var img=new Image();
+    img.onload=function(){
+      var c=document.createElement("canvas"); c.width=g.W; c.height=g.H; var x=c.getContext("2d"); x.drawImage(img,0,0);
+      if($("stGtx254").checked){
+        var id=x.getImageData(0,0,g.W,g.H), d=id.data;
+        for(var i=0;i<d.length;i+=4){ if(d[i+3]>0 && d[i]===255 && d[i+1]===255 && d[i+2]===255){ d[i]=d[i+1]=d[i+2]=254; } }
+        // keep "No ink" colours at pure 255 by redrawing them on top
+        x.putImageData(id,0,0);
+        var keep=S.order.filter(function(h){ return effRole(S.colors[h].role,"brother")==="noink"; });
+        if(keep.length){ var b=designBox(), ART=artOps(), k=g.W/b.w; x.save(); x.setTransform(k,0,0,k,-b.x*k,-b.y*k); x.fillStyle="rgb(255,255,255)";
+          ART.forEach(function(p){ if(keep.indexOf(p.hex)<0) return; x.fill(new Path2D(opsToD(p.ops))); }); x.restore(); }
+      }
+      pngBlob(c,dpi).then(function(blob){ saveBlob(blob, S.name+"-GTX.png", "image/png", null); stStatus("PNG ready: "+g.W+" × "+g.H+" px at "+dpi+" dpi.","ok"); });
+    };
+    img.onerror=function(){ stStatus("Couldn't make the PNG.","err"); };
+    img.src="data:image/svg+xml;charset=utf-8,"+encodeURIComponent(g.svg);
+  });
+
+  // ---- saving
+  function saveBlob(blob, fname){
+    var a=document.createElement("a"), url=URL.createObjectURL(blob);
+    a.href=url; a.download=fname; a.style.display="none"; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 5000);
+    toast("Downloading "+fname);
+  }
+  async function makePdf(brand){
+    try{ stStatus("Building the PDF…"); var r=await buildPdf(brand); stStatus("PDF ready: "+r.copies+" cop"+(r.copies===1?"y":"ies")+", "+r.pages+" page"+(r.pages===1?"":"s")+(r.spots.length?". Spot colours: "+r.spots.join(", "):"")+".","ok"); return r; }
+    catch(e){ console.error(e); stStatus(e.message==="nofit"?"The design doesn't fit the media. Make it smaller or pick wider media.":"Couldn't build the PDF.","err"); return null; }
+  }
+  function fileName(brand){ return (S.name||"design")+"-"+BRANDS[brand].rip.replace(/\s+/g,"")+".pdf"; }
+  $("stPdf").addEventListener("click", async function(){ var r=await makePdf(S.brand); if(r) saveBlob(r.blob, fileName(S.brand)); });
+
+  var RIPINFO={
+    roland:{ title:"Send to VersaWorks", path:"C:\\ProgramData\\Roland DG VersaWorks\\VersaWorks\\Printers\\<your printer>\\<queue hot folder>",
+      steps:["Click <b>Save PDF…</b> below.","In the save window, go to the VersaWorks hot folder for the printer and queue you want (path below). From another PC, open the hot folder VersaWorks shares on the network.","VersaWorks picks the file up and prints with that queue's settings. Cut lines use <b>CutContour</b> / <b>PerfCutContour</b>; white uses <b>RDG_WHITE</b>."],
+      note:"VersaWorks creates one hot folder per queue. Your folder names depend on how VersaWorks was set up. Ask us if you can't find it." },
+    mimaki:{ title:"Send to RasterLink", path:"\\\\<RasterLink PC>\\<hot folder for your printer>   (on the RasterLink PC: under C:\\Mijctrl)",
+      steps:["Click <b>Save PDF…</b> below.","Save it into the hot folder RasterLink created for your printer (path below). RasterLink shares it on the network so other PCs can reach it.","RasterLink imports the job. Cut lines are spot colours starting with <b>CutContour</b>; set the perforation condition for <b>"+esc(BRANDS.mimaki.spots.perf)+"</b> in RasterLink's cut settings once."],
+      note:"RasterLink7 makes a hot folder for each printer you register. Folder names depend on your setup. Ask us if you can't find it." },
+    mutoh:{ title:"Send to VerteLith", path:"C:\\Users\\Public\\VerteLith\\HotFolders\\<your printer>\\<hot folder name>",
+      steps:["Click <b>Save PDF…</b> below.","Save it into the VerteLith hot folder for your printer and setting (path below). From another PC, use the hot folder shared from the VerteLith PC.","VerteLith picks the file up and applies that hot folder's settings. White and varnish use <b>Spot_White</b> and <b>Spot_Varnish</b>."],
+      note:"VerteLith hot folders are created per printer and per setting. Your folder names depend on your setup. Ask us if you can't find it." }
+  };
+  var dlgBrand="roland";
+  [].forEach.call(document.querySelectorAll("[data-rip]"),function(btn){
+    btn.addEventListener("click",function(){
+      dlgBrand=btn.dataset.rip; var I=RIPINFO[dlgBrand];
+      $("ripTitle").textContent=I.title;
+      $("ripSteps").innerHTML=I.steps.map(function(s){ return "<li>"+s.replace(/(CutContour|PerfCutContour|RDG_WHITE|Spot_White|Spot_Varnish)/g,function(m){ return esc(spotName(dlgBrand, {CutContour:"cut",PerfCutContour:"perf",RDG_WHITE:"white",Spot_White:"white",Spot_Varnish:"gloss"}[m])||m); })+"</li>"; }).join("");
+      $("ripPath").textContent=I.path;
+      $("ripNote").textContent=I.note+(dlgBrand!==S.brand?" This PDF uses "+BRANDS[dlgBrand].name+" spot colour names.":"");
+      var d=$("ripDlg"); if(d.showModal) d.showModal(); else d.setAttribute("open","");
+    });
+  });
+  $("ripCopy").addEventListener("click",function(){
+    var t=$("ripPath").textContent;
+    if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(function(){ toast("Path copied"); },function(){ selectPath(); });
+    else selectPath();
+    function selectPath(){ var r=document.createRange(); r.selectNodeContents($("ripPath")); var s=getSelection(); s.removeAllRanges(); s.addRange(r); }
+  });
+  $("ripSave").addEventListener("click", async function(){
+    var r=await makePdf(dlgBrand); if(!r) return;
+    if(window.showSaveFilePicker){
+      try{
+        var h=await window.showSaveFilePicker({ id:"rip-"+dlgBrand, suggestedName:fileName(dlgBrand), types:[{description:"PDF",accept:{"application/pdf":[".pdf"]}}] });
+        var w=await h.createWritable(); await w.write(r.blob); await w.close();
+        $("ripDlg").close(); toast("Saved to "+h.name); stStatus("Saved "+h.name+". The save window remembers this folder next time.","ok");
+        return;
+      }catch(e){ if(e && e.name==="AbortError") return; console.warn(e); }
+    }
+    saveBlob(r.blob, fileName(dlgBrand)); $("ripDlg").close();
+    stStatus("Your browser saves to Downloads. Move the PDF into the hot folder shown.","ok");
+  });
+  $("ripDl").addEventListener("click", async function(){ var r=await makePdf(dlgBrand); if(r){ saveBlob(r.blob, fileName(dlgBrand)); $("ripDlg").close(); } });
+
+  // ---- controls
+  var ct=null; function scheduleContour(){ clearTimeout(ct); ct=setTimeout(buildContour, 300); }
+  $("stBrand").addEventListener("change",function(){ S.brand=this.value; try{ localStorage.setItem("hd_vc_brand",S.brand); }catch(e){} if(S.brand==="brother") S.view="design"; syncTabs(); buildColors(); buildObjs(); buildNames(); render(); });
+  $("stUnder").addEventListener("change",function(){ S.under=this.checked; render(); });
+  $("stOver").addEventListener("change",function(){ S.over=this.checked; render(); });
+  $("stContour").addEventListener("change",function(){ S.contour.on=this.checked; $("stContourOpts").hidden=!this.checked; buildContour(); });
+  $("stCType").addEventListener("change",function(){ S.contour.type=this.value; render(); });
+  ["stOffset","stBridge"].forEach(function(id){ $(id).addEventListener("input",scheduleContour); });
+  [].forEach.call(document.querySelectorAll("[data-add]"),function(b){
+    b.addEventListener("click",function(){
+      var a=artSize(), k=b.dataset.add, o={id:S.nextId++, role:"cut", color:"#000000", ink:"normal"};
+      if(k==="box"){ var m=3; o.kind="rect"; o.x=-m; o.y=-m; o.w=a.w+2*m; o.h=a.h+2*m; }
+      else { var s=Math.max(10, Math.round(Math.min(a.w,a.h)*0.4)); o.kind=k; o.x=a.w/2-s/2; o.y=a.h/2-s/2; o.w=s; o.h=s; o.r=Math.round(s/8); if(k!=="rect"&&k!=="round") o.kind="ellipse"; }
+      if(S.brand==="brother") o.role="fill";
+      S.objs.push(o); S.sel=S.objs.length-1; buildObjs(); render();
+    });
+  });
+  $("stAddText").addEventListener("click",function(){
+    var t=$("stText").value.trim(); if(!t){ $("stText").focus(); return; }
+    var a=artSize(), pt=Math.max(8, Math.round(a.h*0.12*MM2PT));
+    var o={id:S.nextId++, kind:"text", text:t, font:"helvb", pt:pt, x:0, y:a.h+pt/MM2PT*1.1, role:"fill", color:"#000000", ink:"normal"};
+    S.objs.push(o); S.sel=S.objs.length-1; $("stText").value=""; buildObjs(); render(); if(S.contour.on) scheduleContour();
+  });
+  $("stText").addEventListener("keydown",function(e){ if(e.key==="Enter"){ e.preventDefault(); $("stAddText").click(); } });
+  ["stPage","stPW","stPH","stMode","stQty","stLen","stGap","stMargin","stRotate"].forEach(function(id){
+    $(id).addEventListener(id==="stPage"||id==="stMode"||id==="stRotate"?"change":"input",function(){ syncLayoutFields(); render(); });
+  });
+  function syncLayoutFields(){
+    var v=$("stPage").value, roll=pageSpec().roll, fill=$("stMode").value==="fill";
+    $("stPWl").hidden=!(v==="custom"||v==="customroll"); $("stPHl").hidden=v!=="custom";
+    $("stQtyl").hidden=fill; $("stLenl").hidden=!(fill&&roll);
+  }
+  function syncTabs(){
+    $("tabDesign").setAttribute("aria-selected", String(S.view==="design")); $("tabSheet").setAttribute("aria-selected", String(S.view==="sheet"));
+    $("tabSheet").hidden = S.brand==="brother";
+  }
+  $("tabDesign").addEventListener("click",function(){ S.view="design"; syncTabs(); render(); });
+  $("tabSheet").addEventListener("click",function(){ S.view="sheet"; syncTabs(); render(); });
+  ["outW","outH","outU","outLock"].forEach(function(id){ $(id).addEventListener(id==="outW"||id==="outH"?"input":"change",function(){ if(!S.ready) return; render(); if(S.contour.on) scheduleContour(); }); });
+
+  window.addEventListener("vc:traced",function(e){
+    S.svg=e.detail.svg; S.name=e.detail.name||"design";
+    try{ ingest(S.svg); }catch(err){ console.error(err); return; }
+    var first=!S.ready; S.ready=S.paths.length>0;
+    $("stEmpty").hidden=S.ready; $("stBody").hidden=!S.ready;
+    if(!S.ready) return;
+    buildColors(); buildObjs(); buildNames(); syncLayoutFields(); syncTabs(); render();
+    if(S.contour.on) buildContour();
+  });
+  window.__vcStudio=S; // for support/debugging
+})();
+</script>
+
 </body>
 </html>
