@@ -1519,6 +1519,99 @@ async function renderKits() {
       el("p", { class: "small" }, unc.map((u) => u.brand + " " + (u.model || "(no model)") + " ×" + u.n).join(" · "))) : null,
     ...kits.map((k) => kitCard(k, used[k.id] || 0))].filter(Boolean));
 }
+/* Parts finder for a kit: the model's parts from the Mimaki price list, a search, the OneDrive parts lists for the
+   model (rank A = periodic replacement) and the Mimaki Australia supply page (consumables). Tick parts, then add them. */
+function kitFinder(d, key, onAdd) {
+  const box = el("div", { class: "kit-finder", hidden: true });
+  const models = () => String(Array.isArray(d.models) ? d.models.join(",") : d.models || "").split(",").map((s) => s.trim()).filter(Boolean);
+  let rows = [], msg = "";
+  const status = el("p", { class: "muted small kf-msg" });
+  const list = el("div", { class: "kf-list" });
+  const say = (m) => { msg = m; status.textContent = m; };
+  const merge = (items, src) => {
+    for (const it of items) {
+      if (!it.pn) continue;
+      const ex = rows.find((r) => r.pn === it.pn);
+      if (ex) { ex.src = [...new Set([...ex.src, src])]; if (it.rank && !ex.rank) ex.rank = it.rank; if (it.qty > ex.qty) ex.qty = it.qty; if (!ex.name && it.name) ex.name = it.name; if (it.tick) ex.tick = true; if (it.section && !ex.section) ex.section = it.section; }
+      else rows.push({ pn: it.pn, name: it.name || "", qty: it.qty || 1, rank: it.rank || "", section: it.section || "", src: [src], tick: !!it.tick, ex: it.ex ?? null, cost: it.cost ?? null });
+    }
+  };
+  const prices = async () => {
+    const need = rows.filter((r) => r.ex == null).map((r) => r.pn);
+    for (let i = 0; i < need.length; i += 100) {
+      const { data } = await sb.from("part_prices").select("pn,name,rrp,cost").in("pn", need.slice(i, i + 100));
+      for (const p of data || []) { const r = rows.find((x) => x.pn === p.pn); if (r) { r.ex = p.rrp != null && +p.rrp > 0 ? +p.rrp : null; r.cost = p.cost; if (p.name && (!r.name || r.src.includes("Parts list"))) r.name = p.name; } }
+    }
+  };
+  const draw = () => {
+    const inKit = new Set((d[key] || []).map((p) => p.pn));
+    const order = (r) => (r.rank === "A" ? 0 : r.tick ? 1 : r.src.includes("Supply page") ? 2 : 3);
+    const shown = rows.slice().sort((a, b) => order(a) - order(b) || a.pn.localeCompare(b.pn));
+    list.replaceChildren(shown.length ? el("table", { class: "tbl sub kf-tbl" },
+      el("thead", {}, el("tr", {}, ...["", "Part no.", "Name", "Qty", "Ex GST", "Found in"].map((h) => el("th", {}, h)))),
+      el("tbody", {}, ...shown.map((r) => el("tr", { class: inKit.has(r.pn) ? "off" : "" },
+        el("td", {}, inKit.has(r.pn) ? el("span", { class: "small muted" }, "in kit") : el("input", { type: "checkbox", checked: r.tick, onchange: (e) => { r.tick = e.target.checked; } })),
+        el("td", { class: "mono small" }, r.pn),
+        el("td", {}, r.name || "", r.rank ? el("span", { class: "pill " + (r.rank === "A" ? "ok" : "soon"), title: r.rank === "A" ? "Rank A: periodic replacement" : "Rank " + r.rank }, " " + r.rank) : null,
+          r.section ? el("div", { class: "muted small" }, r.section) : null),
+        el("td", {}, el("input", { class: "field n kf-qty", type: "number", min: 1, value: r.qty, oninput: (e) => (r.qty = Math.max(1, Math.round(+e.target.value || 1))) })),
+        el("td", { class: "n" }, r.ex != null ? money2(r.ex) : el("span", { class: "muted small", title: r.cost != null ? "Mimaki cost " + money2(r.cost) : "" }, r.cost != null ? "cost " + money2(r.cost) : "—")),
+        el("td", { class: "muted small" }, r.src.join(", ")))))) : el("p", { class: "muted small" }, "No parts yet. Search, or scan the parts lists."));
+  };
+  const run = async (label, fn) => { say(label); try { await fn(); await prices(); say(msg === label ? rows.length + " parts found. Tick the ones to add." : msg); } catch (e) { say((e && e.message) || "Something went wrong"); } draw(); };
+  const tool = async (p) => { const { data, error } = await sb.rpc("staff_kit_tool", { p }); if (error) throw new Error(error.message); if (!data || data.ok === false) throw new Error((data && data.error) || "The tool didn't answer"); return data; };
+  const search = el("input", { class: "field", type: "search", placeholder: "Search part no. or name, e.g. wiper, damper, SPA-0271" });
+  let timer = 0;
+  search.oninput = () => { clearTimeout(timer); timer = setTimeout(() => run("Searching…", async () => {
+    const { data, error } = await sb.rpc("kit_part_search", { q: search.value, models: models(), lim: 60 });
+    if (error) throw new Error(error.message);
+    merge((data || []).map((p) => ({ pn: p.pn, name: p.name, ex: p.rrp != null && +p.rrp > 0 ? +p.rrp : null, cost: p.cost })), "Price list");
+  }), 300); };
+  const supply = el("input", { class: "field", type: "url", placeholder: "https://www.mimakiaus.com.au/product/…/supply.html", value: d.supply_url || "", oninput: (e) => (d.supply_url = e.target.value) });
+  box.load = () => run("Looking up parts for " + (models().join(", ") || "this kit") + "…", async () => {
+    const { data, error } = await sb.rpc("kit_part_search", { q: "", models: models(), lim: 200 });
+    if (error) throw new Error(error.message);
+    merge((data || []).map((p) => ({ pn: p.pn, name: p.name, ex: p.rrp != null && +p.rrp > 0 ? +p.rrp : null, cost: p.cost })), "Price list");
+  });
+  box.append(
+    el("div", { class: "kf-tools" },
+      el("label", { class: "f" }, el("span", { class: "small muted" }, "Search the Mimaki price list"), search),
+      el("div", { class: "kf-btns" },
+        el("button", { class: "btn small", type: "button", onclick: () => run("Scanning OneDrive parts lists for " + models().join(", ") + "…", async () => {
+          const f = await tool({ op: "kit_manuals", models: models() });
+          const files = (f.files || []).filter((x) => x.score >= 2).slice(0, 3);
+          if (!files.length) { msg = "No parts list found in OneDrive for " + models().join(", ") + "."; return; }
+          for (const file of files) {
+            say("Reading " + file.name + "…");
+            const r = await tool({ op: "kit_manual_parts", itemId: file.id });
+            merge((r.parts || []).filter((p) => /^(MP-|SP[ABC]?-|SP-|ML|FL)/.test(p.pn)).map((p) => {
+              const q = String(p.name || "").match(/\s(\d{1,3})\s*$/);
+              return { pn: p.pn, name: String(p.name || "").replace(/\s\d{1,3}\s*$/, "").replace(/\s+(JFX|UJF|UCJV|TxF|CJV|JV|\d{3}).*$/i, "").trim(), qty: q ? +q[1] : 1, rank: p.rank, tick: p.rank === "A" };
+            }), "Parts list");
+          }
+          msg = "Read " + files.map((x) => x.name).join(", ") + ". Rank A parts (periodic replacement) are ticked.";
+        }) }, "Scan OneDrive parts lists"),
+      )),
+    el("div", { class: "kf-tools" },
+      el("label", { class: "f" }, el("span", { class: "small muted" }, "Mimaki Australia supply page (consumables)"), supply),
+      el("div", { class: "kf-btns" }, el("button", { class: "btn small", type: "button", onclick: () => run("Reading the Mimaki supply page…", async () => {
+        if (!/mimakiaus\.com\.au/i.test(supply.value)) throw new Error("Paste the model's supply page link from mimakiaus.com.au first.");
+        const r = await tool({ op: "mimaki_supply", url: supply.value.trim() });
+        merge((r.items || []).filter((x) => !/ink$|^option/i.test(x.section)).map((x) => ({ pn: x.pn, name: x.name + (x.volume ? " (" + x.volume + ")" : ""), section: x.section, tick: false })), "Supply page");
+        msg = (r.items || []).length + " items on the supply page (ink and options left out). Tick the consumables to include.";
+      }) }, "Get consumables"))),
+    status, list,
+    el("div", { class: "kf-foot" },
+      el("button", { class: "btn primary small", type: "button", onclick: () => {
+        const inKit = new Set((d[key] || []).map((p) => p.pn));
+        const pick = rows.filter((r) => r.tick && !inKit.has(r.pn));
+        if (!pick.length) { say("Tick at least one part that isn't in the kit yet."); return; }
+        onAdd(pick.map((r) => ({ pn: r.pn, name: r.name, qty: r.qty, ex: r.ex, ...(r.ex == null && r.cost != null ? { note: "Mimaki cost " + money2(r.cost) + "; set the price" } : {}) })));
+        pick.forEach((r) => (r.tick = false)); say(pick.length + " part" + (pick.length === 1 ? "" : "s") + " added. Save the kit to keep them."); draw();
+      } }, "Add ticked parts to this kit"),
+      el("button", { class: "btn ghost small", type: "button", onclick: () => (box.hidden = true) }, "Close")));
+  return box;
+}
 function kitCard(k, nMachines) {
   const d = JSON.parse(JSON.stringify(k));
   const note = el("span", { class: "saved" });
@@ -1534,6 +1627,7 @@ function kitCard(k, nMachines) {
   const inp = (key, attrs = {}) => el("input", { class: "field", value: d[key] ?? "", ...attrs, oninput: (e) => { d[key] = e.target.value; recalc(); } });
   const partsEditor = (key, title) => {
     const box = el("div", { class: "kit-pbox" });
+    const finder = kitFinder(d, key, (rows) => { for (const r of rows) { const ex = (d[key] = d[key] || []).find((p) => p.pn === r.pn); if (ex) ex.qty = Math.max(+ex.qty || 1, r.qty); else d[key].push(r); } draw(); recalc(); });
     const draw = () => box.replaceChildren(...[el("h4", {}, title),
       el("table", { class: "tbl sub kit-parts" },
         el("thead", {}, el("tr", {}, ...["Part no.", "Name", "Qty", "Ex GST each", "Note", ""].map((h) => el("th", {}, h)))),
@@ -1545,7 +1639,10 @@ function kitCard(k, nMachines) {
             oninput: (e) => { p.ex = e.target.value === "" ? null : +e.target.value; e.target.classList.toggle("need", e.target.value === ""); recalc(); } })),
           el("td", {}, el("input", { class: "field", value: p.note || "", oninput: (e) => (p.note = e.target.value) })),
           el("td", {}, el("button", { class: "btn ghost small", type: "button", onclick: () => { d[key].splice(i, 1); draw(); recalc(); } }, "Remove")))))),
-      el("button", { class: "btn small", type: "button", onclick: () => { (d[key] = d[key] || []).push({ pn: "", name: "", qty: 1, ex: null }); draw(); } }, "+ Add part"),
+      el("div", { class: "kit-addrow" },
+        el("button", { class: "btn small", type: "button", onclick: () => { finder.hidden = !finder.hidden; if (!finder.hidden && !finder.dataset.loaded) { finder.dataset.loaded = "1"; finder.load(); } } }, "+ Add part"),
+        el("button", { class: "btn ghost small", type: "button", onclick: () => { (d[key] = d[key] || []).push({ pn: "", name: "", qty: 1, ex: null }); draw(); } }, "Blank row")),
+      finder,
       key === "six_parts" ? el("button", { class: "btn ghost small", type: "button", onclick: () => {
         const cap = (d.annual_parts || []).filter((p) => /cap|wip|absorb|pad|felt|foam|pouch/i.test(p.name || ""));
         d.six_parts = JSON.parse(JSON.stringify(cap)); draw(); recalc(); } }, "Copy caps / wipers / absorbers from the annual kit") : null].filter(Boolean));
@@ -1564,7 +1661,7 @@ function kitCard(k, nMachines) {
       exclude: String(Array.isArray(d.exclude) ? d.exclude.join(",") : d.exclude || "").split(",").map((s) => s.trim()).filter(Boolean),
       annual_fee: kitPrice(d.annual_hours, d.annual_parts), six_fee: +d.six_hours > 0 ? kitPrice(d.six_hours, d.six_parts) : null, // the database works these out too
       annual_hours: num(d.annual_hours), six_hours: num(d.six_hours),
-      annual_parts: clean(d.annual_parts), six_parts: clean(d.six_parts), approved: !!d.approved, notes: d.notes || null,
+      annual_parts: clean(d.annual_parts), six_parts: clean(d.six_parts), approved: !!d.approved, notes: d.notes || null, supply_url: String(d.supply_url || "").trim() || null,
       updated_at: new Date().toISOString(), updated_by: state.user?.email || null };
     if (!row.models.length) row.models = [""];
     btn.disabled = true; note.className = "saved"; note.textContent = "Saving…";

@@ -317,3 +317,13 @@ table.billing td.act{text-align:right;white-space:nowrap}
 .kit-price{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline;padding:7px 0;min-height:36px}
 .kit-price b{font-size:16px}
 .sq-onsite{margin:6px 0 2px}
+.kit-addrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.kit-finder{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:8px;background:var(--bg);display:flex;flex-direction:column;gap:8px}
+.kf-tools{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end}
+@media (max-width:640px){.kf-tools{grid-template-columns:1fr}}
+.kf-btns{display:flex;gap:6px;flex-wrap:wrap}
+.kf-list{max-height:420px;overflow:auto}
+.kf-tbl tr.off td{opacity:.55}
+.kf-qty{width:64px}
+.kf-foot{display:flex;gap:8px;flex-wrap:wrap}
+.kf-msg{margin:0}
