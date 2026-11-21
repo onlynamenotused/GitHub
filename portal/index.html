@@ -13,7 +13,7 @@
 <link rel="icon" href="favicon.ico">
 <script src="config.js?v=35"></script>
 <script src="nav.js?v=36"></script>
-<script type="module" src="app.js?v=35"></script>
+<script type="module" src="app.js?v=36"></script>
 </head>
 <body>
 <div id="hd-nav"></div>
@@ -33,6 +33,13 @@
       <button class="btn primary" type="submit">Email me a sign-in link</button>
     </form>
     <p id="loginMsg" class="msg" role="status"></p>
+    <form id="codeForm" hidden>
+      <label for="otp">Or type the code from the email</label>
+      <input id="otp" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="Sign-in code">
+      <button class="btn" type="submit">Sign in with code</button>
+      <p class="muted small" style="margin:0">Handy if you read the email on your phone but want to sign in on this computer.</p>
+    </form>
+    <p id="codeMsg" class="msg" role="status"></p>
    </div>
    <aside class="card about" aria-labelledby="aboutTitle">
     <h2 id="aboutTitle">About Highway Digital</h2>

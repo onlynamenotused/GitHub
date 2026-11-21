@@ -52,7 +52,21 @@ $("#loginForm").addEventListener("submit", async (e) => {
   btn.disabled = false;
   if (error) { msg.className = "msg err"; msg.textContent = "Couldn't send the link: " + error.message; return; }
   msg.className = "msg ok";
-  msg.textContent = "Check your inbox for a sign-in link from Highway Digital. It can take a minute to arrive.";
+  msg.textContent = "Check your inbox for an email from Highway Digital (it can take a minute to arrive). Press Sign in in the email, or type the code from it below.";
+  $("#codeForm").hidden = false; $("#codeMsg").textContent = ""; $("#otp").value = ""; $("#otp").focus();
+});
+// The sign-in email also carries a one-time code, so the email can be read on one device and the code typed on another.
+$("#codeForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const email = $("#email").value.trim(), token = $("#otp").value.replace(/\D/g, "");
+  const msg = $("#codeMsg"), btn = e.target.querySelector("button");
+  if (!email) { msg.className = "msg err"; msg.textContent = "Enter your email address above first."; return; }
+  if (token.length < 6) { msg.className = "msg err"; msg.textContent = "Type the code from the email (numbers only)."; return; }
+  btn.disabled = true; msg.className = "msg"; msg.textContent = "Checking the code…";
+  const { error } = await sb.auth.verifyOtp({ email, token, type: "email" });
+  btn.disabled = false;
+  if (error) { msg.className = "msg err"; msg.textContent = /expired|invalid/i.test(error.message) ? "That code is wrong or has expired. Check the latest email, or send a new one." : "Couldn't sign in: " + error.message; return; }
+  msg.className = "msg ok"; msg.textContent = "Signed in.";
 });
 async function signOut() { await sb.auth.signOut(); setAccessCookie(null); history.replaceState(null, "", location.pathname); location.reload(); }
 
@@ -72,7 +86,7 @@ function setAccessCookie(session) {
     document.cookie = "hd_at=; Path=/; Max-Age=0; Secure; SameSite=Lax";
   }
 }
-const okNext = (p) => typeof p === "string" && /^\/(kb|catalogue|vector|flute)(\/[A-Za-z0-9._\-\/]*)?$/.test(p);
+const okNext = (p) => typeof p === "string" && /^\/(kb|catalogue|vector|flute|warehousing)(\/[A-Za-z0-9._\-\/]*)?$/.test(p);
 {
   const nx = new URLSearchParams(location.search).get("next");
   if (okNext(nx)) { try { localStorage.setItem("hd_next", nx); } catch (e) {} history.replaceState(null, "", location.pathname + location.hash); }
