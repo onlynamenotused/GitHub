@@ -358,7 +358,7 @@ function sqlBackend(mcp){
   const txt=((r&&r.content)||[]).filter(b=>b.type==="text").map(b=>b.text).join("\n")||(r&&typeof r.payload==="string"?r.payload:JSON.stringify((r&&r.payload)||""));
   if(r&&r.isError)throw{code:"database",message:txt.slice(0,240)};
   let s=txt;try{const o=JSON.parse(txt);if(o&&typeof o.result==="string")s=o.result;else if(o&&o.error)s="ERROR "+JSON.stringify(o.error)}catch(e){}
-  const mm=s.match(/<untrusted-data-[^>]+>([\s\S]*)<\/untrusted-data/);if(mm)s=mm[1];s=s.trim();
+  const mm=s.match(/<untrusted-data-[^>]+>\s*(\[[\s\S]*\])\s*<\/untrusted-data/);if(mm)s=mm[1];s=s.trim();
   if(s.startsWith("["))return JSON.parse(s);
   if(/error/i.test(s))throw{code:"database",message:s.slice(0,240)};
   return[];
