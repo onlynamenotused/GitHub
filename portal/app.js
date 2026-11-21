@@ -1363,8 +1363,11 @@ function exportMenu() {
 
 // ---------- "Quote me": fixed-price service + PM kit parts, several machines on one callout ----------
 const money2 = (n) => "$" + (Math.round((+n || 0) * 100) / 100).toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const STD_LABOUR = 150; // no PM kit: 1 hour at the hourly rate (ex GST), parts quoted on inspection
-const SQ = { open: false, sel: {}, extras: [], parts: null, note: "" };
+const STD_LABOUR = 150; // standard hourly rate (ex GST); no PM kit: 1 hour, parts quoted on inspection
+// Kit price = hours on site x hourly rate + the kit parts (qty x ex GST). The callout is never in it: it's added once per visit, only for on-site visits.
+const kitPartsTotal = (parts) => (parts || []).reduce((s, p) => s + (p.ex == null || p.ex === "" || isNaN(+p.ex) ? 0 : Math.max(1, Math.round(+p.qty || 1)) * +p.ex), 0);
+const kitPrice = (hours, parts) => Math.round(((+hours || 0) * STD_LABOUR + kitPartsTotal(parts)) * 100) / 100;
+const SQ = { open: false, sel: {}, extras: [], parts: null, note: "", onsite: true };
 function kitFor(m) { return (state.kits || {})[m.id] || null; }
 function sqMachines() { return state.machines; }
 function sqPartsOf(mid) {
@@ -1382,7 +1385,8 @@ function sqTotals() {
   for (const [mid, s] of Object.entries(SQ.sel)) {
     const k = kitFor(state.machines.find((x) => x.id === mid));
     if (!k) { n++; svc += STD_LABOUR; hrs += 1; continue; }
-    n++; svc += +(s.plan === "six" ? k.six_fee : k.annual_fee) || 0; hrs += +(s.plan === "six" ? k.six_hours : k.annual_hours) || 0;
+    const h = +(s.plan === "six" ? k.six_hours : k.annual_hours) || 0;
+    n++; svc += h * STD_LABOUR; hrs += h;
     for (const p of sqPartsOf(mid)) if (!s.remove.has(p.pn) && p.ex != null) parts += (+p.ex) * (+p.qty || 1);
   }
   for (const x of SQ.extras) parts += x.ex * x.qty;
@@ -1408,7 +1412,7 @@ function renderServiceQuote() {
     const parts = sqPartsOf(m.id);
     const planBtn = (val, label, fee, hrs) => el("label", { class: "sq-plan" + (s.plan === val ? " on" : "") },
       el("input", { type: "radio", name: "plan-" + m.id, checked: s.plan === val, onchange: () => { s.plan = val; s.remove = new Set(); renderServiceQuote(); } }),
-      el("span", {}, el("b", {}, label), el("span", { class: "small" }, " " + money2(fee) + " + parts" + (+hrs ? " · about " + (+hrs) + " h on site" : ""))));
+      el("span", {}, el("b", {}, label), el("span", { class: "small" }, " " + money2(fee) + " incl. parts" + (+hrs ? " · " + (+hrs) + " h labour on site" : ""))));
     return el("div", { class: "sq-m on" }, head,
       el("div", { class: "sq-plans" }, planBtn("annual", "Annual service", k.annual_fee, k.annual_hours),
         k.six_fee != null ? planBtn("six", "6-month service", k.six_fee, k.six_hours) : null),
@@ -1442,16 +1446,19 @@ function renderServiceQuote() {
   const go = el("button", { class: "btn primary send", type: "button", disabled: !t.n, onclick: () => sendServiceQuote(go, msg) }, "Email me this quote");
   layer.replaceChildren(el("div", { class: "sq-panel", role: "dialog", "aria-modal": "true", "aria-label": "Service quote" },
     el("div", { class: "sq-headrow" }, el("h2", {}, "Service quote"), el("button", { class: "btn ghost", type: "button", "aria-label": "Close", onclick: closeServiceQuote }, "✕")),
-    el("p", { class: "muted small" }, "A fixed-price service for each machine, plus the PM parts it needs. Tick more machines to service them on the same visit: there's one callout for the whole visit. We create the quote and email it to you straight away."),
+    el("p", { class: "muted small" }, "Each service is the labour for the job at our hourly rate plus the PM parts it needs. Tick more machines to service them on the same visit: there's one callout for the whole visit when we come to you. We create the quote and email it to you straight away."),
     el("div", { class: "sq-list" }, ...list.map(machineBlock)),
     extras,
     el("label", { class: "f sq-note" }, el("span", { class: "small muted" }, "Anything we should know? (optional)"),
       el("textarea", { class: "field", rows: 2, maxlength: 1000, oninput: (e) => (SQ.note = e.target.value) }, SQ.note)),
     el("div", { class: "sq-sum" },
-      el("div", {}, el("span", {}, "Service" + (t.n > 1 ? "s (" + t.n + " machines)" : "")), el("span", {}, money2(t.svc))),
+      el("div", {}, el("span", {}, "Labour" + (t.hrs ? " (" + t.hrs + " h at " + money2(STD_LABOUR) + "/h)" : "") + (t.n > 1 ? " · " + t.n + " machines" : "")), el("span", {}, money2(t.svc))),
       el("div", {}, el("span", {}, "Parts"), el("span", {}, money2(t.parts))),
-      el("div", {}, el("span", {}, "Callout (one for the visit)"), el("span", { class: "small" }, "$80 within 30 km · $125 within 100 km")),
-      el("div", { class: "sq-tot" }, el("span", {}, "Estimate before callout"), el("b", {}, money2(t.svc + t.parts) + " + GST")),
+      el("label", { class: "chk sq-onsite" }, el("input", { type: "checkbox", checked: SQ.onsite, onchange: (e) => { SQ.onsite = e.target.checked; renderServiceQuote(); } }),
+        " We come to you (adds one callout for the visit)"),
+      SQ.onsite ? el("div", {}, el("span", {}, "Callout (one for the visit)"), el("span", { class: "small" }, "$80 within 30 km · $125 within 100 km"))
+        : el("div", { class: "muted small" }, "No callout: you bring the machine to us, or we arrange it with you."),
+      el("div", { class: "sq-tot" }, el("span", {}, SQ.onsite ? "Estimate before callout" : "Estimate"), el("b", {}, money2(t.svc + t.parts) + " + GST")),
       t.hrs ? el("div", { class: "muted small" }, "About " + t.hrs + " hours on site in total.") : null,
       el("div", { class: "muted small" }, "Prices are ex GST. Service plan members' parts discount is applied on the quote.")),
     go, msg));
@@ -1476,11 +1483,11 @@ async function sendServiceQuote(btn, msg) {
   btn.disabled = true; msg.className = "msg"; msg.textContent = "Creating your quote…";
   try {
     const r = await fetch("/service/quote", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ machines, extras: SQ.extras.map((x) => ({ brand: x.brand, key: x.key, qty: x.qty })), note: SQ.note }) });
+      body: JSON.stringify({ machines, extras: SQ.extras.map((x) => ({ brand: x.brand, key: x.key, qty: x.qty })), note: SQ.note, onsite: SQ.onsite !== false }) });
     const j = await r.json().catch(() => ({}));
     if (!j.ok) throw new Error(j.error || "Couldn't create the quote.");
     const panel = btn.closest(".sq-panel");
-    SQ.sel = {}; SQ.extras = []; SQ.note = "";
+    SQ.sel = {}; SQ.extras = []; SQ.note = ""; SQ.onsite = true;
     panel.replaceChildren(...[el("div", { class: "sq-headrow" }, el("h2", {}, "Quote sent"), el("button", { class: "btn ghost", type: "button", "aria-label": "Close", onclick: closeServiceQuote }, "✕")),
       el("p", {}, "Quote " + (j.number || "") + " for " + money2(j.total) + " inc GST " + (j.sent ? "has been emailed to " + j.email + "." : "has been created. " + (j.error || ""))),
       (j.skipped || []).length ? el("p", { class: "muted small" }, "Some parts couldn't be priced online, so we'll follow up on those.") : null,
@@ -1505,9 +1512,9 @@ async function renderKits() {
       el("button", { class: "btn", type: "button", onclick: async () => {
         const { error: e } = await sb.from("service_kits").insert({ name: "New kit", brand: "Mimaki", models: [], priority: 100 });
         if (e) alert(e.message); else renderKits(); } }, "+ New kit")),
-    el("p", { class: "muted small" }, "Each kit is the fixed service price, the hours on site and the parts for one model family. Customers see ",
+    el("p", { class: "muted small" }, "Each kit is the hours on site and the parts for one model family; its price is worked out as hours × " + money2(STD_LABOUR) + " + parts (callout separate, on-site visits only). Customers see ",
       el("b", {}, "Quote me"), " on a machine only when its kit is ", el("b", {}, "approved"),
-      ". The 6-month kit is the caps, wipers and absorbers only; leave its price blank to offer annual only. Part prices are ex GST and are what the quote uses. A callout is added once per visit. Models are matched on letters and digits, so “CJV150” matches CJV150-160; lower priority numbers are checked first."),
+      ". The 6-month kit is the caps, wipers and absorbers only; leave its hours blank to offer annual only. Part prices are ex GST and are what the quote uses. A callout is added once per visit. Models are matched on letters and digits, so “CJV150” matches CJV150-160; lower priority numbers are checked first."),
     unc.length ? el("details", { class: "kb" }, el("summary", {}, unc.length + " customer models have no kit yet"),
       el("p", { class: "small" }, unc.map((u) => u.brand + " " + (u.model || "(no model)") + " ×" + u.n).join(" · "))) : null,
     ...kits.map((k) => kitCard(k, used[k.id] || 0))].filter(Boolean));
@@ -1515,7 +1522,16 @@ async function renderKits() {
 function kitCard(k, nMachines) {
   const d = JSON.parse(JSON.stringify(k));
   const note = el("span", { class: "saved" });
-  const inp = (key, attrs = {}) => el("input", { class: "field", value: d[key] ?? "", ...attrs, oninput: (e) => (d[key] = e.target.value) });
+  const priceA = el("output", { class: "kit-price" }), priceS = el("output", { class: "kit-price" });
+  const recalc = () => {
+    const unA = (d.annual_parts || []).filter((p) => p.ex == null || p.ex === "").length, unS = (d.six_parts || []).filter((p) => p.ex == null || p.ex === "").length;
+    const show = (box, hours, parts, un, none) => box.replaceChildren(...(none ? [el("span", { class: "muted" }, none)] : [
+      el("b", {}, money2(kitPrice(hours, parts))), " ",
+      el("span", { class: "muted small" }, (+hours || 0) + " h × " + money2(STD_LABOUR) + " = " + money2((+hours || 0) * STD_LABOUR) + " + parts " + money2(kitPartsTotal(parts)) + (un ? " · " + un + " part" + (un === 1 ? "" : "s") + " not priced yet" : ""))]));
+    show(priceA, d.annual_hours, d.annual_parts, unA, (d.annual_hours === "" || d.annual_hours == null) && !kitPartsTotal(d.annual_parts) ? "Add the hours and part prices" : null);
+    show(priceS, d.six_hours, d.six_parts, unS, +d.six_hours > 0 ? null : "No 6-month service (enter 6-month hours to offer one)");
+  };
+  const inp = (key, attrs = {}) => el("input", { class: "field", value: d[key] ?? "", ...attrs, oninput: (e) => { d[key] = e.target.value; recalc(); } });
   const partsEditor = (key, title) => {
     const box = el("div", { class: "kit-pbox" });
     const draw = () => box.replaceChildren(...[el("h4", {}, title),
@@ -1524,17 +1540,18 @@ function kitCard(k, nMachines) {
         el("tbody", {}, ...(d[key] || []).map((p, i) => el("tr", {},
           el("td", {}, el("input", { class: "field", value: p.pn || "", oninput: (e) => (p.pn = e.target.value.trim()) })),
           el("td", {}, el("input", { class: "field", value: p.name || "", oninput: (e) => (p.name = e.target.value) })),
-          el("td", {}, el("input", { class: "field n", type: "number", min: 1, value: p.qty ?? 1, oninput: (e) => (p.qty = Math.max(1, Math.round(+e.target.value || 1))) })),
+          el("td", {}, el("input", { class: "field n", type: "number", min: 1, value: p.qty ?? 1, oninput: (e) => { p.qty = Math.max(1, Math.round(+e.target.value || 1)); recalc(); } })),
           el("td", {}, el("input", { class: "field n" + (p.ex == null || p.ex === "" ? " need" : ""), type: "number", step: "0.01", min: 0, value: p.ex ?? "", placeholder: "price",
-            oninput: (e) => { p.ex = e.target.value === "" ? null : +e.target.value; e.target.classList.toggle("need", e.target.value === ""); } })),
+            oninput: (e) => { p.ex = e.target.value === "" ? null : +e.target.value; e.target.classList.toggle("need", e.target.value === ""); recalc(); } })),
           el("td", {}, el("input", { class: "field", value: p.note || "", oninput: (e) => (p.note = e.target.value) })),
-          el("td", {}, el("button", { class: "btn ghost small", type: "button", onclick: () => { d[key].splice(i, 1); draw(); } }, "Remove")))))),
+          el("td", {}, el("button", { class: "btn ghost small", type: "button", onclick: () => { d[key].splice(i, 1); draw(); recalc(); } }, "Remove")))))),
       el("button", { class: "btn small", type: "button", onclick: () => { (d[key] = d[key] || []).push({ pn: "", name: "", qty: 1, ex: null }); draw(); } }, "+ Add part"),
       key === "six_parts" ? el("button", { class: "btn ghost small", type: "button", onclick: () => {
         const cap = (d.annual_parts || []).filter((p) => /cap|wip|absorb|pad|felt|foam|pouch/i.test(p.name || ""));
-        d.six_parts = JSON.parse(JSON.stringify(cap)); draw(); } }, "Copy caps / wipers / absorbers from the annual kit") : null].filter(Boolean));
+        d.six_parts = JSON.parse(JSON.stringify(cap)); draw(); recalc(); } }, "Copy caps / wipers / absorbers from the annual kit") : null].filter(Boolean));
     draw(); return box;
   };
+  queueMicrotask(recalc);
   const approved = el("input", { type: "checkbox", checked: !!d.approved, onchange: (e) => (d.approved = e.target.checked) });
   const save = async (btn) => {
     const num = (x) => (x === "" || x == null ? null : +x);
@@ -1545,7 +1562,8 @@ function kitCard(k, nMachines) {
     const row = { name: String(d.name || "").trim() || "Kit", brand: String(d.brand || "").trim(), priority: Math.round(+d.priority || 100),
       models: String(Array.isArray(d.models) ? d.models.join(",") : d.models || "").split(",").map((s) => s.trim()).filter((s, i, a) => s || a.length === 1),
       exclude: String(Array.isArray(d.exclude) ? d.exclude.join(",") : d.exclude || "").split(",").map((s) => s.trim()).filter(Boolean),
-      annual_fee: num(d.annual_fee) ?? 0, six_fee: num(d.six_fee), annual_hours: num(d.annual_hours), six_hours: num(d.six_hours),
+      annual_fee: kitPrice(d.annual_hours, d.annual_parts), six_fee: +d.six_hours > 0 ? kitPrice(d.six_hours, d.six_parts) : null, // the database works these out too
+      annual_hours: num(d.annual_hours), six_hours: num(d.six_hours),
       annual_parts: clean(d.annual_parts), six_parts: clean(d.six_parts), approved: !!d.approved, notes: d.notes || null,
       updated_at: new Date().toISOString(), updated_by: state.user?.email || null };
     if (!row.models.length) row.models = [""];
@@ -1553,7 +1571,8 @@ function kitCard(k, nMachines) {
     const { error } = await sb.from("service_kits").update(row).eq("id", k.id);
     btn.disabled = false;
     if (error) { note.className = "saved msg err"; note.textContent = "Not saved: " + error.message; return; }
-    Object.assign(k, row); note.className = "saved"; note.textContent = "Saved";
+    const { data: fresh } = await sb.from("service_kits").select("annual_fee,six_fee").eq("id", k.id).maybeSingle();
+    Object.assign(k, row, fresh || {}); note.className = "saved"; note.textContent = "Saved";
     summary.replaceChildren(...summaryBits(k, nMachines));
   };
   const summary = el("summary", {}, ...summaryBits(k, nMachines));
@@ -1568,10 +1587,11 @@ function kitCard(k, nMachines) {
       el("label", { class: "f" }, "Models (comma separated)", el("input", { class: "field", value: (d.models || []).join(", "), oninput: (e) => (d.models = e.target.value) })),
       el("label", { class: "f" }, "Not these models", el("input", { class: "field", value: (d.exclude || []).join(", "), oninput: (e) => (d.exclude = e.target.value) })),
       el("label", { class: "f" }, "Priority", inp("priority", { type: "number" })),
-      el("label", { class: "f" }, "Annual service price (ex GST)", inp("annual_fee", { type: "number", step: "0.01", min: 0 })),
       el("label", { class: "f" }, "Annual service hours on site", inp("annual_hours", { type: "number", step: "0.5", min: 0, placeholder: "e.g. 3" })),
-      el("label", { class: "f" }, "6-month service price (blank = none)", inp("six_fee", { type: "number", step: "0.01", min: 0 })),
-      el("label", { class: "f" }, "6-month service hours on site", inp("six_hours", { type: "number", step: "0.5", min: 0, placeholder: "e.g. 1.5" }))),
+      el("div", { class: "f" }, el("span", {}, "Annual service price (ex GST, worked out)"), priceA),
+      el("label", { class: "f" }, "6-month service hours on site (blank = none)", inp("six_hours", { type: "number", step: "0.5", min: 0, placeholder: "e.g. 1.5" })),
+      el("div", { class: "f" }, el("span", {}, "6-month service price (ex GST, worked out)"), priceS)),
+    el("p", { class: "muted small" }, "Prices are hours × " + money2(STD_LABOUR) + " per hour + the kit parts below. The callout isn't included: it's added once per visit, only when the customer wants us on site."),
     partsEditor("annual_parts", "Annual PM kit"),
     partsEditor("six_parts", "6-month kit (caps, wipers, absorbers)"),
     el("label", { class: "f" }, el("span", { class: "small muted" }, "Notes (staff only)"), el("textarea", { class: "field", rows: 2, oninput: (e) => (d.notes = e.target.value) }, d.notes || "")),

@@ -313,3 +313,7 @@ table.billing td.act{text-align:right;white-space:nowrap}
 .kit-pbox{overflow-x:auto}
 .kit-pbox .kit-parts{min-width:640px}
 .mcard:has(.mquote)>span:nth-child(2){padding-right:96px}
+
+.kit-price{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline;padding:7px 0;min-height:36px}
+.kit-price b{font-size:16px}
+.sq-onsite{margin:6px 0 2px}
