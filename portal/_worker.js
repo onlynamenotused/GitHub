@@ -92,6 +92,18 @@ async function apiRoute(req, env, url, p) {
   }
   const token = readCookie(req, "hd_at");
   if (!token) return jres({ ok: false, error: "Please sign in again." }, 401);
+  // Flute Practice admins: invite / list / remove flute-only users (the database checks the caller is a flute admin).
+  if (p === "/flute/api/invites") {
+    const r = await rpc("flute_invites_list", {}, token);
+    return jres(r.ok ? { ok: true, invites: r.j || [] } : { ok: false, error: "Not allowed." }, r.ok ? 200 : 403);
+  }
+  if ((p === "/flute/api/invite" || p === "/flute/api/revoke") && req.method === "POST") {
+    const b = await req.json().catch(() => ({}));
+    const r = p === "/flute/api/invite"
+      ? await rpc("flute_invite", { p_email: String(b.email || ""), p_name: String(b.name || "") }, token)
+      : await rpc("flute_revoke", { p_id: Number(b.id) || 0 }, token);
+    return jres(r.ok ? r.j || { ok: true } : { ok: false, error: (r.j && (r.j.message || r.j.error)) || "Couldn't save that." });
+  }
   if (p === "/vector/log" && req.method === "POST") {
     const b = await req.json().catch(() => ({}));
     await rpc("log_vector_export", { p_kind: String(b.kind || "file").slice(0, 40) }, token);
@@ -151,7 +163,7 @@ export default {
   async fetch(req, env) {
     const url = new URL(req.url);
     const p = url.pathname;
-    if (p === "/_src/catalogue" || p === "/vector/log" || p.startsWith("/catalogue/quote") || p.startsWith("/service/")) {
+    if (p === "/_src/catalogue" || p === "/vector/log" || p.startsWith("/flute/api/") || p.startsWith("/catalogue/quote") || p.startsWith("/service/")) {
       const r = await apiRoute(req, env, url, p);
       if (r) return r;
     }

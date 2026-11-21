@@ -1,0 +1,5 @@
+-- Applied to highway-portal on 21 Nov 2026 (migration "flute_admins"):
+-- tables flute_admins, flute_invites; functions is_flute_admin(), flute_invites_list(), flute_invite(text,text),
+-- flute_revoke(bigint); portal_menu() gains 'flute_admin'. Flute admins invite flute-only users
+-- (apps_only clients with only flute_access, 25 a day) and can remove the ones they invited.
+-- First admin: john_paul_butler@hotmail.com.

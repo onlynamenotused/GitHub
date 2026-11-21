@@ -64,6 +64,9 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,.chip:focus-vis
 .fc svg{display:block;width:100%;height:26px;margin-top:4px}
 .fc small{color:var(--soft);display:block}
 .key{display:flex;gap:16px;flex-wrap:wrap;font-size:14px;color:var(--soft);margin:6px 0 14px}
+.inv{display:flex;gap:12px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--line);padding:10px 0}
+.inv div{flex:1 1 220px}.inv small{color:var(--soft);display:block}
+.inv.off{opacity:.55}
 .err{color:var(--red);font-size:14px;min-height:20px}
 @media(prefers-reduced-motion:reduce){.strip{scroll-behavior:auto}}
 </style>
@@ -111,6 +114,18 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,.chip:focus-vis
 <textarea id="custom" rows="3" placeholder="e.g. E F# G A B:2 A G F# E:2"></textarea>
 <div class="err" id="err"></div>
 <div class="btns"><button class="main" id="load">Load my notes</button></div>
+</section>
+
+<section class="band" id="admin" hidden>
+<h2>Invite players</h2>
+<p class="sub">Give someone their own login to this flute player. They sign in at <b>portal.highwaydigital.com.au</b> with the email you add here and see only Flute Practice. No email is sent, so let them know yourself.</p>
+<form id="invForm" class="ctrl" style="margin-top:0">
+  <div><label for="invName">Name</label><textarea id="invName" rows="1" style="resize:none" placeholder="e.g. Sam Lee"></textarea></div>
+  <div><label for="invEmail">Email</label><textarea id="invEmail" rows="1" style="resize:none" placeholder="name@example.com"></textarea></div>
+  <div class="btns"><button class="main" type="submit">Invite</button></div>
+</form>
+<div class="err" id="invMsg" aria-live="polite"></div>
+<div id="invList"></div>
 </section>
 
 <section class="band">
@@ -372,6 +387,36 @@ const chartNotes=[62,64,65,66,67,68,69,70,71,72,73,74];
 document.getElementById('chart').innerHTML=chartNotes.map(m=>{const i=info(m);return `<button class="fc" data-m="${m}"><b>${i.name}</b>${m===74?' (high)':''}${miniSvg(i.f)}<small>${i.f.map(v=>v===1?'●':v===.5?'◐':'○').join('')}${i.tip?' · '+i.tip:''}${m===74?' · blow faster':''}</small></button>`}).join('');
 document.getElementById('chart').addEventListener('click',e=>{const b=e.target.closest('.fc');if(!b)return;stop();const m=+b.dataset.m;show(m);preview(m);window.scrollTo({top:0,behavior:'smooth'})});
 
+// Flute Practice admins (portal only): invite and remove players. The page works without this.
+{
+  const box=document.getElementById('admin'),list=document.getElementById('invList'),msg=document.getElementById('invMsg');
+  const esc=t=>String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const when=d=>d?new Date(d).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}):'';
+  async function api(path,body){const r=await fetch('/flute/api/'+path,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{credentials:'same-origin'});return r.json()}
+  async function load(){
+    let j;try{j=await api('invites')}catch(e){return}
+    if(!j||!j.ok)return;box.hidden=false;
+    list.innerHTML=j.invites.length?j.invites.map(v=>`<div class="inv${v.revoked?' off':''}"><div><b>${esc(v.name||v.email)}</b><small>${esc(v.email)} · invited ${when(v.created)}${v.revoked?' · removed':v.last_sign_in?' · last signed in '+when(v.last_sign_in):' · not signed in yet'}</small></div>${v.revoked?`<button class="main alt" data-re="${esc(v.email)}" data-n="${esc(v.name||'')}">Invite again</button>`:`<button class="main alt" data-rm="${v.id}">Remove</button>`}</div>`).join(''):'<p class="about">No one invited yet.</p>';
+  }
+  async function invite(email,name){
+    msg.textContent='Saving…';
+    let j;try{j=await api('invite',{email,name})}catch(e){j={ok:false,error:'No connection. Try again.'}}
+    msg.textContent=j.ok?(j.existing?email+' already has access.':email+' can now sign in to Flute Practice.'):(j.error||'Couldn\'t invite.');
+    if(j.ok){document.getElementById('invEmail').value='';document.getElementById('invName').value=''}
+    load();
+  }
+  document.getElementById('invForm').addEventListener('submit',e=>{e.preventDefault();const em=document.getElementById('invEmail').value.trim(),nm=document.getElementById('invName').value.trim();if(!em){msg.textContent='Add their email address.';return}invite(em,nm)});
+  ['invEmail','invName'].forEach(id=>document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();document.getElementById('invForm').requestSubmit()}}));
+  list.addEventListener('click',async e=>{
+    const rm=e.target.closest('[data-rm]'),re=e.target.closest('[data-re]');
+    if(re){invite(re.dataset.re,re.dataset.n);return}
+    if(!rm)return;
+    if(rm.dataset.sure!=='1'){rm.dataset.sure='1';rm.textContent='Tap again to remove';setTimeout(()=>{rm.dataset.sure='';rm.textContent='Remove'},4000);return}
+    let j;try{j=await api('revoke',{id:+rm.dataset.rm})}catch(err){j={ok:false}}
+    msg.textContent=j.ok?'Removed. They can no longer open Flute Practice.':(j.error||'Couldn\'t remove.');load();
+  });
+  if(location.protocol==='https:'&&/highwaydigital\.com\.au$/.test(location.hostname))load();
+}
 loadSong(0);
 }
 </script>
