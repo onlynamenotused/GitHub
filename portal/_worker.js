@@ -4,12 +4,15 @@
 // shared portal menu (nav.js + nav.css) added at the top, with their old cross-links removed.
 const SB_URL = "https://sfuuzcgwbbhdjqzrchvv.supabase.co";
 const SB_KEY = "sb_publishable_uu0N60ZMVjJ1kl14FW1NBA_v-cm_U3_"; // publishable key: safe, RLS protects data
-const V = "34";
+const V = "35";
 const GATED = {
   kb: { page: "/_p/kb/", flag: "kb", name: "Knowledge Base" },
   catalogue: { page: "/_p/catalogue/", flag: "cat", name: "Parts Catalogue" },
-  vector: { page: "/_p/vector/", flag: "vector", name: "Vector Converter" }   // staff, supervisors, customers with vector_access
+  vector: { page: "/_p/vector/", flag: "vector", name: "Vector Converter" },   // staff, supervisors, customers with vector_access
+  warehousing: { page: "/_p/warehousing/", flag: "intranet", name: "Warehousing" } // purchase orders, parts & stock: hello@ only
 };
+// Files the Warehousing page loads next to itself (served only to the same signed-in hello@ account).
+const WH_FILES = new Set(["catalog-mimaki.json", "warranty-mimaki.json", "logo-bw.png"]);
 
 function readCookie(req, name) {
   const m = (req.headers.get("Cookie") || "").match(new RegExp("(?:^|;\\s*)" + name + "=([^;]+)"));
@@ -155,8 +158,18 @@ export default {
       if (r) return r;
     }
     if (p.startsWith("/_p/")) return new Response("Not found", { status: 404 });
-    const key = /^\/kb(\/|$)/.test(p) ? "kb" : /^\/catalogue(\/|$)/.test(p) ? "catalogue" : /^\/vector(\/|$)/.test(p) ? "vector" : null;
+    if (/^\/po(\/|$)/.test(p)) return Response.redirect(url.origin + "/warehousing/", 302);
+    const key = /^\/kb(\/|$)/.test(p) ? "kb" : /^\/catalogue(\/|$)/.test(p) ? "catalogue" : /^\/vector(\/|$)/.test(p) ? "vector" : /^\/warehousing(\/|$)/.test(p) ? "warehousing" : null;
     if (!key) return env.ASSETS.fetch(req);
+    const whFile = key === "warehousing" ? p.slice("/warehousing/".length) : "";
+    if (whFile && WH_FILES.has(whFile)) {
+      const tk = readCookie(req, "hd_at");
+      const ff = tk ? await menuFlags(tk).catch(() => null) : null;
+      if (!ff || !ff.intranet) return new Response("Not found", { status: 404 });
+      const a = await env.ASSETS.fetch(new Request(new URL("/_p/warehousing/" + whFile, url.origin)));
+      const h = new Headers(a.headers); h.set("Cache-Control", "private, max-age=300"); h.set("X-Robots-Tag", "noindex");
+      return new Response(a.body, { status: a.status, headers: h });
+    }
     if (p !== "/" + key + "/") return Response.redirect(url.origin + "/" + key + "/", 302);
 
     const token = readCookie(req, "hd_at");

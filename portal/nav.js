@@ -13,6 +13,7 @@
     out.push(["contact", "/#contact", "Contact & booking"]);
     if (f.staff) out.push(["customers", "/#customers", "Customers (staff)"]);
     if (f.staff) out.push(["service-kits", "/#service-kits", "Service kits (staff)"]);
+    if (f.intranet) out.push(["warehousing", "/warehousing/", "Warehousing"]);
     return out;
   }
   // f: { signedIn, email, staff, intranet, kb, cat, vector, active }

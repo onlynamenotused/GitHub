@@ -1,0 +1,1262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Highway Warehousing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..800&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+/* Service Desk dark palette on every tab. Exported PDFs, spreadsheets and emails are built separately and stay white. */
+:root{
+  --bg:#0f1519;--panel:#172026;--ink:#e4ebef;--muted:#93a4ae;--line:#2c3a42;--soft:#1e2a31;--field-line:#3a4a53;--hover:#1c272e;
+  --head:#172026;--head-ink:#e4ebef;--head-muted:#93a4ae;
+  --accent:#4cb7d4;--accent-hover:#6cc6de;--accent-ink:#06222b;--accent-soft:#16343e;--accent-soft-ink:#bfe6f1;
+  --good:#4ade80;--good-soft:#143022;--warn:#facc15;--warn-soft:#352c10;--warn-ink:#fde68a;--bad:#fb923c;--bad-soft:#3b2216;--bad-line:#6b3a22;
+  --chip-on:#e4ebef;--chip-on-ink:#0f1519;--shadow:rgba(0,0,0,.5);--scrim:rgba(0,0,0,.55);--toast:#e4ebef;--toast-ink:#0f1519;--toast-link:#0b6e8a;--r:8px;color-scheme:dark}
+*{box-sizing:border-box}
+a{color:var(--accent)}
+body{margin:0;font-family:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:14px;color:var(--ink);background:var(--bg)}
+header{background:var(--head);color:var(--head-ink);border-bottom:1px solid var(--line);padding:0 20px;display:flex;align-items:center;gap:24px;flex-wrap:wrap;position:sticky;top:0;z-index:20}
+.brand{font:700 18px/1.1 "Archivo","Arial Narrow",Arial,sans-serif;font-stretch:85%;letter-spacing:.01em;padding:14px 0}
+.brand small{font-weight:400;opacity:.7;margin-left:8px;letter-spacing:0}
+nav{display:flex;gap:2px}
+nav button{background:none;border:0;color:var(--head-muted);padding:16px 14px;font:inherit;font-weight:500;cursor:pointer;border-bottom:3px solid transparent}
+nav button.on{color:var(--head-ink);border-bottom-color:var(--accent)}
+nav .badge{background:var(--accent);color:var(--accent-ink);border-radius:10px;padding:1px 7px;font-size:11px;margin-left:6px;font-weight:700}
+.status{margin-left:auto;font-size:12px;opacity:.75}
+main{max-width:1280px;margin:0 auto;padding:20px}
+.view{display:none}.view.on{display:block}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px;margin-bottom:16px}
+h2{font-size:16px;margin:0 0 12px}
+h3{font-size:13px;margin:0 0 8px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;font-weight:500}
+input,select,textarea{font:inherit;border:1px solid var(--field-line);border-radius:6px;padding:7px 9px;width:100%;background:var(--panel);color:var(--ink)}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
+textarea{resize:vertical;min-height:70px}
+.btn{font:inherit;font-weight:500;border:1px solid var(--field-line);background:var(--panel);color:var(--ink);border-radius:6px;padding:7px 12px;cursor:pointer;white-space:nowrap}
+.btn:hover{background:var(--soft)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{background:var(--accent-hover)}
+.btn.good{background:var(--good);border-color:var(--good);color:var(--panel)}
+.btn.danger{color:var(--bad);border-color:var(--bad-line)}
+.btn.sm{padding:3px 8px;font-size:12px}
+.btn:disabled{opacity:.45;cursor:default}
+.row{display:flex;gap:12px;flex-wrap:wrap}
+.row>*{flex:1;min-width:160px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.grid4{display:grid;grid-template-columns:2fr 1fr 1fr 1.4fr;gap:12px}
+@media(max-width:820px){.grid2,.grid3{grid-template-columns:1fr}.grid4{grid-template-columns:1fr 1fr}}
+table{border-collapse:collapse;width:100%}
+th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;padding:8px;border-bottom:1px solid var(--line);background:var(--soft);position:sticky;top:0}
+td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr.click{cursor:pointer}tr.click:hover td{background:var(--hover)}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px}
+.muted{color:var(--muted)}
+.pill{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11.5px;font-weight:600;background:var(--soft);color:var(--muted)}
+.pill.draft{background:var(--soft)}.pill.sent{background:var(--accent-soft);color:var(--accent)}.pill.received{background:var(--good-soft);color:var(--good)}
+.soh{display:inline-flex;align-items:center;gap:4px}
+.soh b{min-width:34px;text-align:center;padding:2px 6px;border-radius:5px;cursor:pointer;font-variant-numeric:tabular-nums}
+.soh b.pos{background:var(--good-soft);color:var(--good)}.soh b.zero{background:var(--soft);color:var(--muted)}.soh b.neg{background:var(--bad-soft);color:var(--bad)}.soh b.low{background:var(--warn-soft);color:var(--warn)}
+.soh button{border:1px solid var(--line);background:var(--panel);border-radius:4px;width:22px;height:22px;cursor:pointer;line-height:1;color:var(--muted)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--field-line);background:var(--panel);color:var(--ink);border-radius:16px;padding:5px 12px;cursor:pointer;font:inherit;font-size:13px}
+.chip.on{background:var(--chip-on);color:var(--chip-on-ink);border-color:var(--chip-on)}
+.sorth{all:unset;cursor:pointer;display:inline-flex;gap:5px;align-items:center;font:inherit;color:inherit;text-transform:inherit;letter-spacing:inherit}
+.sorth:hover,.sorth.on{color:var(--ink)}.sorth .arr{font-size:9px;opacity:.5}.sorth.on .arr{opacity:1;color:var(--accent)}
+th.num .sorth{flex-direction:row-reverse}
+.tag{display:inline-block;background:var(--accent-soft);color:var(--accent);border-radius:4px;padding:1px 6px;font-size:11.5px;margin:1px 3px 1px 0}
+.toolbar{display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:12px}
+.toolbar .grow{flex:1;min-width:220px}
+.lines input{padding:5px 7px}
+.lines td{padding:5px 6px}
+.totals{margin-left:auto;width:280px}
+.totals div{display:flex;justify-content:space-between;padding:4px 0}
+.totals .grand{font-weight:700;font-size:16px;border-top:2px solid var(--ink);margin-top:4px;padding-top:8px}
+.suggest{position:relative}
+.suggest-list{position:absolute;left:0;right:0;top:100%;background:var(--panel);border:1px solid var(--field-line);border-radius:6px;box-shadow:0 8px 24px var(--shadow);z-index:30;max-height:320px;overflow:auto;display:none}
+.suggest-list div{padding:8px 10px;cursor:pointer;display:flex;gap:10px;align-items:center;border-bottom:1px solid var(--soft)}
+.suggest-list div:hover,.suggest-list div.hi{background:var(--accent-soft)}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+.modal-bg{position:fixed;inset:0;background:var(--scrim);display:none;align-items:flex-start;justify-content:center;z-index:50;padding:40px 16px;overflow:auto}
+.modal-bg.on{display:flex}
+.modal{background:var(--panel);color:var(--ink);border-radius:10px;width:100%;max-width:640px;padding:20px;box-shadow:0 20px 60px var(--shadow)}
+.modal.wide{max-width:900px}
+.modal h2{display:flex;justify-content:space-between;align-items:center}
+.x{border:0;background:none;font-size:22px;cursor:pointer;color:var(--muted)}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--toast);color:var(--toast-ink);padding:10px 16px;border-radius:8px;z-index:60;display:none;max-width:90vw;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+.toast a{color:var(--toast-link)}
+.note{background:var(--warn-soft);color:var(--warn-ink);border-radius:6px;padding:8px 12px;font-size:13px;margin-bottom:12px}
+.info{background:var(--accent-soft);color:var(--accent-soft-ink);border-radius:6px;padding:8px 12px;font-size:13px}
+.empty{padding:28px;text-align:center;color:var(--muted)}
+.scroll{max-height:62vh;overflow:auto;border:1px solid var(--line);border-radius:6px}
+.kpis{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 14px;min-width:140px}
+.kpi b{display:block;font-size:20px}
+.kpi span{font-size:12px;color:var(--muted)}
+.kpi-val{min-width:210px}.kbrk{margin-top:6px;padding-top:6px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:2px}
+.kbrk div{display:flex;justify-content:space-between;gap:12px;font-size:12px}.kbrk div b{font-size:12px;display:inline;font-variant-numeric:tabular-nums}
+.fbjob{display:grid;grid-template-columns:110px 1fr 1fr 90px;gap:8px;padding:9px 10px;border-bottom:1px solid var(--soft);cursor:pointer;align-items:center}
+.fbjob:hover{background:var(--accent-soft)}
+.tabs2{display:flex;gap:6px;margin-bottom:10px}
+.pill.warranty{background:var(--warn-soft);color:var(--warn)}
+#wPanel{border-top:1px solid var(--line);padding-top:12px}
+.wgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px 12px}
+#poDelivery[data-u=overnight]{border-color:#f87171;color:#f87171;font-weight:600}#poDelivery[data-u=economy]{border-color:#4ade80;color:#4ade80}
+.portal .backlink{display:none}.portal .deskonly{display:none!important}.desk .portalonly{display:none!important}
+.wbanner{display:inline-block;background:var(--warn);color:var(--panel);font-weight:700;letter-spacing:.6px;font-size:11px;border-radius:4px;padding:2px 8px;margin-left:8px;vertical-align:middle}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">HIGHWAYDIGITAL<small><a class="backlink" href="index.html" style="color:inherit;text-decoration:none" title="Back to the Service Desk">← Service Desk ·</a> Warehousing</small></div>
+  <nav>
+    <button data-v="po" class="on">New PO <span class="badge" id="lineBadge" style="display:none">0</span></button>
+    <button data-v="parts">Parts &amp; stock</button>
+    <button data-v="history">PO history</button>
+    <button data-v="vendors">Vendors</button>
+  </nav>
+  <div class="status" id="dbStatus">Connecting…</div>
+</header>
+
+<main>
+<!-- ============ NEW PO ============ -->
+<section class="view on" id="v-po">
+  <div class="card" id="wInbox" style="display:none"></div>
+  <div class="card">
+    <h2 id="poTitle">New purchase order</h2>
+    <div class="grid3">
+      <div>
+        <label>Vendor</label>
+        <select id="poVendor"></select>
+      </div>
+      <div>
+        <label>PO number</label>
+        <div style="display:flex;gap:6px">
+          <input id="poNumber" placeholder="e.g. 2556 or E0001210">
+          <button class="btn" id="btnFromFB" title="Use the number and parts from a FreshBooks invoice or estimate">From FreshBooks…</button>
+        </div>
+        <div class="muted" style="font-size:11.5px;margin-top:3px">Invoice no. for invoiced jobs, E + estimate no. for quotes</div>
+      </div>
+      <div>
+        <label>Date</label>
+        <input id="poDate" type="date">
+      </div>
+    </div>
+    <div class="grid2" style="margin-top:12px">
+      <div>
+        <label>Vendor address</label>
+        <textarea id="poVendorAddr" rows="3"></textarea>
+      </div>
+      <div>
+        <label>Ship to <a href="#" id="shipRefresh" style="float:right;font-weight:400" title="Reload the customer list from FreshBooks">refresh customers</a></label>
+        <input id="shipPick" list="shipList" placeholder="Type to search FreshBooks customers…" autocomplete="off" style="margin-bottom:6px">
+        <datalist id="shipList"></datalist>
+        <textarea id="poShip" rows="3"></textarea>
+        <div class="muted" id="shipInfo" style="font-size:11.5px;margin-top:2px"></div>
+      </div>
+    </div>
+    <div style="margin-top:12px">
+      <label>Notes / attention (printed on PO)</label>
+      <input id="poNotes" placeholder="e.g. Attention Brandon · Warranty job · Customer: Peterkin">
+    </div>
+    <div class="grid3" style="margin-top:12px">
+      <div><label>Delivery</label><select id="poDelivery"><option value="overnight">Overnight</option><option value="standard">Standard</option><option value="economy">Not urgent - reduce shipping costs where possible</option></select></div>
+      <div><label>PO type</label><select id="poType"><option value="normal">Normal purchase</option><option value="warranty">Warranty claim</option></select></div>
+      <div id="wFormWrap" style="display:none"><label>Claim form</label><select id="wForm"><option value="mimaki">Mimaki warranty form (.xlsx)</option><option value="standard">Standard PO marked WARRANTY</option></select></div>
+    </div>
+    <div id="wPanel" style="display:none;margin-top:12px">
+      <h3>Warranty claim details</h3>
+      <div class="wgrid" id="wFields"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="toolbar">
+      <div style="min-width:200px"><label>Model</label><select id="qaModel"><option value="">All models</option></select></div>
+      <div class="grow suggest">
+        <label>Add a part — type a code or description, or pick a model to list its parts</label>
+        <input id="quickAdd" placeholder="e.g. cap head, MP-M905240, damper…" autocomplete="off">
+        <div class="suggest-list" id="quickList"></div>
+      </div>
+      <button class="btn" id="btnBlankLine">+ Blank line</button>
+    </div>
+    <table class="lines">
+      <thead><tr><th style="width:70px">Qty</th><th style="width:190px">Item #</th><th>Description</th><th style="width:110px" class="num">Unit price</th><th style="width:80px" class="num">Disc %</th><th style="width:110px" class="num">Line total</th><th style="width:70px" class="num">On hand</th><th style="width:34px"></th></tr></thead>
+      <tbody id="lineBody"></tbody>
+    </table>
+    <div class="empty" id="linesEmpty">No lines yet. Search above, add from <a href="#" data-go="parts">Parts &amp; stock</a>, or pull from a FreshBooks job.</div>
+    <div style="display:flex;margin-top:12px">
+      <div class="totals">
+        <div><span>Subtotal</span><span id="tSub">$0.00</span></div>
+        <div><span>GST (10%)</span><span id="tGst">$0.00</span></div>
+        <div class="grand"><span>Total</span><span id="tTot">$0.00</span></div>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn primary" id="btnSave">Save</button>
+      <button class="btn" id="btnPdf">Download PDF</button>
+      <button class="btn" id="btnWForm" style="display:none">Download Mimaki form (.xlsx)</button>
+      <button class="btn" id="btnOneDrive">Save PDF to OneDrive</button>
+      <button class="btn deskonly" id="btnEmail">Create Outlook draft</button><button class="btn portalonly" id="btnSend">Email PO to vendor…</button>
+      <span style="flex:1"></span>
+      <button class="btn" id="btnSent">Mark sent</button>
+      <button class="btn good" id="btnReceive">Receive into stock</button>
+      <button class="btn" id="btnNew">Start new PO</button>
+      <button class="btn danger" id="btnDelete" style="display:none" title="Only draft POs can be deleted">Delete draft</button>
+    </div>
+    <div class="muted" id="poState" style="font-size:12px;margin-top:8px"></div>
+  </div>
+</section>
+
+<!-- ============ PARTS ============ -->
+<section class="view" id="v-parts">
+  <div class="kpis" id="kpis"></div>
+  <div class="card">
+    <div class="toolbar">
+      <div class="grow"><label>Search</label><input id="pSearch" placeholder="Code, description, model…"></div>
+      <div style="min-width:180px"><label>Model</label><select id="pModel"></select></div>
+      <div style="min-width:170px"><label>Show</label>
+        <select id="pScope">
+          <option value="all">Tracked + price lists</option>
+          <option value="tracked">Tracked parts only</option>
+          <option value="list">Price lists only</option>
+        </select></div>
+      <div style="min-width:160px"><label>Stock</label>
+        <select id="pStock">
+          <option value="all">All parts</option>
+          <option value="in">In stock (est.)</option>
+          <option value="low">At / below reorder level</option>
+          <option value="none">None on hand</option>
+        </select></div>
+      <button class="btn primary" id="btnNewPart">+ New part</button>
+    </div>
+    <div class="chips" id="brandChips" style="margin-bottom:12px"></div>
+    <div id="pmKit" class="info" style="display:none;margin-bottom:12px"></div>
+    <div class="scroll">
+      <table>
+        <thead id="partHead"><tr><th data-ps="code">Item #</th><th data-ps="desc">Description</th><th data-ps="brand">Brand</th><th data-ps="models">Models</th><th class="num" data-ps="cost">Cost</th><th class="num" data-ps="sell">Sell</th><th class="num" data-ps="soh">Est. on hand</th><th data-ps="last">Last bought</th><th></th></tr></thead>
+        <tbody id="partBody"></tbody>
+      </table>
+      <div class="empty" id="partsEmpty" style="display:none">No parts match these filters.</div>
+      <div class="muted" id="partsMore" style="display:none;padding:10px;text-align:center;font-size:12.5px"></div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px">
+      <button class="btn" id="btnSync">Deduct parts invoiced in FreshBooks</button>
+      <label style="display:inline-flex;gap:6px;align-items:center;margin:0;color:var(--ink);font-size:13px"><input type="checkbox" id="syncDrafts" style="width:auto"> include draft invoices</label>
+      <span class="muted" id="syncInfo" style="font-size:12.5px"></span>
+      <span style="flex:1"></span>
+      <button class="btn" id="btnCsv">Export CSV (stock take)</button>
+    </div>
+  </div>
+  <div class="info">Estimated on hand = your last count (or 0 at the 30 June stock take) + parts received on POs − parts on FreshBooks invoices. Click a number to enter a counted quantity; use − / + for quick adjustments.</div>
+</section>
+
+<!-- ============ HISTORY ============ -->
+<section class="view" id="v-history">
+  <div class="card">
+    <div class="toolbar">
+      <div class="grow"><label>Search</label><input id="hSearch" placeholder="PO number, part code, note…"></div>
+      <div style="min-width:180px"><label>Vendor</label><select id="hVendor"></select></div>
+      <div style="min-width:150px"><label>Status</label><select id="hStatus"><option value="">Any</option><option value="draft">Draft</option><option value="sent">Sent</option><option value="received">Received</option></select></div>
+    </div>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>PO</th><th>Date</th><th>Vendor</th><th>Items</th><th class="num">Total inc GST</th><th>Status</th></tr></thead>
+        <tbody id="histBody"></tbody>
+      </table>
+      <div class="empty" id="histEmpty" style="display:none">No purchase orders yet.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ VENDORS ============ -->
+<section class="view" id="v-vendors">
+  <div id="vendorCards"></div>
+  <button class="btn" id="btnNewVendor">+ Add vendor</button>
+</section>
+</main>
+
+<div class="modal-bg" id="modalBg"><div class="modal" id="modal"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+"use strict";
+const BIZ = "04811001-0002-6d26-0608-711ac6442d1d";
+const DRIVE = "b!YDCkHOwT9U2-W573oXEZkmZfdhLu4AxFn0enShuhuMtuT0i8MUXGRIkzdiNbwJvn";
+const MBE = "HIGHWAYDIGITAL c/o MBE\n28/1101 Hay Street\nWest Perth WA 6005";
+const FBM = () => ({intent:"Highway Digital PO tool: look up jobs and parts usage", correlation_id:"po-tool-page"});
+
+let db=null, mcp=null, downloads=null, adb=null;
+let parts=new Map(), vendors=[], pos=[], settings={};
+/* Built-in copy of the vendor list, used until the database answers (or when this view can't reach it). */
+const DEFAULT_VENDORS=[
+  {_id:"mimaki",name:"Mimaki Australia",brand:"Mimaki",line1:"Unit 14, 38-46 South Street",line2:"Rydalmere NSW 2116",line3:"",order:1,folderId:"01E7J5PATOF7GMCPDWCFFKWCSJKBPY4VMK",folderPath:"Vendors\\Mimaki\\Purchase Orders"},
+  {_id:"brother",name:"Brother International (Aust) Pty Ltd",brand:"Brother",line1:"",line2:"",line3:"",order:2,folderId:"01E7J5PAQIUPKBNEOWZZHYQZF3BG65IGUC",folderPath:"Vendors\\Brother\\Purchase Orders"},
+  {_id:"mutoh",name:"Mutoh Australia",brand:"Mutoh",line1:"19/76 Reserve Rd",line2:"Artarmon NSW 2064",line3:"",order:3,folderId:"01E7J5PAS7EUGMIS3U4JEJYHM5ZWNTL3OT",folderPath:"Vendors\\Mutoh\\Purhcase Orders"},
+  {_id:"alfex",name:"Alfex Laser",brand:"Epilog",line1:"10 Northgate Drive",line2:"Thomastown VIC 3074",line3:"Australia",order:4,folderId:"01E7J5PAQ73JUZYC56VRHJINQRVFWXNTRC",folderPath:"Vendors\\Alfex\\Purchase Orders"}];
+vendors=DEFAULT_VENDORS.slice();
+let catalog=new Map(), catDocs=[];
+let cur=null;
+let pf={q:"",brand:"",model:"",stock:"all",scope:"all",sort:"",dir:1};
+let staticCats=[],pmKits={};
+
+const $=s=>document.querySelector(s);
+const $$=s=>Array.from(document.querySelectorAll(s));
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const money=n=>"$"+(Number(n)||0).toLocaleString("en-AU",{minimumFractionDigits:2,maximumFractionDigits:2});
+const idOf=s=>String(s).trim().toUpperCase().replace(/[^A-Z0-9_\-.~:@+]/g,"_").replace(/^\.+$/,"_");
+const today=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
+const auDate=iso=>{if(!iso)return"";const [y,m,d]=iso.slice(0,10).split("-");return d+"/"+m+"/"+y};
+function blankPO(){return{id:null,number:"",vendorId:"",date:today(),vendorAddr:"",shipTo:MBE,shipName:"HIGHWAYDIGITAL c/o MBE (default)",notes:"",lines:[],status:"draft",ref:null,stockApplied:false,type:"normal",warranty:null,delivery:"standard"}}
+const DELIVERY={overnight:"Overnight",standard:"Standard",economy:"Not urgent - reduce shipping costs where possible"};
+const delLabel=k=>DELIVERY[k]||DELIVERY.standard;
+function toast(html,ms){const t=$("#toast");t.innerHTML=html;t.style.display="block";clearTimeout(t._h);t._h=setTimeout(()=>t.style.display="none",ms||3500)}
+
+/* ---------- tabs ---------- */
+function show(v){$$("nav button").forEach(b=>b.classList.toggle("on",b.dataset.v===v));$$(".view").forEach(s=>s.classList.toggle("on",s.id==="v-"+v));if(v==="parts")renderParts();if(v==="history")renderHistory();if(v==="vendors")renderVendors();try{history.replaceState(null,"","#"+v)}catch(e){}}
+$$("nav button").forEach(b=>b.onclick=()=>show(b.dataset.v));
+document.addEventListener("click",e=>{const g=e.target.closest("[data-go]");if(g){e.preventDefault();show(g.dataset.go)}});
+
+/* ---------- modal ---------- */
+function modal(html,wide){const m=$("#modal");m.className="modal"+(wide?" wide":"");m.innerHTML=html;$("#modalBg").classList.add("on");const x=m.querySelector(".x");if(x)x.onclick=closeModal;return m}
+function closeModal(){$("#modalBg").classList.remove("on")}
+$("#modalBg").addEventListener("mousedown",e=>{if(e.target.id==="modalBg")closeModal()});
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeModal()});
+
+/* ---------- capabilities ---------- */
+let logoData=null,logoRatio=161/900;
+async function loadLogo(){try{const r=await fetch("logo-bw.png");if(!r.ok)return;const b=await r.blob();logoData=await new Promise(ok=>{const fr=new FileReader();fr.onload=()=>ok(fr.result);fr.readAsDataURL(b)});const img=new Image();img.onload=()=>{logoRatio=img.naturalHeight/img.naturalWidth};img.src=logoData}catch(e){}}
+async function loadStatic(){
+  try{const r=await fetch("catalog-mimaki.json");if(!r.ok)return;const j=await r.json();staticCats=[{_id:"static-mimaki",vendorId:j.vendorId,brand:j.brand,source:j.source,imported:j.issued,items:j.items}];pmKits=Object.assign(pmKits,{Mimaki:j.pm||{}});rebuildCatalog();fillQaModels();refreshAll()}catch(e){}
+}
+/* ---------- data: Supabase (highway-portal), shared by the Service Desk app (Supabase connector) and the portal (/warehousing/) ---------- */
+const SBP="sfuuzcgwbbhdjqzrchvv",SBURL="https://sfuuzcgwbbhdjqzrchvv.supabase.co",SBKEY="sb_publishable_uu0N60ZMVjJ1kl14FW1NBA_v-cm_U3_";
+let MODE="",sbc=null;
+const MAPS={
+ parts:{t:"po_parts",pk:"id",f:{code:"code",desc:"descr",brand:"brand",models:"models",cost:"cost",sell:"sell",min:"min_qty",soh:"soh",lastPO:"last_po",lastDate:"last_date",countDate:"count_date",notes:"notes"}},
+ vendors:{t:"po_vendors",pk:"id",f:{name:"name",brand:"brand",line1:"line1",line2:"line2",line3:"line3",street:"street",street2:"street2",suburb:"suburb",state:"state",postcode:"postcode",country:"country",email:"email",attention:"attention",phone:"phone",account:"account",fbClientId:"fb_client_id",folderPath:"folder_path",folderId:"folder_id",order:"sort"}},
+ pos:{t:"po_orders",pk:"id",f:{number:"number",vendorId:"vendor_id",vendorName:"vendor_name",date:"po_date",vendorAddr:"vendor_addr",shipTo:"ship_to",shipName:"ship_name",notes:"notes",delivery:"delivery",type:"po_type",warranty:"warranty",lines:"lines",status:"status",ref:"ref",stockApplied:"stock_applied",receivedAt:"received_at",subtotal:"subtotal",gst:"gst",total:"total"}},
+ catalog:{t:"po_catalog",pk:"id",json:"data"},
+ settings:{t:"po_settings",pk:"key",json:"value"},
+ cache:{t:"po_settings",pk:"key",json:"value",pre:"cache_"}
+};
+const SB_DATES=new Set(["last_date","count_date","po_date","received_at"]),SB_NUMS=new Set(["cost","sell","min_qty","soh","subtotal","gst","total","sort"]),SB_JSON=new Set(["warranty","ref"]);
+function toRow(m,data){if(m.json)return{[m.json]:data};const r={};for(const[k,v]of Object.entries(data)){const c=m.f[k];if(!c)continue;let x=v;if(SB_DATES.has(c)&&!x)x=null;else if(SB_NUMS.has(c))x=(x===""||x==null)?(c==="sort"?null:0):Number(x)||0;else if(c==="models")x=Array.isArray(x)?x.map(String):[];else if(c==="fb_client_id")x=x==null?"":String(x);r[c]=x}return r}
+function fromRow(m,row){if(m.json)return row[m.json]||{};const d={};for(const[k,c]of Object.entries(m.f)){let v=row[c];if(SB_NUMS.has(c))v=Number(v)||0;else if(v==null)v=c==="models"||c==="lines"?[]:SB_JSON.has(c)||c==="received_at"?null:c==="stock_applied"?false:c==="po_type"?"normal":c==="delivery"?"standard":"";d[k]=v}return d}
+function sqlBackend(mcp){
+ const lit=s=>{s=String(s);let t;do{t="q"+Math.random().toString(36).slice(2,8)}while(s.includes("$"+t+"$"));return`$${t}$${s}$${t}$`};
+ async function run(q){
+  const r=await mcp.callTool("Supabase","execute_sql",{project_id:SBP,query:q});
+  const txt=((r&&r.content)||[]).filter(b=>b.type==="text").map(b=>b.text).join("\n")||(r&&typeof r.payload==="string"?r.payload:JSON.stringify((r&&r.payload)||""));
+  if(r&&r.isError)throw{code:"database",message:txt.slice(0,240)};
+  let s=txt;try{const o=JSON.parse(txt);if(o&&typeof o.result==="string")s=o.result;else if(o&&o.error)s="ERROR "+JSON.stringify(o.error)}catch(e){}
+  const mm=s.match(/<untrusted-data-[^>]+>([\s\S]*)<\/untrusted-data/);if(mm)s=mm[1];s=s.trim();
+  if(s.startsWith("["))return JSON.parse(s);
+  if(/error/i.test(s))throw{code:"database",message:s.slice(0,240)};
+  return[];
+ }
+ const ups=(t,pk,cols)=>`on conflict (${pk}) do update set ${cols.filter(c=>c!==pk).map(c=>c+"=excluded."+c).concat(["updated_at=now()"]).join(",")}`;
+ return{
+  async list(t){const r=await run(`select coalesce(jsonb_agg(to_jsonb(x)),'[]'::jsonb) j from public.${t} x;`);return(r[0]&&r[0].j)||[]},
+  async getOne(t,pk,id){const r=await run(`select to_jsonb(x) j from public.${t} x where ${pk}=${lit(id)};`);return r[0]?r[0].j:null},
+  async upsert(t,pk,row){const cols=Object.keys(row);await run(`insert into public.${t}(${cols.join(",")}) select ${cols.join(",")} from jsonb_populate_record(null::public.${t}, ${lit(JSON.stringify(row))}::jsonb) ${ups(t,pk,cols)};`)},
+  async upsertMany(t,pk,rows){if(!rows.length)return;const cols=[...new Set(rows.flatMap(Object.keys))];await run(`insert into public.${t}(${cols.join(",")}) select ${cols.join(",")} from jsonb_populate_recordset(null::public.${t}, ${lit(JSON.stringify(rows))}::jsonb) ${ups(t,pk,cols)};`)},
+  async patch(t,pk,id,row){const cols=Object.keys(row);if(!cols.length)return;await run(`update public.${t} set (${cols.join(",")},updated_at)=(select ${cols.join(",")},now() from jsonb_populate_record(null::public.${t}, ${lit(JSON.stringify(row))}::jsonb)) where ${pk}=${lit(id)};`)},
+  async remove(t,pk,id){await run(`delete from public.${t} where ${pk}=${lit(id)};`)}
+ };
+}
+function restBackend(sb){
+ const ok=({data,error})=>{if(error)throw{code:error.code||"database",message:error.message};return data};
+ const stamp=r=>Object.assign({},r,{updated_at:new Date().toISOString()});
+ return{
+  async list(t){const out=[];for(let from=0;;from+=1000){const d=ok(await sb.from(t).select("*").range(from,from+999));out.push(...d);if(d.length<1000)return out}},
+  async getOne(t,pk,id){return ok(await sb.from(t).select("*").eq(pk,id).maybeSingle())},
+  async upsert(t,pk,row){ok(await sb.from(t).upsert(stamp(row),{onConflict:pk}))},
+  async upsertMany(t,pk,rows){if(rows.length)ok(await sb.from(t).upsert(rows.map(stamp),{onConflict:pk}))},
+  async patch(t,pk,id,row){if(!Object.keys(row).length)return;ok(await sb.from(t).update(stamp(row)).eq(pk,id))},
+  async remove(t,pk,id){ok(await sb.from(t).delete().eq(pk,id))}
+ };
+}
+function makeDB(be){
+ const cl={},dl={},timers={};
+ const vis=(m,rows)=>m.pre?rows.filter(r=>String(r[m.pk]).startsWith(m.pre)):rows.filter(r=>!(m.t==="po_settings"&&String(r[m.pk]).startsWith("cache_")));
+ async function rc(c){const m=MAPS[c],L=cl[c];if(!L||!L.length)return;try{const rows=vis(m,await be.list(m.t));const s={docs:rows.map(r=>({id:String(r[m.pk]).slice((m.pre||"").length),data:()=>fromRow(m,r)})),metadata:{fromCache:false}};L.forEach(([cb])=>cb(s))}catch(e){L.forEach(([,f])=>f&&f(e))}}
+ async function rd(p){const L=dl[p];if(!L||!L.length)return;const[c,id]=p.split("/"),m=MAPS[c];try{const r=await be.getOne(m.t,m.pk,(m.pre||"")+id);L.forEach(([cb])=>cb({exists:!!r,id,data:()=>r?fromRow(m,r):undefined}))}catch(e){L.forEach(([,f])=>f&&f(e))}}
+ const later=(k,fn)=>{clearTimeout(timers[k]);timers[k]=setTimeout(fn,350)};
+ const touch=(c,id)=>{later("c:"+c,()=>rc(c));if(id!=null)later("d:"+c+"/"+id,()=>rd(c+"/"+id))};
+ setInterval(()=>{if(document.hidden)return;Object.keys(cl).forEach(rc);Object.keys(dl).forEach(rd)},60000);
+ document.addEventListener("visibilitychange",()=>{if(!document.hidden){Object.keys(cl).forEach(rc);Object.keys(dl).forEach(rd)}});
+ return{
+  collection(c){return{onSnapshot(cb,f){(cl[c]=cl[c]||[]).push([cb,f]);rc(c);return()=>{}}}},
+  async setMany(c,docs){const m=MAPS[c];const rows=docs.map(([id,d])=>{const r=toRow(m,d);r[m.pk]=(m.pre||"")+id;return r});for(let i=0;i<rows.length;i+=(c==="catalog"?1:60))await be.upsertMany(m.t,m.pk,rows.slice(i,i+(c==="catalog"?1:60)));touch(c)},
+  doc(path){const[c,id]=path.split("/"),m=MAPS[c],key=(m.pre||"")+id;return{
+   async get(){const r=await be.getOne(m.t,m.pk,key);return{exists:!!r,id,data:()=>r?fromRow(m,r):undefined}},
+   async set(d){const row=toRow(m,d);row[m.pk]=key;await be.upsert(m.t,m.pk,row);touch(c,id)},
+   async update(d){await be.patch(m.t,m.pk,key,toRow(m,d));touch(c,id)},
+   async delete(){await be.remove(m.t,m.pk,key);touch(c,id)},
+   onSnapshot(cb,f){(dl[path]=dl[path]||[]).push([cb,f]);rd(path);return()=>{}}}}
+ };
+}
+/* Tools that need FreshBooks / OneDrive / email. Service Desk app: the viewer's connectors. Portal: public.wh_tool (hello@ only). */
+async function whTool(p){const{data,error}=await sbc.rpc("wh_tool",{p});if(error)throw{code:"tool_error",message:error.message};if(data&&data.ok===false)throw{code:"tool_error",message:data.error||data.detail||"failed"};return data}
+async function oneDriveUpload(folderId,filename,b64,contentType){
+  if(MODE==="desk"){const r=payloadOf(await mcp.callTool("Microsoft 365","sharepoint_upload_file",{driveId:DRIVE,parentItemId:folderId,filename,contentBase64:b64,conflictBehavior:"rename"}));return r&&(r.webUrl||(r.item&&r.item.webUrl))}
+  const r=await whTool({op:"upload",driveId:DRIVE,parentItemId:folderId,filename,contentType,b64});return r.webUrl;
+}
+async function saveFile(name,data,type){
+  if(downloads){try{await downloads.save({filename:name,data})}catch(e){if(e.code!=="declined")throw e}return}
+  const b=data instanceof Blob?data:new Blob([data],{type:type||"text/csv"});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500);
+}
+/* One-time move of the stock data the Service Desk kept in its own artifact database into Supabase (artifact data wins). */
+async function migrateFromDesk(){
+  if(MODE!=="desk"||!adb)return;
+  try{const f=await db.doc("settings/migrated_desk").get();if(f.exists)return}catch(e){return}
+  const st=$("#dbStatus");const get=async c=>{try{return(await adb.collection(c).get()).docs.map(d=>[d.id,d.data()])}catch(e){return[]}};
+  try{
+    let n=0;
+    for(const c of["vendors","parts","pos","catalog"]){const docs=await get(c);if(!docs.length)continue;st.textContent=`Moving ${c} to the shared database (${docs.length})…`;await db.setMany(c,docs);n+=docs.length}
+    const sm=await get("settings");const main=sm.find(x=>x[0]==="main");if(main)await db.doc("settings/main").set(main[1]);
+    await db.doc("settings/migrated_desk").set({at:new Date().toISOString(),docs:n});
+    if(n)toast(`Moved ${n} stock records into the shared Warehousing database`,5000);
+  }catch(e){st.textContent="Couldn't finish moving the stock data: "+(e.message||e.code);console.error(e)}
+}
+async function init(){
+  loadStatic();loadLogo();
+  const c=window.claude;
+  if(c&&c.use){try{[mcp,downloads,adb]=await Promise.all([c.use("mcp").catch(()=>null),c.use("downloads").catch(()=>null),c.use("db").catch(()=>null)])}catch(e){}}
+  try{
+    if(mcp){db=makeDB(sqlBackend(mcp));MODE="desk";document.body.classList.add("desk")}
+    else if(c&&c.use){$("#dbStatus").textContent="The Supabase connector isn't available in this view";return}
+    else{
+      MODE="portal";document.body.classList.add("portal");
+      const {createClient}=await import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm");
+      sbc=createClient(SBURL,SBKEY,{auth:{persistSession:true,autoRefreshToken:true}});
+      const {data:{session}}=await sbc.auth.getSession();
+      if(!session){location.href="/?next="+encodeURIComponent("/warehousing/");return}
+      const {data:f}=await sbc.rpc("portal_menu");
+      if(!f||!f.intranet){$("#dbStatus").textContent="Warehousing is only available on the hello@ account";return}
+      db=makeDB(restBackend(sbc));
+    }
+  }catch(e){console.error(e)}
+  if(!db){$("#dbStatus").textContent="Database unavailable — changes won't save";return}
+  const timer=setTimeout(()=>{$("#dbStatus").textContent="Still loading data…"},10000);
+  const done=()=>{clearTimeout(timer);$("#dbStatus").textContent="Saved to the shared Warehousing database"};
+  const fail=e=>{clearTimeout(timer);$("#dbStatus").textContent="Data error: "+(e&&(e.message||e.code)||"unknown");console.error(e)};
+  await migrateFromDesk();
+  db.collection("parts").onSnapshot(s=>{parts=new Map();s.docs.forEach(d=>parts.set(d.id,Object.assign({_id:d.id},d.data())));if(!s.metadata.fromCache)done();refreshAll()},fail);
+  db.collection("vendors").onSnapshot(s=>{if(!s.docs.length&&vendors.length)return;vendors=s.docs.map(d=>Object.assign({_id:d.id},d.data())).sort((a,b)=>(a.order||99)-(b.order||99)||a.name.localeCompare(b.name));fillVendorSelects();refreshAll()},fail);
+  db.collection("pos").onSnapshot(s=>{pos=s.docs.map(d=>Object.assign({_id:d.id},d.data()));renderState();if($("#v-history").classList.contains("on"))renderHistory()},fail);
+  db.collection("catalog").onSnapshot(s=>{catDocs=s.docs.map(d=>Object.assign({_id:d.id},d.data()));rebuildCatalog();refreshAll()},fail);
+  setTimeout(()=>loadClients(false),300);
+  setTimeout(loadReqs,500);
+  db.doc("settings/main").onSnapshot(s=>{settings=s.exists?s.data():{};renderSyncInfo()},fail);
+}
+function refreshAll(){fillQaModels();renderLines();if($("#v-parts").classList.contains("on"))renderParts();if($("#v-vendors").classList.contains("on"))renderVendors()}
+
+/* ---------- vendors ---------- */
+const vById=id=>vendors.find(v=>v._id===id);
+const AU_STATES=["WA","NSW","VIC","QLD","SA","TAS","NT","ACT"];
+/* Vendor address parts. Older records only have line1-3 ("Rydalmere NSW 2116"): split those on the fly. */
+function vParts(v){v=v||{};if(v.suburb!=null||v.state!=null||v.postcode!=null)return{street:v.street!=null?v.street:v.line1||"",street2:v.street2||"",suburb:v.suburb||"",state:v.state||"",postcode:v.postcode||"",country:v.country!=null?v.country:v.line3||""};
+  const l2=String(v.line2||""),pc=(l2.match(/\b(\d{4})\s*$/)||[])[1]||"",st=(l2.match(/\b(WA|NSW|VIC|QLD|SA|TAS|NT|ACT)\b/i)||[])[1]||"";
+  return{street:v.line1||"",street2:"",suburb:l2.replace(pc,"").replace(new RegExp("\\b"+st+"\\b","i"),"").replace(/\s+/g," ").trim(),state:st.toUpperCase(),postcode:pc,country:v.line3||""}}
+function vLines(p){return{line1:[p.street,p.street2].filter(Boolean).join(", "),line2:[p.suburb,p.state,p.postcode].filter(Boolean).join(" "),line3:p.country&&!/^australia$/i.test(p.country)?p.country:""}}
+function vendorAddr(v){return v?[v.name,v.line1,v.line2,v.line3].filter(Boolean).join("\n"):""}
+function fillVendorSelects(){
+  const opts=vendors.map(v=>`<option value="${esc(v._id)}">${esc(v.name)}${v.brand?" — "+esc(v.brand):""}</option>`).join("");
+  const sel=$("#poVendor");sel.innerHTML=`<option value="">Choose vendor…</option>`+opts;sel.value=cur.vendorId||"";
+  const h=$("#hVendor");const hv=h.value;h.innerHTML=`<option value="">All vendors</option>`+opts;h.value=hv;
+}
+function renderVendors(){
+  $("#vendorCards").innerHTML=vendors.map(v=>`<div class="card"><div style="display:flex;justify-content:space-between;align-items:start;gap:10px">
+    <div><h2 style="margin-bottom:4px">${esc(v.name)}</h2><div class="muted" style="white-space:pre-line">${esc([v.line1,v.line2,v.line3].filter(Boolean).join("\n"))}</div>
+    <div style="margin-top:6px;font-size:13px">Brand: <b>${esc(v.brand||"—")}</b> · FreshBooks: ${v.fbClientId?'linked #'+esc(v.fbClientId):'<span class="muted">not linked</span>'} · Orders email: ${v.email?esc(v.email):'<span class="muted">not set</span>'} · OneDrive folder: ${v.folderPath?esc(v.folderPath):'<span class="muted">not set</span>'}</div>
+    <div style="margin-top:4px;font-size:13px">Price list: ${(()=>{const ds=catDocs.filter(d=>d.vendorId===v._id);const n=ds.reduce((s,d)=>s+(d.items||[]).length,0);return n?`<b>${n.toLocaleString()} parts</b> <span class="muted">from ${esc(ds[0].source||"file")}, imported ${auDate(ds[0].imported)}</span>`:'<span class="muted">none imported</span>'})()}</div></div>
+    <div style="display:flex;gap:6px"><button class="btn" data-imp="${esc(v._id)}">Import price list</button><button class="btn" data-ev="${esc(v._id)}">Edit</button></div></div></div>`).join("")||`<div class="empty">No vendors yet.</div>`;
+  $$("[data-ev]").forEach(b=>b.onclick=()=>editVendor(vById(b.dataset.ev)));
+  $$("[data-imp]").forEach(b=>b.onclick=()=>importPriceList(vById(b.dataset.imp)));
+}
+/* Vendors are picked from (or added to) the FreshBooks customer list: company name, contact, address. */
+async function fbClientCreate(d){ if(MODE==="portal"){ const r=await whTool(Object.assign({op:"client_create"},d)); if(!r||!r.id)throw new Error("FreshBooks didn't create the customer"); return r; } const r=await sb(`select fbw.call(${sqlStr(JSON.stringify(Object.assign({op:"client_create",ref:"stock-vendor"},d)))}::jsonb) as r;`); if(!r||r.ok===false)throw new Error((r&&r.error)||"FreshBooks didn't create the customer"); return r; }
+function editVendor(v){
+  v=v||{};
+  const m=modal(`<h2>${v._id?"Edit vendor":"Add vendor"}<button class="x">×</button></h2>
+   <div class="card" style="margin-bottom:12px;padding:12px">
+     <h3>${v.fbClientId?"Linked FreshBooks company":"Use a company from FreshBooks"}</h3>
+     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input id="ev_fbq" type="search" placeholder="Filter companies…" autocomplete="off" style="flex:1 1 160px"><select id="ev_fb" style="flex:2 1 260px"><option value="">Loading FreshBooks companies…</option></select><a href="#" id="ev_fbre" style="white-space:nowrap;font-size:12px">refresh</a></div>
+     <div class="muted" id="ev_fbinfo" style="font-size:12px;margin-top:4px">${v.fbClientId?"Linked to FreshBooks company #"+esc(v.fbClientId)+".":"Picking one fills in the details below and links them."}</div>
+   </div>
+   <h3>${v._id?"Vendor details":"Or enter a new vendor"}</h3>
+   <div class="grid2"><div><label>Company name</label><input id="ev_name" value="${esc(v.name)}"></div><div><label>Brand(s) supplied</label><input id="ev_brand" value="${esc(v.brand)}" placeholder="e.g. Mimaki"></div></div>
+   ${(()=>{const a=vParts(v);return`<div class="grid2" style="margin-top:10px"><div><label>Street address</label><input id="ev_st" value="${esc(a.street)}" placeholder="e.g. Unit 14, 38-46 South Street"></div><div><label>Street address line 2</label><input id="ev_st2" value="${esc(a.street2)}"></div></div>
+   <div class="grid4" style="margin-top:10px"><div><label>Suburb</label><input id="ev_sub" value="${esc(a.suburb)}"></div>
+     <div><label>State</label><select id="ev_state"><option value=""></option>${AU_STATES.map(s=>`<option ${s===a.state?"selected":""}>${s}</option>`).join("")}${a.state&&!AU_STATES.includes(a.state)?`<option selected>${esc(a.state)}</option>`:""}</select></div>
+     <div><label>Postcode</label><input id="ev_pc" value="${esc(a.postcode)}" inputmode="numeric" maxlength="10"></div>
+     <div><label>Country</label><input id="ev_ctry" value="${esc(a.country||"Australia")}"></div></div>`})()}
+   <div class="grid2" style="margin-top:10px"><div><label>Parts orders email</label><input id="ev_email" value="${esc(v.email)}" placeholder="parts@vendor.com.au"></div><div><label>Default attention</label><input id="ev_att" value="${esc(v.attention)}"></div></div>
+   <div class="grid2" style="margin-top:10px"><div><label>Phone</label><input id="ev_phone" value="${esc(v.phone)}"></div><div><label>Our account number with them</label><input id="ev_acct" value="${esc(v.account)}"></div></div>
+   <div class="grid2" style="margin-top:10px"><div><label>OneDrive folder (display)</label><input id="ev_fp" value="${esc(v.folderPath)}" placeholder="Vendors\\Mimaki\\Purchase Orders"></div><div><label>OneDrive folder item id</label><input id="ev_fid" class="mono" value="${esc(v.folderId)}"></div></div>
+   <label id="ev_mkwrap" style="display:${v.fbClientId?"none":"flex"};gap:6px;align-items:center;margin-top:12px;color:var(--ink);font-size:13px"><input type="checkbox" id="ev_mk" ${v._id?"":"checked"} style="width:auto"> Also add this company to FreshBooks (as a client record; FreshBooks sends nothing)</label>
+   <div class="actions"><button class="btn primary" id="ev_save">Save vendor</button>${v._id?'<button class="btn danger" id="ev_del">Delete</button>':""}<span class="muted" id="ev_msg" style="font-size:12.5px;align-self:center"></span></div>`);
+  let fbId=v.fbClientId||"";
+  const inp=m.querySelector("#ev_fb"), q=m.querySelector("#ev_fbq"), info=m.querySelector("#ev_fbinfo"), mkwrap=m.querySelector("#ev_mkwrap"), msg=m.querySelector("#ev_msg");
+  const opts=()=>{
+    const taken=new Set(vendors.filter(x=>x.fbClientId&&x._id!==v._id).map(x=>String(x.fbClientId)));
+    const f=q.value.trim().toLowerCase(), list=clients.filter(c=>!f||(c.n+" "+(c.a&&c.a.city||"")).toLowerCase().includes(f));
+    inp.innerHTML=`<option value="">${clients.length?(f?list.length+" matching":"Choose a FreshBooks company ("+clients.length+")")+"…":"No FreshBooks companies loaded"}</option>`+(fbId?`<option value="-">Unlink from FreshBooks</option>`:"")+
+      list.slice(0,600).map(c=>`<option value="${esc(c.id)}" ${String(c.id)===String(fbId)?"selected":""}>${esc(c.n)}${c.a&&c.a.city?" · "+esc(c.a.city):""}${taken.has(String(c.id))?" (already a vendor)":""}</option>`).join("");
+  };
+  const fill=async(force)=>{
+    if(force||!clients.length||!clients[0].id){ info.textContent="Loading companies from FreshBooks…"; await loadClients(true); if(!clients.length){ try{const s=await db.doc("cache/clients").get();if(s.exists)clients=s.data().list||[]}catch(e){} } }
+    opts();
+    info.textContent=clients.length?(fbId?"Linked to FreshBooks company #"+fbId+". ":"")+"Picking a company fills in the details below and links them.":"Couldn't load the FreshBooks companies ("+($("#shipInfo").textContent||"no answer")+"). Enter a new vendor below.";
+  };
+  q.oninput=opts;
+  inp.onchange=()=>{
+    if(inp.value==="-"){fbId="";mkwrap.style.display="flex";info.textContent="Will be unlinked when you save.";return}
+    const c=clients.find(x=>String(x.id)===inp.value); if(!c){ fbId=v.fbClientId||""; mkwrap.style.display=fbId?"none":"flex"; return; }
+    fbId=c.id; mkwrap.style.display="none"; const a=c.a||{};
+    const set=(id,val)=>{if(val)m.querySelector(id).value=val};
+    set("#ev_name",c.n); set("#ev_st",a.street); set("#ev_st2",a.street2); set("#ev_sub",a.city); set("#ev_pc",a.postal_code);
+    const stv=String(a.province||"").trim(), stCode=AU_STATES.find(s=>s===stv.toUpperCase())||({"western australia":"WA","new south wales":"NSW","victoria":"VIC","queensland":"QLD","south australia":"SA","tasmania":"TAS","northern territory":"NT","australian capital territory":"ACT"})[stv.toLowerCase()]||stv;
+    if(stCode){const sel=m.querySelector("#ev_state");if(![...sel.options].some(o=>o.value===stCode))sel.insertAdjacentHTML("beforeend",`<option>${esc(stCode)}</option>`);sel.value=stCode}
+    set("#ev_email",c.email); set("#ev_att",[c.first_name,c.last_name].filter(Boolean).join(" ")); set("#ev_phone",c.phone);
+    info.textContent="Linked to FreshBooks company #"+c.id+" when you save. Details filled in from FreshBooks; check them.";
+  };
+  m.querySelector("#ev_fbre").onclick=e=>{e.preventDefault();fill(true)};
+  fill(false);
+  m.querySelector("#ev_save").onclick=async()=>{
+    const ap={street:$("#ev_st").value.trim(),street2:$("#ev_st2").value.trim(),suburb:$("#ev_sub").value.trim(),state:$("#ev_state").value.trim(),postcode:$("#ev_pc").value.trim(),country:$("#ev_ctry").value.trim()||"Australia"};
+    const d={name:$("#ev_name").value.trim(),brand:$("#ev_brand").value.trim(),...ap,...vLines(ap),email:$("#ev_email").value.trim(),attention:$("#ev_att").value.trim(),phone:$("#ev_phone").value.trim(),account:$("#ev_acct").value.trim(),folderPath:$("#ev_fp").value.trim(),folderId:$("#ev_fid").value.trim(),order:v.order||50,fbClientId:fbId||""};
+    if(!d.name){toast("Give the vendor a name");return}
+    const btn=m.querySelector("#ev_save");btn.disabled=true;
+    try{
+      if(!fbId&&m.querySelector("#ev_mk").checked&&mkwrap.style.display!=="none"){
+        const dup=clients.find(x=>x.n.trim().toLowerCase()===d.name.toLowerCase());
+        if(dup){msg.textContent="FreshBooks already has "+dup.n+". Pick it from the list above instead.";btn.disabled=false;return}
+        msg.textContent="Adding the company to FreshBooks…";
+        const [first,...rest]=d.attention.split(/\s+/);
+        const r=await fbClientCreate({organization:d.name,fname:first||"",lname:rest.join(" "),email:d.email,phone:d.phone,street:d.line1,city:ap.suburb,state:ap.state,postcode:ap.postcode,country:ap.country,note:"Supplier (vendor) added from the Highway Digital Warehousing page."});
+        d.fbClientId=r.id; loadClients(true).catch(()=>{});
+      }
+      const id=v._id||idOf(d.name.replace(/\s+/g,"-")).toLowerCase();
+      await db.doc("vendors/"+id).set(d);closeModal();toast(d.fbClientId&&!v.fbClientId?"Vendor saved and linked to FreshBooks":"Vendor saved");
+    }catch(e){msg.textContent="Couldn't save: "+((e&&(e.message||e.code))||"error");btn.disabled=false}
+  };
+  const del=m.querySelector("#ev_del");if(del)del.onclick=async()=>{await db.doc("vendors/"+v._id).delete();closeModal()};
+}
+$("#btnNewVendor").onclick=()=>editVendor(null);
+
+/* price list import */
+function cellNum(v){if(typeof v==="number")return v;const n=parseFloat(String(v||"").replace(/[^0-9.\-]/g,""));return isNaN(n)?0:n}
+function guessCol(hdr,res){for(const re of res){const i=hdr.findIndex(h=>re.test(String(h||"")));if(i>=0)return i}return -1}
+function importPriceList(v){
+  const brand=(v.brand||"").split(/,\s*/)[0]||v.name;
+  const m=modal(`<h2>Import ${esc(v.name)} price list<button class="x">×</button></h2>
+   <p class="muted" style="margin-top:0">Choose the vendor's spreadsheet (.xlsx, .xls or .csv). Parts land in a searchable price list for ${esc(brand)}: they show in search and can go on POs, and only become stock items when you track or receive them. Importing again replaces this vendor's list.</p>
+   <input type="file" id="plFile" accept=".xlsx,.xls,.csv">
+   <div id="plMap" style="margin-top:12px"></div>`,true);
+  let rows=[],fileName="";
+  m.querySelector("#plFile").onchange=async e=>{
+    const f=e.target.files[0];if(!f)return;fileName=f.name;
+    if(!window.XLSX){toast("Spreadsheet reader didn't load — check your connection and reload");return}
+    try{
+      const ab=f.arrayBuffer?await f.arrayBuffer():await new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=no;r.readAsArrayBuffer(f)});const wb=XLSX.read(new Uint8Array(ab),{type:"array"});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:""});
+    }catch(err){toast("Couldn't read that file: "+esc(err.message));return}
+    let h=rows.findIndex(r=>r.filter(c=>String(c).trim()).length>=3);if(h<0)h=0;
+    const hdr=rows[h].map(String);
+    const opt=sel=>`<option value="-1">— none —</option>`+hdr.map((x,i)=>`<option value="${i}" ${i===sel?"selected":""}>${esc(x||"Column "+(i+1))}</option>`).join("");
+    const gc=guessCol(hdr,[/parts?\s*(no|#|num)|item\s*(#|no)|part\s*code|^code|sku/i,/part/i]),
+          gd=guessCol(hdr,[/desc/i,/name/i]),gm=guessCol(hdr,[/model|machine|fits/i]),
+          gb=guessCol(hdr,[/buy|cost|dealer|net|trade/i]),gr=guessCol(hdr,[/rrp|list|retail/i]);
+    m.querySelector("#plMap").innerHTML=`<div class="grid3">
+      <div><label>Part code</label><select id="pc">${opt(gc)}</select></div>
+      <div><label>Description</label><select id="pd">${opt(gd)}</select></div>
+      <div><label>Model(s)</label><select id="pm">${opt(gm)}</select></div>
+      <div><label>Your buy price (ex GST)</label><select id="pb">${opt(gb)}</select></div>
+      <div><label>RRP (ex GST)</label><select id="pr">${opt(gr)}</select></div>
+      <div><label>Brand</label><input id="pbrand" value="${esc(brand)}"></div></div>
+      <label style="display:flex;gap:6px;align-items:center;margin-top:10px;color:var(--ink);font-size:13px"><input type="checkbox" id="pupd" checked style="width:auto"> Update cost on parts you already track when the price list differs</label>
+      <div id="plPrev" style="margin-top:10px"></div>
+      <div class="actions"><button class="btn primary" id="plGo">Import</button></div>`;
+    const prev=()=>{const c=+$("#pc").value,d=+$("#pd").value,b=+$("#pb").value;const sample=rows.slice(h+1).filter(r=>c>=0&&String(r[c]).trim()).slice(0,5);
+      $("#plPrev").innerHTML=`<div class="muted" style="font-size:12.5px;margin-bottom:4px">${(rows.length-h-1).toLocaleString()} rows in file · preview:</div><table><tbody>${sample.map(r=>`<tr><td class="mono">${esc(r[c])}</td><td>${d>=0?esc(r[d]):""}</td><td class="num">${b>=0?money(cellNum(r[b])):""}</td></tr>`).join("")}</tbody></table>`};
+    m.querySelectorAll("select").forEach(s=>s.onchange=prev);prev();
+    m.querySelector("#plGo").onclick=async()=>{
+      const c=+$("#pc").value,d=+$("#pd").value,mo=+$("#pm").value,b=+$("#pb").value,r=+$("#pr").value,br=$("#pbrand").value.trim(),upd=$("#pupd").checked;
+      if(c<0){toast("Pick the part code column");return}
+      const map=new Map();
+      rows.slice(h+1).forEach(row=>{
+        const code=String(row[c]||"").trim();if(!code||/\s{2,}/.test(code)||code.length>60)return;
+        const id=idOf(code);
+        const models=mo>=0?String(row[mo]||"").split(/,|\s{2,}|\//).map(s=>s.trim()).filter(s=>s&&s!=="-"):[];
+        const e=map.get(id);
+        if(e){models.forEach(x=>{if(!e[2].includes(x))e[2].push(x)});if(!e[3]&&b>=0)e[3]=Math.round(cellNum(row[b])*100)/100;return}
+        map.set(id,[code,d>=0?String(row[d]||"").trim().replace(/\s+/g," "):"",models,b>=0?Math.round(cellNum(row[b])*100)/100:0,r>=0?Math.round(cellNum(row[r])*100)/100:0]);
+      });
+      const items=[...map.values()];if(!items.length){toast("No part codes found in that column");return}
+      const go=m.querySelector("#plGo");go.disabled=true;
+      try{
+        for(const old of catDocs.filter(x=>x.vendorId===v._id)){go.textContent="Clearing old list…";await db.doc("catalog/"+old._id).delete()}
+        const CH=400,n=Math.ceil(items.length/CH);
+        for(let i=0;i<n;i++){go.textContent=`Saving ${i+1}/${n}…`;await db.doc(`catalog/${v._id}-${i}`).set({vendorId:v._id,brand:br,source:fileName,imported:today(),items:items.slice(i*CH,(i+1)*CH)})}
+        let changed=0;
+        if(upd&&b>=0){for(const it of items){const p=parts.get(idOf(it[0]));if(p&&it[3]&&Math.abs((Number(p.cost)||0)-it[3])>0.005){go.textContent="Updating costs…";const add={cost:it[3]};if(!(p.models||[]).length&&it[2].length)add.models=it[2];await db.doc("parts/"+p._id).update(add);changed++}}}
+        closeModal();toast(`Imported ${items.length.toLocaleString()} ${esc(br)} parts${changed?` · updated cost on ${changed} tracked part${changed===1?"":"s"}`:""}`,6000);
+      }catch(err){toast("Import stopped: "+esc(err.code||err.message));go.disabled=false;go.textContent="Import"}
+    };
+  };
+}
+
+/* ---------- price-list catalogue ---------- */
+function rebuildCatalog(){
+  catalog=new Map();
+  const dbVendors=new Set(catDocs.map(d=>d.vendorId));
+  staticCats.filter(d=>!dbVendors.has(d.vendorId)).concat(catDocs).forEach(d=>(d.items||[]).forEach(it=>{const [code,desc,models,buy,rrp]=it;const id=idOf(code);if(!catalog.has(id))catalog.set(id,{_id:id,code,desc,models:models||[],cost:buy||0,rrp:rrp||0,brand:d.brand||"",vendorId:d.vendorId,cat:true,soh:0})}));
+}
+function lookup(id){return parts.get(id)||catalog.get(id)}
+function allItems(scope){
+  scope=scope||"all";
+  const out=[];
+  if(scope!=="list")parts.forEach(p=>{const c=catalog.get(p._id)||{};const models=[...new Set([...(p.models||[]),...(c.models||[])])];out.push(Object.assign({},p,{rrp:c.rrp||0,models}))});
+  if(scope!=="tracked")catalog.forEach((c,id)=>{if(!parts.has(id))out.push(c)});
+  return out;
+}
+async function trackPart(c){
+  if(!c||parts.has(c._id))return;
+  try{await db.doc("parts/"+c._id).set({code:c.code,desc:c.desc,brand:c.brand,models:c.models||[],cost:c.cost||0,sell:0,min:0,soh:0,lastPO:"",lastDate:"",notes:""});toast(esc(c.code)+" is now tracked in stock")}catch(e){toast("Couldn't save: "+(e.code||e.message))}
+}
+
+/* ---------- parts ---------- */
+const brandToVendor=b=>vendors.find(v=>(v.brand||"").toLowerCase().split(/[,/ ]+/).includes(String(b||"").toLowerCase()));
+function sohClass(p){const s=Number(p.soh)||0;if(s<0)return"neg";if(p.min>0&&s<=p.min)return"low";return s>0?"pos":"zero"}
+function partMatches(p){
+  if(pf.brand&&p.brand!==pf.brand)return false;
+  if(pf.model&&!(p.models||[]).includes(pf.model))return false;
+  const s=Number(p.soh)||0;
+  if(pf.stock==="in"&&s<=0)return false;
+  if(pf.stock==="none"&&s>0)return false;
+  if(pf.stock==="low"&&!(s<=0||(p.min>0&&s<=p.min)))return false;
+  if(pf.q){const q=pf.q.toLowerCase();const hay=(p.code+" "+p.desc+" "+(p.models||[]).join(" ")+" "+(p.notes||"")).toLowerCase();if(!q.split(/\s+/).every(t=>hay.includes(t)))return false}
+  return true;
+}
+function renderParts(){
+  const all=allItems(pf.scope);
+  const brands=[...new Set(all.map(p=>p.brand).filter(Boolean))].sort();
+  $("#brandChips").innerHTML=[`<button class="chip ${pf.brand?"":"on"}" data-b="">All brands</button>`].concat(brands.map(b=>`<button class="chip ${pf.brand===b?"on":""}" data-b="${esc(b)}">${esc(b)} <span class="muted">${all.filter(p=>p.brand===b).length}</span></button>`)).join("");
+  $$("#brandChips .chip").forEach(c=>c.onclick=()=>{pf.brand=c.dataset.b;pf.model="";renderParts()});
+  const models=[...new Set(all.filter(p=>!pf.brand||p.brand===pf.brand).flatMap(p=>p.models||[]))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
+  $("#pModel").innerHTML=`<option value="">All models</option>`+models.map(m=>`<option ${pf.model===m?"selected":""}>${esc(m)}</option>`).join("");
+  const kit=pf.model?pmKitFor(pf.model):null,kp=$("#pmKit");
+  if(kit){kp.style.display="block";kp.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div><b>${esc(pf.model)} annual PM kit</b> (Mimaki PM service list): ${kit.map(k=>`<span class="mono">${k[1]}× ${esc(k[0])}</span>`).join(", ")}</div><button class="btn sm primary" id="btnKit">Add kit to PO</button></div>`;$("#btnKit").onclick=()=>addKit(pf.model)}else kp.style.display="none";
+  const sv=(p,k)=>k==="code"?p.code:k==="desc"?p.desc:k==="brand"?p.brand:k==="models"?(p.models||[])[0]:k==="cost"?Number(p.cost)||null:k==="sell"?(Number(p.sell)||Number(p.rrp)||null):k==="soh"?(p.cat?null:Number(p.soh)||0):k==="last"?p.lastDate:"";
+  const cmp=(a,b)=>{if(!pf.sort)return(a.cat?1:0)-(b.cat?1:0)||(a.brand||"").localeCompare(b.brand||"")||a.code.localeCompare(b.code);
+    const x=sv(a,pf.sort),y=sv(b,pf.sort),ex=x==null||x==="",ey=y==null||y==="";if(ex||ey)return ex&&ey?a.code.localeCompare(b.code):ex?1:-1;
+    const c=typeof x==="number"&&typeof y==="number"?x-y:String(x).localeCompare(String(y),undefined,{numeric:true,sensitivity:"base"});return c*pf.dir||a.code.localeCompare(b.code)};
+  const full=all.filter(partMatches).sort(cmp);
+  $$("#partHead [data-ps]").forEach(th=>{const on=pf.sort===th.dataset.ps;th.setAttribute("aria-sort",on?(pf.dir>0?"ascending":"descending"):"none");th.innerHTML=`<button type="button" class="sorth${on?" on":""}">${esc(th.dataset.label||(th.dataset.label=th.textContent))}<span class="arr">${on?(pf.dir>0?"▲":"▼"):"↕"}</span></button>`;th.firstChild.onclick=()=>{if(pf.sort===th.dataset.ps){if(!pf.flip){pf.dir=-pf.dir;pf.flip=true}else{pf.sort="";pf.dir=1;pf.flip=false}}else{pf.sort=th.dataset.ps;pf.flip=false;pf.dir=["cost","sell","soh","last"].includes(th.dataset.ps)?-1:1}renderParts()}});
+  const CAP=300,list=full.slice(0,CAP);
+  const modelTags=m=>{m=m||[];return m.slice(0,4).map(x=>`<span class="tag">${esc(x)}</span>`).join("")+(m.length>4?`<span class="muted" style="font-size:11.5px" title="${esc(m.join(", "))}">+${m.length-4}</span>`:"")};
+  $("#partBody").innerHTML=list.map(p=>p.cat?`<tr style="background:var(--soft)">
+    <td class="mono">${esc(p.code)}</td><td>${esc(p.desc)} <span class="pill" title="From the imported price list — not tracked in stock yet">price list</span></td>
+    <td>${esc(p.brand||"")}</td><td>${modelTags(p.models)}</td>
+    <td class="num">${p.cost?money(p.cost):'<span class="muted">—</span>'}</td><td class="num muted" title="RRP ex GST">${p.rrp?money(p.rrp)+" RRP":"—"}</td>
+    <td class="num muted">—</td><td></td>
+    <td style="white-space:nowrap"><button class="btn sm primary" data-add="${esc(p._id)}">+ PO</button> <button class="btn sm" data-track="${esc(p._id)}" title="Add to your tracked parts so stock is counted">Track</button></td></tr>`:`<tr>
+    <td class="mono"><b>${esc(p.code)}</b></td><td>${esc(p.desc)}${p.notes?`<div class="muted" style="font-size:12px">${esc(p.notes)}</div>`:""}</td>
+    <td>${esc(p.brand||"")}</td><td>${modelTags(p.models)}</td>
+    <td class="num">${p.cost?money(p.cost):'<span class="muted">—</span>'}</td><td class="num">${p.sell?money(p.sell):(p.rrp?`<span class="muted" title="RRP ex GST from price list">${money(p.rrp)} RRP</span>`:'<span class="muted">—</span>')}</td>
+    <td class="num"><span class="soh"><button data-adj="-1" data-id="${esc(p._id)}">−</button><b class="${sohClass(p)}" data-count="${esc(p._id)}" title="Click to enter a counted quantity">${Number(p.soh)||0}</b><button data-adj="1" data-id="${esc(p._id)}">+</button></span></td>
+    <td class="muted" style="font-size:12.5px">${p.lastDate?auDate(p.lastDate):""}${p.lastPO?" · PO "+esc(p.lastPO):""}</td>
+    <td style="white-space:nowrap"><button class="btn sm primary" data-add="${esc(p._id)}">+ PO</button> <button class="btn sm" data-edit="${esc(p._id)}">Edit</button></td></tr>`).join("");
+  $("#partsEmpty").style.display=list.length?"none":"block";
+  const more=$("#partsMore");more.style.display=full.length>CAP?"block":"none";more.textContent=`Showing ${CAP} of ${full.length.toLocaleString()} — search or pick a model to narrow it down.`;
+  $$("[data-track]").forEach(b=>b.onclick=()=>trackPart(catalog.get(b.dataset.track)));
+  $$("[data-add]").forEach(b=>b.onclick=()=>addPartToPO(lookup(b.dataset.add)));
+  $$("[data-edit]").forEach(b=>b.onclick=()=>editPart(parts.get(b.dataset.edit)));
+  $$("[data-adj]").forEach(b=>b.onclick=()=>adjust(b.dataset.id,Number(b.dataset.adj)));
+  $$("[data-count]").forEach(b=>b.onclick=()=>countPart(parts.get(b.dataset.count)));
+  const tracked=[...parts.values()];
+  const tot=tracked.length,inS=tracked.filter(p=>(Number(p.soh)||0)>0),val=inS.reduce((s,p)=>s+(Number(p.soh)||0)*(Number(p.cost)||0),0),low=tracked.filter(p=>p.min>0&&(Number(p.soh)||0)<=p.min).length;
+  $("#kpis").innerHTML=`<div class="kpi"><b>${tot}</b><span>tracked parts</span></div><div class="kpi"><b>${catalog.size.toLocaleString()}</b><span>on vendor price lists</span></div><div class="kpi"><b>${inS.length}</b><span>with stock on hand (est.)</span></div><div class="kpi kpi-val"><b>${money(val)}</b><span>est. stock value at cost</span><div class="kbrk">${(()=>{const CORE=["Brother","Epilog","Mimaki","Mutoh"],by={};inS.forEach(p=>{const b=CORE.find(c=>c.toLowerCase()===String(p.brand||"").trim().toLowerCase())||"Other";by[b]=(by[b]||0)+(Number(p.soh)||0)*(Number(p.cost)||0)});return[...CORE,"Other"].filter(b=>b!=="Other"||by.Other).map(b=>`<div><span>${b}</span><b>${money(by[b]||0)}</b></div>`).join("")})()}</div></div><div class="kpi"><b>${low}</b><span>at / below reorder level</span></div>`;
+}
+$("#pSearch").oninput=e=>{pf.q=e.target.value.trim();renderParts()};
+$("#pModel").onchange=e=>{pf.model=e.target.value;renderParts()};
+$("#pStock").onchange=e=>{pf.stock=e.target.value;renderParts()};
+$("#pScope").onchange=e=>{pf.scope=e.target.value;pf.model="";renderParts()};
+let adjBusy=Promise.resolve();
+function adjust(id,delta){adjBusy=adjBusy.then(async()=>{const p=parts.get(id);if(!p)return;try{await db.doc("parts/"+id).update({soh:(Number(p.soh)||0)+delta})}catch(e){toast("Couldn't update: "+(e.code||e.message))}})}
+function countPart(p){
+  const m=modal(`<h2>Stock count — ${esc(p.code)}<button class="x">×</button></h2><p class="muted" style="margin-top:0">${esc(p.desc)}</p>
+   <label>Counted quantity on hand</label><input id="cnt" type="number" value="${Number(p.soh)||0}" style="max-width:160px">
+   <div class="actions"><button class="btn primary" id="cntSave">Save count</button></div>`);
+  const i=m.querySelector("#cnt");i.focus();i.select();
+  const save=async()=>{try{await db.doc("parts/"+p._id).update({soh:Number(i.value)||0,countDate:today()});closeModal();toast("Count saved for "+esc(p.code))}catch(e){toast("Couldn't save: "+(e.code||e.message))}};
+  m.querySelector("#cntSave").onclick=save;i.onkeydown=e=>{if(e.key==="Enter")save()};
+}
+function editPart(p){
+  p=p||{};
+  const brands=[...new Set([...vendors.flatMap(v=>(v.brand||"").split(/,\s*/)),...[...parts.values()].map(x=>x.brand)].filter(Boolean))].sort();
+  const m=modal(`<h2>${p._id?"Edit part":"New part"}<button class="x">×</button></h2>
+   <div class="grid2"><div><label>Item # / part code</label><input id="ep_code" class="mono" value="${esc(p.code)}" ${p._id?"readonly":""}></div>
+   <div><label>Brand</label><input id="ep_brand" list="brandList" value="${esc(p.brand||pf.brand)}"><datalist id="brandList">${brands.map(b=>`<option value="${esc(b)}">`).join("")}</datalist></div></div>
+   <div style="margin-top:10px"><label>Description</label><input id="ep_desc" value="${esc(p.desc)}"></div>
+   <div style="margin-top:10px"><label>Models it fits (comma separated)</label><input id="ep_models" value="${esc((p.models||[]).join(", "))}" placeholder="JFX200-2513EX, TxF300-75"></div>
+   <div class="grid3" style="margin-top:10px"><div><label>Cost ex GST</label><input id="ep_cost" type="number" step="0.01" value="${p.cost||""}"></div><div><label>Sell ex GST</label><input id="ep_sell" type="number" step="0.01" value="${p.sell||""}"></div><div><label>Reorder level</label><input id="ep_min" type="number" value="${p.min||""}" placeholder="0 = none"></div></div>
+   <div class="grid2" style="margin-top:10px"><div><label>Est. on hand</label><input id="ep_soh" type="number" value="${Number(p.soh)||0}"></div><div><label>Notes / location</label><input id="ep_notes" value="${esc(p.notes)}"></div></div>
+   <div class="actions"><button class="btn primary" id="ep_save">Save part</button>${p._id?'<button class="btn danger" id="ep_del">Delete part</button>':""}</div>`);
+  m.querySelector("#ep_save").onclick=async()=>{
+    const code=$("#ep_code").value.trim();if(!code){toast("Enter a part code");return}
+    const id=p._id||idOf(code);
+    if(!p._id&&parts.has(id)){toast("That part code already exists");return}
+    const d=Object.assign({},p,{code,brand:$("#ep_brand").value.trim(),desc:$("#ep_desc").value.trim(),models:$("#ep_models").value.split(",").map(s=>s.trim()).filter(Boolean),cost:Number($("#ep_cost").value)||0,sell:Number($("#ep_sell").value)||0,min:Number($("#ep_min").value)||0,soh:Number($("#ep_soh").value)||0,notes:$("#ep_notes").value.trim()});
+    delete d._id;
+    try{await db.doc("parts/"+id).set(d);closeModal();toast("Part saved")}catch(e){toast("Couldn't save: "+(e.code||e.message))}
+  };
+  const del=m.querySelector("#ep_del");if(del)del.onclick=async()=>{await db.doc("parts/"+p._id).delete();closeModal();toast("Part deleted")};
+}
+$("#btnNewPart").onclick=()=>editPart(null);
+
+/* CSV */
+$("#btnCsv").onclick=async()=>{
+  const rows=[["Item #","Description","Brand","Models","Cost ex GST","Est. on hand","Counted","Last bought","Last PO"]];
+  [...parts.values()].filter(partMatches).sort((a,b)=>(a.brand||"").localeCompare(b.brand||"")||a.code.localeCompare(b.code)).forEach(p=>rows.push([p.code,p.desc,p.brand,(p.models||[]).join("; "),p.cost||"",Number(p.soh)||0,"",p.lastDate||"",p.lastPO||""]));
+  const csv=rows.map(r=>r.map(c=>{c=String(c==null?"":c);return/[",\n]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c}).join(",")).join("\n");
+  try{await saveFile("Highway Digital stock "+today()+".csv",csv,"text/csv")}catch(e){toast("Couldn't save CSV: "+(e.code||e.message))}
+};
+
+/* ---------- FreshBooks helpers ---------- */
+function payloadOf(r){let p=r&&("payload" in r)?r.payload:r;if(typeof p==="string"){try{p=JSON.parse(p)}catch(e){}}return p}
+function mcpErr(e,server){
+  const c=e&&e.code;
+  if(c==="needs_reauth")return server+" needs reconnecting in claude.ai Settings → Connectors.";
+  if(c==="server_not_connected")return"Add the "+server+" connector in claude.ai Settings → Connectors.";
+  if(c==="approval_required"||c==="not_in_manifest"||c==="consent_required")return server+" access wasn't approved for this page. Try again and choose Allow.";
+  if(c==="server_unavailable")return server+" didn't answer — try again in a moment.";
+  if(c==="tool_error")return server+" reported an error: "+String(e.message||"").slice(0,200);
+  return server+" call failed ("+(c||"unknown")+").";
+}
+async function fb(tool,input){if(MODE==="portal")return whTool(Object.assign({op:"fb_list",tool:tool.replace(/^accounting__/,"")},input));if(!mcp)throw{code:"not_granted"};return payloadOf(await mcp.callTool("FreshBooks",tool,Object.assign({business_uuid:BIZ,fb_meta:FBM()},input)))}
+const isPartLine=n=>{n=String(n||"").trim();return n&&!/\s/.test(n)&&/\d/.test(n)&&n.length>=4&&!/^(labour|callout|delivery|reports?)$/i.test(n)};
+
+/* Pick FreshBooks job */
+$("#btnFromFB").onclick=async()=>{
+  const m=modal(`<h2>Use a FreshBooks job<button class="x">×</button></h2>
+   <div class="tabs2"><button class="chip on" data-k="inv">Invoices</button><button class="chip" data-k="est">Estimates (E)</button></div>
+   <div id="fbList" class="scroll" style="max-height:55vh"><div class="empty">Loading from FreshBooks…</div></div>
+   <p class="muted" style="font-size:12.5px">Picking a job sets the PO number and brings in its part lines at your cost price (not the sell price). Labour, callout and delivery lines are skipped.</p>`,true);
+  let kind="inv";const cache={};
+  const load=async()=>{
+    const box=m.querySelector("#fbList");
+    if(!cache[kind]){box.innerHTML=`<div class="empty">Loading from FreshBooks…</div>`;
+      try{const r=await fb(kind==="inv"?"accounting__list_invoices":"accounting__list_estimates",{per_page:30,page:1});cache[kind]=(kind==="inv"?r.invoices:r.estimates)||[]}
+      catch(e){box.innerHTML=`<div class="empty">${esc(mcpErr(e,"FreshBooks"))}</div>`;return}}
+    const list=cache[kind];
+    box.innerHTML=list.map((x,i)=>{const num=kind==="inv"?x.invoice_number:x.estimate_number;const client=kind==="inv"?(x.client&&x.client.name):x.client_name;const pl=(x.lines||[]).filter(l=>isPartLine(l.name)).length;
+      return`<div class="fbjob" data-i="${i}"><b class="mono">${kind==="inv"?String(parseInt(num,10)):"E"+esc(num)}</b><div>${esc(client||"")}<div class="muted" style="font-size:12px">${esc(x.po_number||"")}</div></div><div class="muted" style="font-size:12.5px">${pl} part line${pl===1?"":"s"} · ${esc((x.display_status||x.status||""))}</div><div class="muted" style="font-size:12.5px">${auDate(x.create_date)}</div></div>`}).join("")||`<div class="empty">Nothing found.</div>`;
+    box.querySelectorAll(".fbjob").forEach(el=>el.onclick=()=>{applyJob(list[+el.dataset.i],kind);closeModal()});
+  };
+  m.querySelectorAll("[data-k]").forEach(b=>b.onclick=()=>{kind=b.dataset.k;m.querySelectorAll("[data-k]").forEach(c=>c.classList.toggle("on",c===b));load()});
+  load();
+};
+function applyJob(x,kind){
+  const num=kind==="inv"?String(parseInt(x.invoice_number,10)):"E"+x.estimate_number;
+  cur.number=num;$("#poNumber").value=num;
+  const client=kind==="inv"?(x.client&&x.client.name):x.client_name;
+  cur.ref={kind,id:kind==="inv"?x.invoice_id:x.estimate_id,number:kind==="inv"?x.invoice_number:x.estimate_number,client:client||"",po:x.po_number||""};
+  let added=0;
+  (x.lines||[]).filter(l=>isPartLine(l.name)).forEach(l=>{
+    const code=l.name.trim();const p=lookup(idOf(code));
+    if(cur.lines.some(z=>idOf(z.code)===idOf(code)))return;
+    cur.lines.push({code,desc:p?p.desc:String(l.description||"").split("\n")[0],qty:Number(l.quantity)||1,price:p&&p.cost?p.cost:0,disc:0});added++;
+    if(!cur.vendorId&&p){const v=brandToVendor(p.brand);if(v)setVendor(v._id)}
+  });
+  if(!cur.notes&&client){cur.notes="Customer: "+client+(x.po_number?" · "+x.po_number:"");$("#poNotes").value=cur.notes}
+  if(kind==="est"&&x.billing_address&&false){}
+  renderLines();
+  toast(`PO ${esc(num)} linked to ${esc(client||"job")} — ${added} part line${added===1?"":"s"} added${cur.lines.some(l=>!l.price)?" (check prices marked in amber)":""}`,5000);
+}
+
+/* FreshBooks usage sync */
+function renderSyncInfo(){const s=settings||{};$("#syncInfo").textContent=s.lastSync?`Last run ${auDate(s.lastSync)} · ${(s.processed||[]).length} invoices counted since ${auDate(s.syncFrom||"2026-07-01")}`:`Not run yet — will count invoices since ${auDate(s.syncFrom||"2026-07-01")}`}
+$("#btnSync").onclick=async()=>{
+  const btn=$("#btnSync");btn.disabled=true;const info=$("#syncInfo");
+  const from=(settings.syncFrom||"2026-07-01");const done=new Set((settings.processed||[]).map(String));const inclDraft=$("#syncDrafts").checked;
+  const deltas={};const newly=[];let unmatched={};let pages=0;
+  try{
+    for(let page=1;page<=15;page++){
+      info.textContent=`Reading FreshBooks invoices (page ${page})…`;
+      const r=await fb("accounting__list_invoices",{per_page:100,page});pages=page;
+      const inv=r.invoices||[];let older=false;
+      for(const x of inv){
+        if(String(x.create_date)<from){older=true;continue}
+        if(done.has(String(x.invoice_id)))continue;
+        if(!inclDraft&&x.display_status==="draft")continue;
+        newly.push(String(x.invoice_id));
+        (x.lines||[]).forEach(l=>{if(!isPartLine(l.name))return;const id=idOf(l.name);if(parts.has(id))deltas[id]=(deltas[id]||0)+(Number(l.quantity)||0);else unmatched[l.name.trim()]=(unmatched[l.name.trim()]||0)+(Number(l.quantity)||0)})
+      }
+      if(older||!inv.length||page>=(r.total_pages||1))break;
+    }
+    const ids=Object.keys(deltas);let i=0;
+    for(const id of ids){i++;info.textContent=`Updating stock ${i}/${ids.length}…`;const p=parts.get(id);await db.doc("parts/"+id).update({soh:(Number(p.soh)||0)-deltas[id]})}
+    await db.doc("settings/main").set(Object.assign({},settings,{syncFrom:from,lastSync:today(),processed:[...done,...newly]}));
+    const um=Object.keys(unmatched);
+    modal(`<h2>FreshBooks usage counted<button class="x">×</button></h2>
+      <p>${newly.length} new invoice${newly.length===1?"":"s"} read; ${ids.length} part${ids.length===1?"":"s"} reduced.</p>
+      ${ids.length?`<table><thead><tr><th>Item #</th><th class="num">Deducted</th></tr></thead><tbody>${ids.map(id=>`<tr><td class="mono">${esc(parts.get(id).code)}</td><td class="num">${deltas[id]}</td></tr>`).join("")}</tbody></table>`:""}
+      ${um.length?`<h3 style="margin-top:14px">Codes on invoices not in your parts list</h3><p class="muted" style="font-size:12.5px;margin-top:0">Add any you stock so they're tracked next time.</p><div>${um.map(c=>`<span class="tag mono">${esc(c)} ×${unmatched[c]}</span>`).join(" ")}</div>`:""}`);
+  }catch(e){toast(esc(mcpErr(e,"FreshBooks")),6000)}
+  btn.disabled=false;renderSyncInfo();
+};
+
+/* ---------- PO editor ---------- */
+function setVendor(id){cur.vendorId=id;$("#poVendor").value=id;const v=vById(id);cur.vendorAddr=vendorAddr(v);$("#poVendorAddr").value=cur.vendorAddr;if(v&&v.attention&&!cur.notes){cur.notes="Attention "+v.attention;$("#poNotes").value=cur.notes}renderWarranty()}
+$("#poVendor").onchange=e=>setVendor(e.target.value);
+$("#poNumber").oninput=e=>{cur.number=e.target.value.trim();renderState()};
+$("#poDate").onchange=e=>cur.date=e.target.value;
+$("#poVendorAddr").oninput=e=>cur.vendorAddr=e.target.value;
+$("#poShip").oninput=e=>cur.shipTo=e.target.value;
+$("#poNotes").oninput=e=>cur.notes=e.target.value;
+/* ship-to: MBE default + FreshBooks customers */
+const MBE_LABEL="HIGHWAYDIGITAL c/o MBE (default)";
+let clients=[],clientsAt="";
+function clientAddr(c){const a=c.primary_mailing_address||c.a||{};const name=c.organization||c.display_name||[c.first_name,c.last_name].filter(Boolean).join(" ");const att=[c.first_name,c.last_name].filter(Boolean).join(" ");
+  return[name,att&&att!==name&&!/^accounts?$/i.test(att)?"Attn: "+att:"",a.street,a.street2,[a.city,a.province,a.postal_code].filter(Boolean).join(" "),c.phone||c.business_phone||c.mobile_phone||c.home_phone||""].filter(x=>x&&String(x).trim()).join("\n")}
+function fillShipList(){$("#shipList").innerHTML=`<option value="${esc(MBE_LABEL)}">`+clients.map(c=>`<option value="${esc(c.n)}">`).join("");$("#shipInfo").textContent=clients.length?`${clients.length} FreshBooks customers${clientsAt?" · updated "+auDate(clientsAt):""}`:"Customer list not loaded yet"}
+async function loadClients(force){
+  if(!force){try{const s=await db.doc("cache/clients").get();if(s.exists){const d=s.data();clients=d.list||[];clientsAt=d.at;fillShipList();if(d.at===today())return}}catch(e){}}
+  if(!mcp&&MODE!=="portal"){fillShipList();return}
+  const info=$("#shipInfo");info.textContent="Loading customers from FreshBooks…";
+  try{const all=[];for(let page=1;page<=20;page++){const r=await fb("accounting__list_clients",{per_page:100,page});(r.clients||[]).forEach(c=>{if(c.status&&c.status!=="active")return;const a=c.primary_mailing_address||{};all.push({id:String(c.id||c.client_id||""),email:c.email||"",n:c.organization||c.display_name||[c.first_name,c.last_name].join(" "),first_name:c.first_name||"",last_name:c.last_name||"",organization:c.organization||c.display_name||"",phone:c.business_phone||c.mobile_phone||c.home_phone||"",a:{street:a.street||"",street2:a.street2||"",city:a.city||"",province:a.province||"",postal_code:a.postal_code||""}})});if(page>=(r.total_pages||1))break}
+    const seen=new Set();clients=all.filter(c=>c.n&&!seen.has(c.n)&&seen.add(c.n)).sort((x,y)=>x.n.localeCompare(y.n));
+    clientsAt=today();fillShipList();
+    if(db)try{await db.doc("cache/clients").set({at:today(),list:clients})}catch(e){}
+  }catch(e){info.textContent=mcpErr(e,"FreshBooks")}
+}
+function setShip(label){
+  if(!label||label===MBE_LABEL){cur.shipTo=MBE;cur.shipName=MBE_LABEL}else{const c=clients.find(x=>x.n===label);if(!c)return;cur.shipTo=clientAddr(c);cur.shipName=c.n}
+  $("#poShip").value=cur.shipTo;$("#shipPick").value=cur.shipName;
+}
+$("#shipPick").onchange=e=>setShip(e.target.value.trim());
+$("#shipPick").onfocus=e=>{e.target.select();if(!clients.length)loadClients()};
+$("#shipRefresh").onclick=e=>{e.preventDefault();loadClients(true)};
+function loadPOtoForm(){
+  $("#poVendor").value=cur.vendorId||"";$("#poNumber").value=cur.number||"";$("#poDate").value=cur.date||today();
+  $("#poVendorAddr").value=cur.vendorAddr||vendorAddr(vById(cur.vendorId));$("#poShip").value=cur.shipTo||"";$("#shipPick").value=cur.shipName||(cur.shipTo===MBE||!cur.shipTo?"HIGHWAYDIGITAL c/o MBE (default)":"");$("#poNotes").value=cur.notes||"";$("#poDelivery").value=cur.delivery||"standard";$("#poDelivery").dataset.u=$("#poDelivery").value;
+  renderWarranty();renderLines();
+}
+function lineTotal(l){return(Number(l.qty)||0)*(Number(l.price)||0)*(1-(Number(l.disc)||0)/100)}
+function totals(){const sub=cur.lines.reduce((s,l)=>s+lineTotal(l),0);const gst=Math.round(sub*10)/100;return{sub,gst,tot:sub+gst}}
+function renderLines(){
+  const tb=$("#lineBody");
+  tb.innerHTML=cur.lines.map((l,i)=>{const p=parts.get(idOf(l.code||""));return`<tr>
+    <td><input type="number" min="0" data-f="qty" data-i="${i}" value="${esc(l.qty)}"></td>
+    <td><input class="mono" data-f="code" data-i="${i}" value="${esc(l.code)}"></td>
+    <td><input data-f="desc" data-i="${i}" value="${esc(l.desc)}">${isW()&&l.supply?`<div class="muted" style="font-size:11.5px;margin-top:2px">${l.supply==="stock"?"Fitted from stock: replenish":"Ordered for this job"}${l.billable?" · customer billed":""}</div>`:""}</td>
+    <td><input class="num" type="number" step="0.01" data-f="price" data-i="${i}" value="${l.price===""?"":esc(l.price)}" style="${!Number(l.price)?"background:var(--warn-soft)":""}"></td>
+    <td><input class="num" type="number" step="1" data-f="disc" data-i="${i}" value="${l.disc?esc(l.disc):""}"></td>
+    <td class="num" data-lt="${i}">${money(lineTotal(l))}</td>
+    <td class="num">${p?`<b class="${sohClass(p)}" style="padding:2px 6px;border-radius:5px">${Number(p.soh)||0}</b>`:(catalog.has(idOf(l.code||""))?'<span class="muted" title="On the vendor price list — tracked once received">list</span>':'<span class="muted" title="Not in parts list — it will be added when received">new</span>')}</td>
+    <td><button class="btn sm danger" data-rm="${i}" title="Remove line">×</button></td></tr>`}).join("");
+  $("#linesEmpty").style.display=cur.lines.length?"none":"block";
+  tb.querySelectorAll("input").forEach(inp=>{
+    inp.oninput=()=>{const l=cur.lines[+inp.dataset.i];const f=inp.dataset.f;l[f]=(f==="qty"||f==="price"||f==="disc")?(inp.value===""?"":Number(inp.value)):inp.value;tb.querySelector(`[data-lt="${inp.dataset.i}"]`).textContent=money(lineTotal(l));if(f==="price")inp.style.background=Number(inp.value)?"":"var(--warn-soft)";renderTotals()};
+    if(inp.dataset.f==="code")inp.onchange=()=>{const l=cur.lines[+inp.dataset.i];const p=lookup(idOf(l.code));if(p){if(!l.desc)l.desc=p.desc;if(!Number(l.price))l.price=p.cost||0;renderLines()}};
+  });
+  tb.querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>{cur.lines.splice(+b.dataset.rm,1);renderLines()});
+  renderTotals();
+  const bd=$("#lineBadge");bd.textContent=cur.lines.length;bd.style.display=cur.lines.length?"inline":"none";
+  renderState();
+  try{localStorage.setItem("hd-po-draft",JSON.stringify(cur))}catch(e){}
+}
+function renderTotals(){const t=totals();$("#tSub").textContent=money(t.sub);$("#tGst").textContent=money(t.gst);$("#tTot").textContent=money(t.tot)}
+function renderState(){
+  const ex=pos.find(p=>String(p.number).toUpperCase()===String(cur.number).toUpperCase()&&p._id!==cur.id);
+  let s=cur.id?`Saved PO · status <span class="pill ${cur.status}">${cur.status}</span>`:"Not saved yet";
+  if(cur.ref)s+=` · linked to FreshBooks ${cur.ref.kind==="inv"?"invoice":"estimate"} ${esc(cur.ref.number)} (${esc(cur.ref.client)})`;
+  if(ex)s+=` · <span style="color:var(--bad)">PO ${esc(cur.number)} already exists in history</span>`;
+  if(cur.stockApplied)s+=" · received into stock";
+  $("#poState").innerHTML=s;
+  $("#poTitle").textContent=cur.id?("Purchase order "+cur.number):"New purchase order";
+  $("#btnReceive").disabled=!!cur.stockApplied;
+  const saved=cur.id&&pos.find(p=>p._id===cur.id);$("#btnDelete").style.display=(saved&&saved.status==="draft"&&cur.status==="draft")?"":"none";
+}
+function addPartToPO(p,qty,quiet){
+  if(!p)return;
+  const ex=cur.lines.find(l=>idOf(l.code)===p._id);
+  if(ex)ex.qty=(Number(ex.qty)||0)+(qty||1);else cur.lines.push({code:p.code,desc:p.desc,qty:qty||1,price:p.cost||0,disc:0});
+  if(!cur.vendorId){const v=brandToVendor(p.brand);if(v)setVendor(v._id)}
+  else{const v=vById(cur.vendorId);if(v&&p.brand&&!(v.brand||"").toLowerCase().includes(p.brand.toLowerCase()))toast(`Heads up: ${esc(p.code)} is a ${esc(p.brand)} part and this PO is to ${esc(v.name)}`,4500)}
+  if(quiet)return;
+  renderLines();
+  if(!$("#v-po").classList.contains("on"))toast(`Added ${esc(p.code)} — <a href="#" data-go="po">open PO (${cur.lines.length} line${cur.lines.length===1?"":"s"})</a>`);
+}
+$("#btnBlankLine").onclick=()=>{cur.lines.push({code:"",desc:"",qty:1,price:"",disc:0});renderLines();const ins=$$("#lineBody input[data-f=code]");if(ins.length)ins[ins.length-1].focus()};
+
+/* quick add search */
+let qa=[],qaHi=0;
+function qaRender(){
+  const L=$("#quickList");
+  if(!qa.length){L.style.display="none";return}
+  const kit=$("#qaModel").value?pmKitFor($("#qaModel").value):null;const kq={};(kit||[]).forEach(k=>kq[idOf(k[0])]=k[1]);
+  const kitBtn=kit?`<div style="background:var(--accent-soft);justify-content:space-between" data-kit="1"><span><b>Annual PM kit for ${esc($("#qaModel").value)}</b> · ${kit.length} parts</span><span class="btn sm primary">Add whole kit</span></div>`:"";
+  L.innerHTML=kitBtn+qa.map((p,i)=>`<div data-q="${i}" class="${i===qaHi?"hi":""}"><b class="mono" style="min-width:150px">${esc(p.code)}</b>${kq[p._id]?`<span class="tag" title="Annual PM quantity">PM ×${kq[p._id]}</span>`:""}<span style="flex:1">${esc(p.desc)} ${(p.models||[]).slice(0,2).map(m=>`<span class="tag">${esc(m)}</span>`).join("")}</span><span class="muted">${esc(p.brand||"")}</span><span class="num" style="min-width:70px">${p.cost?money(p.cost):""}</span><b class="${sohClass(p)}" style="padding:1px 6px;border-radius:5px;font-size:12px">${Number(p.soh)||0}</b></div>`).join("");
+  L.style.display="block";
+  L.querySelectorAll("[data-q]").forEach(d=>d.onmousedown=e=>{e.preventDefault();pickQa(+d.dataset.q)});
+  const kb=L.querySelector("[data-kit]");if(kb)kb.onmousedown=e=>{e.preventDefault();addKit($("#qaModel").value);L.style.display="none"};
+}
+function pickQa(i){const p=qa[i];if(!p)return;addPartToPO(p);$("#quickAdd").value="";qa=[];qaRender();$("#quickAdd").focus()}
+function qaSearch(){
+  const q=$("#quickAdd").value.trim().toLowerCase(),mdl=$("#qaModel").value;qaHi=0;
+  if(!q&&!mdl){qa=[];qaRender();return}
+  const v=vById(cur.vendorId);const vb=v?(v.brand||"").toLowerCase():"";
+  const kit=mdl?pmKitFor(mdl):null;const kitSet=new Set((kit||[]).map(k=>idOf(k[0])));
+  qa=allItems().filter(p=>{if(mdl&&!(p.models||[]).includes(mdl))return false;if(!q)return true;const hay=(p.code+" "+p.desc+" "+(p.models||[]).join(" ")).toLowerCase();return q.split(/\s+/).every(t=>hay.includes(t))})
+    .sort((a,b)=>(kitSet.has(b._id)?1:0)-(kitSet.has(a._id)?1:0)||(a.cat?1:0)-(b.cat?1:0)||(()=>{const ab=vb&&vb.includes((a.brand||"").toLowerCase())?0:1,bb=vb&&vb.includes((b.brand||"").toLowerCase())?0:1;return ab-bb})()||a.code.localeCompare(b.code)).slice(0,mdl&&!q?60:15);
+  qaRender();
+}
+$("#quickAdd").oninput=qaSearch;
+$("#quickAdd").onfocus=()=>{if($("#qaModel").value)qaSearch()};
+$("#qaModel").onchange=()=>{qaSearch();$("#quickAdd").focus()};
+function allModels(){return[...new Set(allItems().flatMap(p=>p.models||[]))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}))}
+function fillQaModels(){const sel=$("#qaModel");const v=sel.value;sel.innerHTML=`<option value="">All models</option>`+allModels().map(m=>`<option ${m===v?"selected":""}>${esc(m)}</option>`).join("")}
+function pmKitFor(model){for(const b in pmKits){if(pmKits[b][model])return pmKits[b][model]}return null}
+function addKit(model){
+  const kit=pmKitFor(model);if(!kit)return;let n=0;
+  kit.forEach(([code,qty])=>{const id=idOf(code);const p=lookup(id);if(p){addPartToPO(p,qty,true);n++}else{cur.lines.push({code,desc:"",qty,price:"",disc:0});n++}});
+  renderLines();toast(`Added the ${esc(model)} annual PM kit (${n} lines) — <a href="#" data-go="po">open PO</a>`,5000);
+}
+$("#quickAdd").onkeydown=e=>{
+  if(e.key==="ArrowDown"){qaHi=Math.min(qaHi+1,qa.length-1);qaRender();e.preventDefault()}
+  else if(e.key==="ArrowUp"){qaHi=Math.max(qaHi-1,0);qaRender();e.preventDefault()}
+  else if(e.key==="Enter"){e.preventDefault();if(qa.length)pickQa(qaHi);else if(e.target.value.trim()){cur.lines.push({code:e.target.value.trim(),desc:"",qty:1,price:"",disc:0});e.target.value="";renderLines()}}
+};
+$("#quickAdd").onblur=()=>setTimeout(()=>{$("#quickList").style.display="none"},150);
+
+/* save / status */
+function validate(){
+  if(!cur.vendorId){toast("Choose a vendor first");return false}
+  if(!cur.number){toast("Enter a PO number (or pick a FreshBooks job)");return false}
+  if(!cur.lines.length){toast("Add at least one line");return false}
+  return true;
+}
+function poDoc(){const t=totals();return{number:cur.number,vendorId:cur.vendorId,vendorName:(vById(cur.vendorId)||{}).name||"",date:cur.date,vendorAddr:cur.vendorAddr,shipTo:cur.shipTo,shipName:cur.shipName||"",notes:cur.notes,delivery:cur.delivery||"standard",type:cur.type||"normal",warranty:isW()?Object.assign(wBlank(),cur.warranty||{},{form:wForm()}):null,lines:cur.lines.map(l=>Object.assign({code:String(l.code||"").trim(),desc:l.desc||"",qty:Number(l.qty)||0,price:Number(l.price)||0,disc:Number(l.disc)||0},l.supply?{supply:l.supply}:{},l.billable!==undefined?{billable:!!l.billable}:{})),status:cur.status||"draft",ref:cur.ref||null,stockApplied:!!cur.stockApplied,receivedAt:cur.receivedAt||null,subtotal:t.sub,gst:t.gst,total:t.tot,updated:today()}}
+async function savePO(quiet){
+  if(!db){toast("Database unavailable");return false}
+  if(!validate())return false;
+  const ex=pos.find(p=>String(p.number).toUpperCase()===String(cur.number).toUpperCase()&&p._id!==cur.id);
+  if(ex){toast(`PO ${esc(cur.number)} already exists — change the number or open it from history`,5000);return false}
+  const id=cur.id||idOf(cur.number);
+  try{await db.doc("pos/"+id).set(poDoc());cur.id=id;renderState();syncReq();if(!quiet)toast("PO "+esc(cur.number)+" saved");return true}catch(e){toast("Couldn't save: "+(e.code||e.message));return false}
+}
+$("#btnSave").onclick=()=>savePO();
+$("#btnSent").onclick=async()=>{if(cur.status==="draft")cur.status="sent";if(await savePO(true))toast("PO "+esc(cur.number)+" marked sent")};
+$("#btnNew").onclick=()=>{cur=blankPO();loadPOtoForm();toast("Started a new PO")};
+$("#btnReceive").onclick=async()=>{
+  if(cur.stockApplied){toast("Already received into stock");return}
+  if(!validate())return;
+  const v=vById(cur.vendorId)||{};const brand=(v.brand||"").split(/,\s*/)[0]||"";
+  const m=modal(`<h2>Receive PO ${esc(cur.number)} into stock<button class="x">×</button></h2>
+    <p class="muted" style="margin-top:0">Adds these quantities to estimated on hand and records the cost and date. Edit a quantity if the delivery was short.</p>
+    <table><thead><tr><th>Item #</th><th>Description</th><th class="num" style="width:110px">Qty received</th></tr></thead><tbody>
+    ${cur.lines.filter(l=>String(l.code||"").trim()).map((l,i)=>`<tr><td class="mono">${esc(l.code)}${parts.has(idOf(l.code))?"":' <span class="tag">new part</span>'}</td><td>${esc(l.desc)}</td><td><input type="number" class="num" data-rq="${i}" value="${Number(l.qty)||0}"></td></tr>`).join("")}
+    </tbody></table><div class="actions"><button class="btn good" id="rcvGo">Receive</button></div>`);
+  m.querySelector("#rcvGo").onclick=async()=>{
+    const ls=cur.lines.filter(l=>String(l.code||"").trim());const qtys=[...m.querySelectorAll("[data-rq]")].map(i=>Number(i.value)||0);
+    m.querySelector("#rcvGo").disabled=true;
+    try{
+      for(let i=0;i<ls.length;i++){const l=ls[i];const id=idOf(l.code);const p=parts.get(id);const q=qtys[i];
+        if(p){await db.doc("parts/"+id).update({soh:(Number(p.soh)||0)+q,lastPO:cur.number,lastDate:cur.date,cost:Number(l.price)||p.cost||0})}
+        else{const c=catalog.get(id)||{};await db.doc("parts/"+id).set({code:l.code.trim(),desc:l.desc||c.desc||"",brand:c.brand||brand,models:c.models||[],cost:Number(l.price)||0,sell:0,min:0,soh:q,lastPO:cur.number,lastDate:cur.date,notes:""})}}
+      cur.stockApplied=true;cur.status="received";cur.receivedAt=today();await savePO(true);closeModal();toast("Stock updated from PO "+esc(cur.number));renderLines();
+    }catch(e){toast("Couldn't update stock: "+(e.code||e.message));m.querySelector("#rcvGo").disabled=false}
+  };
+};
+
+/* ---------- PDF ---------- */
+function fileName(){const n=String(cur.number).trim();return"Purchase Order "+(/^\d+$/.test(n)?n.padStart(7,"0"):n)+".pdf"}
+function buildPDF(){
+  if(!window.jspdf){toast("PDF library didn't load — check your connection and reload");return null}
+  const {jsPDF}=window.jspdf;const d=new jsPDF({unit:"mm",format:"a4"});const W=210,M=15;
+  if(logoData){const lw=78;d.addImage(logoData,"PNG",M,11,lw,lw*logoRatio)}else{d.setFont("helvetica","bold");d.setFontSize(20);d.setTextColor(22,32,44);d.text("HIGHWAYDIGITAL",M,22)}
+  d.setFont("helvetica","bold");d.setFontSize(22);d.setTextColor(22,32,44);d.text(isW()?"Warranty Claim PO":"Purchase Order",W-M,22,{align:"right"});
+  d.setFont("helvetica","normal");d.setFontSize(10);d.setTextColor(60,70,80);
+  d.text("Date:",W-M-48,31);d.text(auDate(cur.date),W-M,31,{align:"right"});
+  d.text("Purchase Order:",W-M-48,37);d.setFont("helvetica","bold");d.text(String(cur.number),W-M,37,{align:"right"});
+  d.setFont("helvetica","normal");d.text("www.highwaydigital.com.au · 1300 880 815 · ABN 85 387 583 538",M,38);
+  const y0=46;
+  d.setFillColor(22,32,44);d.rect(M,y0,85,6,"F");d.rect(W-M-85,y0,85,6,"F");
+  d.setTextColor(255,255,255);d.setFont("helvetica","bold");d.setFontSize(9);d.text("VENDOR",M+2,y0+4.2);d.text("SHIP TO",W-M-83,y0+4.2);
+  d.setTextColor(22,32,44);d.setFont("helvetica","normal");d.setFontSize(10);
+  const va=(cur.vendorAddr||"").split("\n"),sa=(cur.shipTo||"").split("\n");
+  va.forEach((t,i)=>{d.setFont("helvetica",i===0?"bold":"normal");d.text(t,M+2,y0+12+i*5)});
+  sa.forEach((t,i)=>{d.setFont("helvetica",i===0?"bold":"normal");d.text(t,W-M-83,y0+12+i*5)});
+  let y=y0+14+Math.max(va.length,sa.length)*5;
+  {y+=2;const k=cur.delivery||"standard",lab="DELIVERY: "+delLabel(k).toUpperCase();d.setFont("helvetica","bold");d.setFontSize(10);
+   const c=k==="overnight"?[192,57,43]:k==="economy"?[39,110,67]:[22,32,44];const w=d.getTextWidth(lab)+6;d.setDrawColor(...c);d.setTextColor(...c);d.setLineWidth(0.5);d.rect(M,y-4.2,w,6.4);d.text(lab,M+3,y);d.setTextColor(22,32,44);d.setLineWidth(0.2);y+=8}
+  if(cur.notes){d.setFont("helvetica","italic");d.setFontSize(9.5);d.text(d.splitTextToSize(cur.notes,W-2*M),M,y);y+=7}
+  if(isW()){const w=cur.warranty||{};d.setFillColor(154,91,0);d.rect(M,y-1,W-2*M,6,"F");d.setTextColor(255,255,255);d.setFont("helvetica","bold");d.setFontSize(9);d.text("WARRANTY CLAIM: parts to be supplied under the manufacturer's warranty",M+2,y+3.2);d.setTextColor(22,32,44);y+=10;
+    const kv=[["Machine",[w.model,w.serial?"S/N "+w.serial:"",w.firmware?"Firmware "+w.firmware:""].filter(Boolean).join(" · ")],["End user",w.endUser],["Issue occurred",w.issueDate?auDate(w.issueDate):""],["Installed",w.installDate?auDate(w.installDate):""],["Ink",[w.ink,w.inkLot?"lot "+w.inkLot:""].filter(Boolean).join(", ")],["Machine status",w.machineStatus],["Problem",w.problem],["Troubleshooting",w.troubleshoot],["Cause",w.cause],["Comments",w.comments]].filter(x=>x[1]);
+    d.setFontSize(9.5);kv.forEach(([k,v])=>{d.setFont("helvetica","bold");d.text(k+":",M,y);d.setFont("helvetica","normal");const t=d.splitTextToSize(String(v),W-2*M-34);d.text(t,M+34,y);y+=4.6*t.length+0.6});y+=2}
+  const body=cur.lines.map(l=>[String(Number(l.qty)||0),l.code||"",(l.desc||"")+(isW()&&l.supply?(l.supply==="stock"?"\n(replenishes our stock)":"\n(for this job)"):""),Number(l.price)?money(l.price):(isW()?"Warranty":""),Number(l.disc)?l.disc+"%":"",Number(l.price)?money(lineTotal(l)):""]);
+  d.autoTable({startY:y+2,head:[["Qty","Item #","Description","Unit Price","Discount","Line Total"]],body,margin:{left:M,right:M},theme:"grid",
+    styles:{font:"helvetica",fontSize:9.5,cellPadding:2.2,lineColor:[210,215,222],textColor:[22,32,44]},headStyles:{fillColor:[22,32,44],textColor:255,fontStyle:"bold"},
+    columnStyles:{0:{halign:"center",cellWidth:14},1:{cellWidth:38,font:"courier"},3:{halign:"right",cellWidth:26},4:{halign:"right",cellWidth:20},5:{halign:"right",cellWidth:28}}});
+  const t=totals();y=d.lastAutoTable.finalY+6;
+  const row=(lab,val,b)=>{d.setFont("helvetica",b?"bold":"normal");d.setFontSize(b?11.5:10);d.text(lab,W-M-60,y);d.text(val,W-M,y,{align:"right"});y+=b?7:5.5};
+  row("Subtotal",money(t.sub));row("GST",money(t.gst));d.setDrawColor(22,32,44);d.line(W-M-60,y-3.5,W-M,y-3.5);y+=1.5;row("Total",money(t.tot),true);
+  if(!isW()&&cur.lines.some(l=>!Number(l.price))){d.setFont("helvetica","italic");d.setFontSize(9);d.setTextColor(100,110,120);d.text("Lines without a price: please confirm pricing on your order acknowledgement.",M,y+2);d.setTextColor(22,32,44)}
+  const fy=270;d.setDrawColor(210,215,222);d.line(M,fy-6,W-M,fy-6);
+  d.setFont("helvetica","bold");d.setFontSize(10);d.text("Sean Hannan | Proprietor",M,fy);
+  d.setFont("helvetica","normal");d.setFontSize(9);d.text("Email: hello@highwaydigital.com.au   Web: www.highwaydigital.com.au   Phone: 1300 880 815   ABN: 85387583538",M,fy+5);
+  d.setFont("helvetica","bold");d.setFontSize(10);d.text("Thank you",W-M,fy,{align:"right"});
+  return d;
+}
+$("#btnPdf").onclick=async()=>{
+  if(!validate())return;const d=buildPDF();if(!d)return;
+  try{await saveFile(fileName(),d.output("blob"),"application/pdf");if(!cur.id)savePO(true)}catch(e){toast("Couldn't download: "+(e.code||e.message))}
+};
+$("#btnOneDrive").onclick=async()=>{
+  if(!validate())return;const v=vById(cur.vendorId);
+  if(!v||!v.folderId){toast("Set the OneDrive folder for this vendor on the Vendors tab");return}
+  const d=buildPDF();if(!d)return;if(!mcp&&MODE!=="portal"){toast("Connectors aren't available in this view");return}
+  const b64=d.output("datauristring").split(",")[1];const btn=$("#btnOneDrive");btn.disabled=true;btn.textContent="Saving…";
+  try{
+    let url=await oneDriveUpload(v.folderId,fileName(),b64,"application/pdf");
+    if(isW()&&wForm()==="mimaki"){const xb=await blobB64(await mimakiXlsx());url=(await oneDriveUpload(v.folderId,wFileName(),xb,"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))||url}
+    toast(`Saved to ${esc(v.folderPath||"OneDrive")}${url?` — <a href="${esc(url)}" target="_blank" rel="noopener">open</a>`:""}`,6000);
+    await savePO(true);
+  }catch(e){toast(e instanceof Error?"Couldn't save: "+esc(e.message):esc(mcpErr(e,MODE==="portal"?"OneDrive":"Microsoft 365")),6000)}
+  btn.disabled=false;btn.textContent="Save PDF to OneDrive";
+};
+$("#btnEmail").onclick=async()=>{
+  if(!validate())return;const v=vById(cur.vendorId)||{};if(!mcp){toast("Connectors aren't available in this view");return}
+  const t=totals();
+  const rows=cur.lines.map(l=>`<tr><td>${Number(l.qty)||0}</td><td>${esc(l.code)}</td><td>${esc(l.desc)}</td><td>${Number(l.price)?money(l.price):"TBC"}</td><td>${Number(l.price)?money(lineTotal(l)):""}</td></tr>`).join("");
+  const body=poEmailHtml(v,t,rows);
+  const btn=$("#btnEmail");btn.disabled=true;
+  try{
+    const inp={subject:poSubject(),body,bodyType:"html"};if(v.email)inp.to=[v.email];
+    const r=payloadOf(await mcp.callTool("Microsoft 365","outlook_create_draft",inp));
+    const url=r&&(typeof r==="string"?((r.match(/webLink:\s*(\S+)/)||[])[1]):(r.webLink||r.weblink));
+    toast(`Draft created in Outlook${v.email?"":" (no vendor email set — add the recipient)"}${url?` — <a href="${esc(url)}" target="_blank" rel="noopener">open draft</a>`:""}. Attach the ${isW()&&wForm()==="mimaki"?"Mimaki form":"PDF"} before sending.`,7000);
+    if(cur.status==="draft")cur.status="sent";await savePO(true);
+  }catch(e){toast(esc(mcpErr(e,"Microsoft 365")),6000)}
+  btn.disabled=false;
+};
+
+
+function poSubject(){const w=cur.warranty||{};return(isW()?"Warranty claim PO "+cur.number+(w.model?" - "+w.model:"")+(w.serial?" S/N "+w.serial:""):"Purchase Order "+cur.number)+" - Highway Digital"+(cur.delivery==="overnight"?" - URGENT (overnight)":"")}
+function poEmailHtml(v,t,rows){
+  const w=cur.warranty||{},wm=isW()&&wForm()==="mimaki";
+  const wInfo=isW()?`<table>${[["Machine",[w.model,w.serial?"S/N "+w.serial:"",w.firmware?"firmware "+w.firmware:""].filter(Boolean).join(" · ")],["End user",w.endUser],["Issue occurred",w.issueDate?auDate(w.issueDate):""],["Installed",w.installDate?auDate(w.installDate):""],["Ink",[w.ink,w.inkLot?"lot "+w.inkLot:""].filter(Boolean).join(", ")],["Machine status",w.machineStatus],["Problem",w.problem],["Troubleshooting",w.troubleshoot],["Cause",w.cause],["Comments",w.comments]].filter(x=>x[1]).map(x=>`<tr><td><b>${esc(x[0])}</b></td><td>${esc(x[1])}</td></tr>`).join("")}</table>`:"";
+  const sig=`<p>Thank you,<br>Sean Hannan | Proprietor<br>Highway Digital<br>1300 880 815 · hello@highwaydigital.com.au</p>`;
+  if(isW())return`<p>Hi ${esc(v.attention||"team")},</p><p>Please find warranty claim PO <b>${esc(cur.number)}</b>${wm?" attached on the Mimaki warranty form":""}. Details below.<br><b>Delivery: ${esc(delLabel(cur.delivery))}</b></p>${wInfo}<p><b>Parts required</b></p>
+   <table><tr><th>Qty</th><th>Item #</th><th>Description</th></tr>${cur.lines.map(l=>`<tr><td>${Number(l.qty)||0}</td><td>${esc(l.code)}</td><td>${esc(l.desc)}</td></tr>`).join("")}</table>
+   <p><b>Ship to:</b><br>${esc(cur.shipTo).replace(/\n/g,"<br>")}</p><p>Please confirm approval and shipping.</p>${sig}`;
+  return`<p>Hi ${esc(v.attention||"team")},</p><p>Please find purchase order <b>${esc(cur.number)}</b> below.<br><b>Delivery: ${esc(delLabel(cur.delivery))}</b>${cur.notes?"<br>"+esc(cur.notes):""}</p>
+   <table><tr><th>Qty</th><th>Item #</th><th>Description</th><th>Unit price</th><th>Line total</th></tr>${rows}
+   <tr><td></td><td></td><td></td><td><b>Subtotal</b></td><td>${money(t.sub)}</td></tr><tr><td></td><td></td><td></td><td>GST</td><td>${money(t.gst)}</td></tr><tr><td></td><td></td><td></td><td><b>Total</b></td><td><b>${money(t.tot)}</b></td></tr></table>
+   <p><b>Ship to:</b><br>${esc(cur.shipTo).replace(/\n/g,"<br>")}</p><p>Please confirm pricing and availability.</p>${sig}`;
+}
+/* Portal: email the PO straight to the vendor from hello@, PDF (and Mimaki form) attached. Asks first. */
+$("#btnSend").onclick=async()=>{
+  if(!validate())return;const v=vById(cur.vendorId)||{};const t=totals();
+  const rows=cur.lines.map(l=>`<tr><td>${Number(l.qty)||0}</td><td>${esc(l.code)}</td><td>${esc(l.desc)}</td><td>${Number(l.price)?money(l.price):"TBC"}</td><td>${Number(l.price)?money(lineTotal(l)):""}</td></tr>`).join("");
+  const m=modal(`<h2>Email PO ${esc(cur.number)} to ${esc(v.name||"the vendor")}<button class="x">×</button></h2>
+   <div class="grid2"><div><label>To</label><input id="em_to" value="${esc(v.email||"")}" placeholder="parts@vendor.com.au"></div><div><label>Cc (optional)</label><input id="em_cc" value=""></div></div>
+   <div style="margin-top:10px"><label>Subject</label><input id="em_sub" value="${esc(poSubject())}"></div>
+   <p class="muted" style="font-size:12.5px">Sends from hello@highwaydigital.com.au now, with ${isW()&&wForm()==="mimaki"?"the PO PDF and the Mimaki warranty form":"the PO PDF"} attached, and marks the PO sent. A copy goes to Sent Items.</p>
+   <div class="actions"><button class="btn primary" id="em_go">Send email</button><button class="btn" id="em_no">Cancel</button><span class="muted" id="em_msg" style="font-size:12.5px;align-self:center"></span></div>`,true);
+  m.querySelector("#em_no").onclick=closeModal;
+  m.querySelector("#em_go").onclick=async()=>{
+    const to=m.querySelector("#em_to").value.split(/[,;\s]+/).filter(Boolean),cc=m.querySelector("#em_cc").value.split(/[,;\s]+/).filter(Boolean);
+    if(!to.length){m.querySelector("#em_msg").textContent="Add the vendor's email address";return}
+    const go=m.querySelector("#em_go");go.disabled=true;m.querySelector("#em_msg").textContent="Sending…";
+    try{
+      const d=buildPDF();if(!d)throw new Error("PDF library didn't load");
+      const att=[{name:fileName(),contentType:"application/pdf",b64:d.output("datauristring").split(",")[1]}];
+      if(isW()&&wForm()==="mimaki")att.push({name:wFileName(),contentType:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",b64:await blobB64(await mimakiXlsx())});
+      const r=await whTool({op:"mail_send",to,cc,subject:m.querySelector("#em_sub").value,html:poEmailHtml(v,t,rows),attachments:att});
+      if(cur.status==="draft")cur.status="sent";await savePO(true);closeModal();
+      toast(`PO ${esc(cur.number)} emailed to ${esc((r.sentTo||to).join(", "))}`,6000);
+    }catch(e){go.disabled=false;m.querySelector("#em_msg").textContent=e.message==="needs_mail_send"?"Microsoft needs reconnecting in the Service Desk before email can be sent.":"Couldn't send: "+(e.message||e.code)}
+  };
+};
+/* Draft POs can be deleted (stock isn't touched). */
+function deleteDraft(id){
+  const p=pos.find(x=>x._id===id);if(!p)return;
+  if(p.status!=="draft"){toast("Only draft POs can be deleted — PO "+esc(p.number)+" is "+esc(p.status));return}
+  const m=modal(`<h2>Delete draft PO ${esc(p.number)}?<button class="x">×</button></h2>
+   <p>${(p.lines||[]).length} line${(p.lines||[]).length===1?"":"s"} · ${money(p.total)} · ${esc(p.vendorName||"")}</p>
+   <p class="muted">This removes the draft from PO history. Stock isn't affected. It can't be undone.</p>
+   <div class="actions"><button class="btn danger" id="dd_go">Delete draft</button><button class="btn" id="dd_no">Keep it</button></div>`);
+  m.querySelector("#dd_no").onclick=closeModal;
+  m.querySelector("#dd_go").onclick=async()=>{
+    try{await db.doc("pos/"+id).delete();pos=pos.filter(x=>x._id!==id);closeModal();
+      if(cur.id===id){cur=blankPO();try{localStorage.removeItem("hd-po-draft")}catch(e){}loadPOtoForm()}
+      if($("#v-history").classList.contains("on"))renderHistory();toast("Draft PO "+esc(p.number)+" deleted")}
+    catch(e){toast("Couldn't delete: "+(e.message||e.code),6000)}};
+}
+$("#btnDelete").onclick=()=>{if(cur.id)deleteDraft(cur.id)};
+$("#poDelivery").onchange=e=>{cur.delivery=e.target.value;$("#poDelivery").dataset.u=cur.delivery;try{localStorage.setItem("hd-po-draft",JSON.stringify(cur))}catch(e){}};
+
+/* ---------- history ---------- */
+function renderHistory(){
+  const q=$("#hSearch").value.trim().toLowerCase(),vf=$("#hVendor").value,sf=$("#hStatus").value;
+  const list=pos.filter(p=>(!vf||p.vendorId===vf)&&(!sf||p.status===sf)&&(!q||(p.number+" "+(p.notes||"")+" "+(p.lines||[]).map(l=>l.code+" "+l.desc).join(" ")).toLowerCase().includes(q)))
+    .sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.number).localeCompare(String(a.number)));
+  $("#histBody").innerHTML=list.map(p=>`<tr class="click" data-po="${esc(p._id)}"><td class="mono"><b>${esc(p.number)}</b></td><td>${auDate(p.date)}</td><td>${esc(p.vendorName||(vById(p.vendorId)||{}).name||"")}</td>
+    <td style="font-size:12.5px">${(p.lines||[]).slice(0,3).map(l=>`<span class="mono">${esc(l.qty)}× ${esc(l.code)}</span>`).join(", ")}${(p.lines||[]).length>3?` <span class="muted">+${p.lines.length-3} more</span>`:""}</td>
+    <td class="num">${money(p.total)}</td><td><span class="pill ${esc(p.status)}">${esc(p.status)}</span>${p.type==="warranty"?' <span class="pill warranty">warranty</span>':""}${p.delivery==="overnight"?' <span class="pill" style="color:var(--bad)">overnight</span>':""}</td></tr>`).join("");
+  $("#histEmpty").style.display=list.length?"none":"block";
+  $$("[data-po]").forEach(r=>r.onclick=()=>{const p=pos.find(x=>x._id===r.dataset.po);if(!p)return;cur=Object.assign(blankPO(),JSON.parse(JSON.stringify(p)),{id:p._id});delete cur._id;loadPOtoForm();show("po")});
+}
+["#hSearch","#hVendor","#hStatus"].forEach(s=>$(s).addEventListener("input",renderHistory));
+
+/* ---------- warranty POs ----------
+   A PO is either a normal purchase or a warranty claim (cur.type). Warranty claims come in from the Service Desk
+   (Supabase table fbw.po_requests) or are started here. Mimaki claims are raised on Mimaki's own warranty form
+   (warranty-mimaki.xlsx, filled in the browser); other makers get the standard PO marked WARRANTY. */
+const SB_PROJECT="sfuuzcgwbbhdjqzrchvv";
+const W_STATUS=["Running (parts replaced)","Running (temporary fix)","Running (issue intermittent)","Down (waiting for parts)","Down (other)"];
+const W_KEYS=[["endUser","End user (customer)"],["dealer","Dealer"],["model","Machine model"],["serial","Serial number"],["firmware","Firmware version"],["ink","Ink type"],["inkLot","Ink lot no."],["issueDate","Date issue occurred","date"],["installDate","Installation date","date"],["machineStatus","Machine status","status"],["problem","Problem","area"],["troubleshoot","Troubleshooting done","area"],["cause","Cause","area"],["comments","Comments for the maker","area"]];
+const isW=()=>cur&&cur.type==="warranty";
+const isMimakiVendor=()=>{const v=vById(cur.vendorId)||{};return /mimaki/i.test((v.brand||"")+" "+(v.name||""))};
+function wBlank(){return{endUser:"",dealer:"Highway Digital",model:"",serial:"",firmware:"",ink:"",inkLot:"",issueDate:"",installDate:"",machineStatus:"",problem:"",troubleshoot:"",cause:"",comments:"",form:"",ticket:""}}
+function wForm(){const w=cur.warranty||{};return w.form||(isMimakiVendor()?"mimaki":"standard")}
+function renderWarranty(){
+  const on=isW();$("#poType").value=on?"warranty":"normal";$("#wPanel").style.display=on?"block":"none";$("#wFormWrap").style.display=on?"block":"none";
+  $("#btnWForm").style.display=on&&wForm()==="mimaki"?"":"none";
+  if(!on)return;
+  if(!cur.warranty)cur.warranty=wBlank();
+  const w=cur.warranty;$("#wForm").value=wForm();
+  $("#wFields").innerHTML=W_KEYS.map(([k,l,ty])=>{const v=esc(w[k]||"");
+    if(ty==="area")return`<div style="grid-column:1/-1"><label>${l}</label><textarea data-w="${k}" rows="2">${v}</textarea></div>`;
+    if(ty==="status")return`<div><label>${l}</label><select data-w="${k}"><option value="">Choose…</option>${W_STATUS.map(s=>`<option ${w[k]===s?"selected":""}>${esc(s)}</option>`).join("")}</select></div>`;
+    return`<div><label>${l}</label><input data-w="${k}" ${ty==="date"?'type="date"':""} value="${v}"></div>`}).join("");
+  $$("#wFields [data-w]").forEach(el=>el.oninput=el.onchange=()=>{cur.warranty[el.dataset.w]=el.value;try{localStorage.setItem("hd-po-draft",JSON.stringify(cur))}catch(e){}});
+}
+$("#poType").onchange=e=>{cur.type=e.target.value;if(isW()&&!cur.warranty)cur.warranty=wBlank();if(isW()&&!cur.notes){cur.notes="Warranty claim";$("#poNotes").value=cur.notes}renderWarranty();renderLines()};
+$("#wForm").onchange=e=>{cur.warranty.form=e.target.value;renderWarranty()};
+
+/* Supabase (shared with the Service Desk) */
+function sbParse(txt){
+  const pick=rows=>{const r0=rows&&rows[0];if(!r0)return null;const v=r0.r!==undefined?r0.r:Object.values(r0)[0];if(typeof v==="string"){try{return JSON.parse(v)}catch(e){return v}}return v};
+  let t=typeof txt==="string"?txt:JSON.stringify(txt||"");
+  for(let i=0;i<3;i++){try{const o=JSON.parse(t);if(Array.isArray(o))return pick(o);if(o&&Array.isArray(o.result))return pick(o.result);if(o&&typeof o.result==="string"){t=o.result;continue}if(o&&o.error)throw new Error(typeof o.error==="string"?o.error:(o.error.message||"Supabase error"))}catch(e){if(e instanceof SyntaxError)break;throw e}break}
+  const a=t.indexOf("[{"),b=t.lastIndexOf("}]");if(a<0||b<a)return null;try{return pick(JSON.parse(t.slice(a,b+2)))}catch(e){return null}
+}
+function sqlStr(s){s=String(s==null?"":s);let tag;do{tag="po"+Math.random().toString(36).slice(2,8)}while(s.includes("$"+tag+"$"));return"$"+tag+"$"+s+"$"+tag+"$"}
+async function sb(q){
+  if(!mcp)throw{code:"not_granted"};
+  const r=await mcp.callTool("Supabase","execute_sql",{project_id:SB_PROJECT,query:q});
+  const txt=r&&r.content?r.content.map(c=>c.text||"").join(""):(typeof r==="string"?r:JSON.stringify(r&&("payload" in r)?r.payload:r));
+  if(r&&r.isError)throw{code:"tool_error",message:txt};
+  return sbParse(txt);
+}
+let wReqs=[],wReqErr="";
+async function loadReqs(){
+  if(MODE==="portal"){try{const{data,error}=await sbc.rpc("wh_requests",{p:{}});if(error)throw new Error(error.message);wReqs=data||[];wReqErr=""}catch(e){wReqErr="Couldn't load warranty requests: "+(e.message||e)}renderInbox();return}
+  if(!mcp)return;
+  try{wReqs=await sb(`select coalesce(json_agg(json_build_object('id',id,'ticket',ticket_num,'vendor',vendor,'status',status,'payload',payload,'created',created_at) order by id desc),'[]')::text as r from fbw.po_requests where kind='warranty' and status='pending';`)||[];wReqErr=""}
+  catch(e){wReqErr=mcpErr(e,"Supabase")}
+  renderInbox();
+}
+function renderInbox(){
+  const box=$("#wInbox");
+  if(!wReqs.length&&!wReqErr){box.style.display="none";return}
+  box.style.display="block";
+  box.innerHTML=`<h2 style="display:flex;justify-content:space-between;align-items:center;gap:8px">Warranty requests from the Service Desk <button class="btn sm" id="wReload">Refresh</button></h2>
+   ${wReqErr?`<div class="note">${esc(wReqErr)}</div>`:""}
+   ${wReqs.map(r=>{const p=r.payload||{};return`<div class="fbjob" style="grid-template-columns:120px 1fr 1fr auto;cursor:default"><b class="mono">${esc(r.ticket||p.ticket||"")}</b>
+     <div>${esc(p.customer||"")}<div class="muted" style="font-size:12px">${esc([p.brand,p.model].filter(Boolean).join(" "))}${p.serial?" · S/N "+esc(p.serial):""}</div></div>
+     <div class="muted" style="font-size:12.5px">${(p.parts||[]).map(x=>`<span class="mono">${esc(x.qty)}× ${esc(x.code)}</span>`).join(", ")}<div>${esc(r.vendor||p.vendor||"")} · ${auDate(String(r.created||"").slice(0,10))}</div></div>
+     <div style="display:flex;gap:6px"><button class="btn sm primary" data-wopen="${esc(r.id)}">Open as warranty PO</button><button class="btn sm" data-wdis="${esc(r.id)}" title="Remove from this list">Dismiss</button></div></div>`}).join("")}`;
+  $("#wReload").onclick=loadReqs;
+  $$("[data-wopen]").forEach(b=>b.onclick=()=>openReq(wReqs.find(r=>String(r.id)===b.dataset.wopen)));
+  $$("[data-wdis]").forEach(b=>b.onclick=async()=>{b.disabled=true;try{if(MODE==="portal"){const{error}=await sbc.rpc("wh_requests",{p:{op:"update",id:+b.dataset.wdis,status:"cancelled",note:"Dismissed in Warehousing"}});if(error)throw new Error(error.message)}else await sb(`update fbw.po_requests set status='cancelled', note='Dismissed in Warehousing', updated_at=now() where id=${+b.dataset.wdis} returning id;`);wReqs=wReqs.filter(r=>String(r.id)!==b.dataset.wdis);renderInbox();toast("Request dismissed")}catch(e){toast(esc(mcpErr(e,"Supabase")));b.disabled=false}});
+}
+function openReq(r){
+  if(!r)return;const p=r.payload||{};
+  cur=blankPO();cur.type="warranty";
+  const v=vendors.find(x=>(x.name||"").toLowerCase()===String(r.vendor||p.vendor||"").toLowerCase())||brandToVendor(p.brand);
+  if(v){cur.vendorId=v._id;cur.vendorAddr=vendorAddr(v)}
+  const digits=String(p.ticket||r.ticket||"").replace(/\D/g,"");
+  cur.number="W"+(digits||r.id);
+  cur.warranty=Object.assign(wBlank(),{endUser:p.endUser||p.customer||"",model:p.model||"",serial:p.serial||"",firmware:p.firmware||"",ink:p.ink||"",inkLot:p.inkLot||"",issueDate:p.issueDate||"",installDate:p.installDate||"",machineStatus:p.machineStatus||"",problem:p.problem||"",troubleshoot:p.troubleshoot||"",cause:p.cause||"",comments:p.comments||"",ticket:p.ticket||r.ticket||""});
+  cur.notes=`Warranty claim · Customer: ${p.customer||""} · Job ${p.ticket||r.ticket||""}`;
+  cur.ref={kind:"ticket",reqId:r.id,number:p.ticket||r.ticket||"",client:p.customer||"",po:""};
+  cur.lines=(p.parts||[]).map(x=>({code:x.code||"",desc:x.desc||"",qty:Number(x.qty)||1,price:0,disc:0,supply:x.supply||"order",billable:!!x.billable}));
+  loadPOtoForm();show("po");window.scrollTo(0,0);
+  toast(`Warranty request #${esc(r.id)} loaded as PO ${esc(cur.number)}. Check the details, then Save.`,5000);
+}
+async function syncReq(){
+  if(!cur.ref||!cur.ref.reqId||(!mcp&&MODE!=="portal"))return;
+  const st=cur.status==="received"?"received":cur.status==="sent"?"sent":"raised";
+  if(MODE==="portal"){try{const{error}=await sbc.rpc("wh_requests",{p:{op:"update",id:+cur.ref.reqId,status:st,po_number:cur.number}});if(error)throw new Error(error.message);wReqs=wReqs.filter(r=>+r.id!==+cur.ref.reqId);renderInbox()}catch(e){toast("PO saved, but the Service Desk couldn't be told: "+esc(e.message),6000)}return}
+  try{await sb(`update fbw.po_requests set status=${sqlStr(st)}, po_number=${sqlStr(cur.number)}, updated_at=now() where id=${+cur.ref.reqId} returning id;`);wReqs=wReqs.filter(r=>+r.id!==+cur.ref.reqId);renderInbox()}catch(e){toast("PO saved, but the Service Desk couldn't be told: "+esc(mcpErr(e,"Supabase")),6000)}
+}
+
+/* Mimaki warranty form: fill the template's first sheet, keeping all its formatting */
+const colIdx=c=>c.split("").reduce((n,ch)=>n*26+ch.charCodeAt(0)-64,0);
+async function mimakiXlsx(){
+  if(!window.JSZip)throw new Error("The spreadsheet library didn't load. Reload the page");
+  const lines=cur.lines.filter(l=>String(l.code||"").trim());
+  if(lines.length>20)throw new Error("Mimaki's form has room for 20 parts; split the claim into two POs");
+  const res=await fetch("warranty-mimaki.json");if(!res.ok)throw new Error("The Mimaki form template is missing");
+  const zip=await JSZip.loadAsync((await res.json()).xlsx,{base64:true});
+  const path="xl/worksheets/sheet1.xml";
+  const doc=new DOMParser().parseFromString(await zip.file(path).async("string"),"application/xml");
+  const NS=doc.documentElement.namespaceURI,sd=doc.getElementsByTagName("sheetData")[0];
+  const kids=(el,tag)=>Array.from(el.childNodes).filter(n=>n.nodeType===1&&n.localName===tag);
+  function cell(ref){
+    const rn=+ref.match(/\d+/)[0],col=ref.match(/[A-Z]+/)[0];
+    let row=kids(sd,"row").find(r=>+r.getAttribute("r")===rn);
+    if(!row){row=doc.createElementNS(NS,"row");row.setAttribute("r",rn);const after=kids(sd,"row").find(r=>+r.getAttribute("r")>rn);sd.insertBefore(row,after||null)}
+    let c=kids(row,"c").find(x=>x.getAttribute("r")===ref);
+    if(!c){c=doc.createElementNS(NS,"c");c.setAttribute("r",ref);const after=kids(row,"c").find(x=>colIdx(x.getAttribute("r").match(/[A-Z]+/)[0])>colIdx(col));row.insertBefore(c,after||null)}
+    while(c.firstChild)c.removeChild(c.firstChild);c.removeAttribute("t");return c;
+  }
+  const str=(ref,v)=>{v=String(v==null?"":v);if(!v.trim())return;const c=cell(ref);c.setAttribute("t","inlineStr");const is=doc.createElementNS(NS,"is"),t=doc.createElementNS(NS,"t");t.setAttributeNS("http://www.w3.org/XML/1998/namespace","xml:space","preserve");t.textContent=v;is.appendChild(t);c.appendChild(is)};
+  const num=(ref,n)=>{const c=cell(ref),v=doc.createElementNS(NS,"v");v.textContent=String(n);c.appendChild(v)};
+  const date=(ref,iso)=>{const m=String(iso||"").match(/^(\d{4})-(\d{2})-(\d{2})/);if(!m){str(ref,iso);return}num(ref,(Date.UTC(+m[1],m[2]-1,+m[3])-Date.UTC(1899,11,30))/864e5)};
+  const w=cur.warranty||wBlank();
+  date("C5",cur.date||today());str("C7",w.dealer||"Highway Digital");str("C8",w.endUser);
+  str("B11",[w.comments,`Highway Digital PO ${cur.number}${w.ticket?" · job "+w.ticket:""}`,lines.some(l=>l.supply==="stock")?"Parts marked replenish were fitted from our stock.":""].filter(Boolean).join("\n"));
+  lines.forEach((l,i)=>{const r=18+i;
+    date("B"+r,w.issueDate);date("C"+r,w.installDate);str("D"+r,w.model);str("E"+r,w.serial);str("F"+r,w.firmware);str("G"+r,w.ink);str("H"+r,w.inkLot);
+    str("I"+r,w.problem);str("J"+r,w.troubleshoot);str("K"+r,w.cause);str("L"+r,w.machineStatus);str("M"+r,String(l.code).trim());num("N"+r,Number(l.qty)||1)});
+  zip.file(path,new XMLSerializer().serializeToString(doc));
+  if(zip.file("xl/calcChain.xml"))zip.remove("xl/calcChain.xml");
+  return zip.generateAsync({type:"blob",mimeType:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",compression:"DEFLATE"});
+}
+function wFileName(){return"Mimaki Warranty PO "+String(cur.number).trim()+".xlsx"}
+function blobB64(b){return new Promise((ok,no)=>{const fr=new FileReader();fr.onload=()=>ok(String(fr.result).split(",")[1]);fr.onerror=no;fr.readAsDataURL(b)})}
+$("#btnWForm").onclick=async()=>{
+  if(!validate())return;
+  try{const b=await mimakiXlsx();await saveFile(wFileName(),b);if(!cur.id)savePO(true)}
+  catch(e){if(e&&e.code==="declined")return;toast("Couldn't build the Mimaki form: "+esc(e.message||e.code),6000)}
+};
+
+/* ---------- start ---------- */
+cur=blankPO();
+try{const s=localStorage.getItem("hd-po-draft");if(s){const o=JSON.parse(s);if(o&&o.lines)cur=Object.assign(blankPO(),o)}}catch(e){}
+fillVendorSelects();
+loadPOtoForm();
+const h=(location.hash||"").slice(1);if(["po","parts","history","vendors"].includes(h))show(h);
+init();
+})();
+</script>
+</body>
+</html>
