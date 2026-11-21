@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flute Practice · Highway Service Desk</title><meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&family=Cormorant+Garamond:wght@600;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE: warm, patient practice companion
+   IDEA: a lacquered bamboo flute laid on the table, with a hymn-book tune strip under it
+   PICTURE: large bamboo flute whose six holes fill and empty as each note plays
+   COLOUR and TYPE: white ground, bamboo gold #e0a63a, lacquer red #c4302b fingers, ink; Outfit
+   LAYOUT: flute + big note first, tune strip, controls, then full fingering chart and custom notes */
+:root{color-scheme:light dark;--bg:light-dark(#fbf6ea,#17150f);--panel:light-dark(rgba(251,246,234,.74),rgba(23,21,15,.74));--sky1:light-dark(#f4ead2,#10141c);--sky2:light-dark(#e6d6b2,#1d2230);--m1:light-dark(#c9c6bb,#2a3140);--m2:light-dark(#9ea3a0,#222836);--m3:light-dark(#5d6461,#171b24);--mist:light-dark(rgba(244,234,210,.75),rgba(16,20,28,.7));--sun:light-dark(#c4302b,#e8e1c8);--ink:light-dark(#1b1915,#f3ece0);--soft:light-dark(#6b645a,#b4aa9b);--line:light-dark(#e7e1d6,#352f27);--card:light-dark(#faf6ef,#211c16);--bam:#e0a63a;--bamD:#b97f1e;--red:#c4302b;--hole:light-dark(#3a2a12,#120d07)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--sky1);color:var(--ink);font:16px/1.55 Outfit,system-ui,sans-serif;overflow-x:clip}
+.band{padding:clamp(18px,3vw,40px) clamp(14px,4vw,44px);max-width:1200px;width:calc(100% - 20px);margin:14px auto;background:var(--panel);border-radius:16px;border:1px solid light-dark(rgba(122,90,40,.25),rgba(232,225,200,.12));box-shadow:0 1px 0 rgba(255,255,255,.4) inset;-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+main{position:relative;z-index:1;padding:clamp(60px,16vh,170px) 0 40px}
+.scenery{position:fixed;inset:0;z-index:0;pointer-events:none}
+.scenery svg{width:100%;height:100%;display:block}
+.titlerow{display:flex;align-items:center;gap:14px}
+.seal{flex:none;width:52px;height:52px;border-radius:6px;background:#b8282a;color:#fbf1e0;display:grid;place-items:center;font:700 30px/1 "Noto Serif SC","Songti SC","SimSun",serif;transform:rotate(-4deg);box-shadow:inset 0 0 0 3px #b8282a,inset 0 0 0 5px rgba(251,241,224,.8)}
+h1{font-family:"Cormorant Garamond",Georgia,serif;font-weight:700;font-size:clamp(32px,5.5vw,50px);line-height:1.05;margin:0 0 4px;text-wrap:balance}
+h2{font-family:"Cormorant Garamond",Georgia,serif;font-weight:700;font-size:28px;margin:0 0 10px}
+.sub{color:var(--soft);margin:0 0 18px}
+.stage{background:light-dark(rgba(255,252,244,.86),rgba(33,28,22,.86));border:1px solid var(--line);border-radius:18px;padding:clamp(14px,3vw,28px)}
+.now{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:6px}
+.big{font-size:clamp(56px,12vw,96px);font-weight:700;line-height:1;color:var(--red);min-width:2.2ch}
+.hint{font-size:17px;color:var(--soft)}
+.hint b{color:var(--ink)}
+.fluteWrap{width:100%;aspect-ratio:1000/170}
+.fluteWrap svg{width:100%;height:100%;display:block}
+.strip{display:flex;gap:6px;overflow-x:auto;padding:12px 2px 6px;scroll-behavior:smooth}
+.chip{flex:none;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:10px;padding:6px 10px;font:600 15px Outfit,sans-serif;min-height:40px;cursor:pointer}
+.chip{display:flex;flex-direction:column;align-items:center;gap:3px}
+.res{font-style:normal;font-size:12px;font-weight:600;border-radius:6px;padding:0 6px;min-height:17px;line-height:17px}
+.res.g{background:#1f9d55;color:#fff}.res.o{background:#e08a00;color:#fff}.res.r{background:#c4302b;color:#fff}.res.m{color:var(--soft)}
+.score{display:flex;gap:10px;flex-wrap:wrap;font-weight:600;margin-top:10px;min-height:24px}
+.score span{border-radius:8px;padding:2px 10px;color:#fff}
+.file{display:block;margin-top:8px;font:16px Outfit,sans-serif;color:var(--ink)}
+.status{font-size:15px;color:var(--soft);min-height:22px;margin-top:6px}
+.chip.done{opacity:.55}
+.chip{position:relative;overflow:hidden;justify-content:flex-end}
+.chip>span,.chip>.len,.chip>.res{position:relative;z-index:1}
+.chip .bar{position:absolute;left:0;top:0;bottom:0;width:calc(var(--p,0)*100%);background:var(--fill,#e0a63a);z-index:0;pointer-events:none}
+.chip.on{background:var(--card);color:var(--ink);border-color:var(--ink);border-width:2px}
+.chip.done .bar{width:100%;background:light-dark(#e9dcc4,#3a3226)}
+.chip .len{font-size:11px;font-weight:400;color:var(--soft);line-height:1}
+.br{flex:none;align-self:center;font:700 22px Outfit,sans-serif;color:#2f7fc1;padding:0 2px;line-height:1}
+.br small{display:block;font-size:10px;font-weight:600;text-align:center}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:14px;color:var(--soft);margin-top:4px}
+.legend i{display:inline-block;width:46px;height:12px;border-radius:4px;vertical-align:middle;margin-right:6px;background:linear-gradient(90deg,hsl(45 75% 55%),hsl(25 80% 52%),hsl(2 70% 50%))}
+.ctrl{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:14px;margin-top:16px;align-items:end}
+label{font-size:14px;color:var(--soft);display:block}
+select,textarea,input[type=range]{width:100%;font:16px Outfit,sans-serif}
+select,textarea{background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px;min-height:44px;margin-top:4px}
+.btns{display:flex;gap:10px;flex-wrap:wrap}
+button.main{font:600 17px Outfit,sans-serif;border:0;border-radius:12px;padding:0 22px;min-height:48px;cursor:pointer;background:var(--ink);color:var(--bg)}
+button.alt{background:transparent;color:var(--ink);border:1px solid var(--line)}
+button:focus-visible,select:focus-visible,textarea:focus-visible,.chip:focus-visible,input:focus-visible{outline:3px solid var(--bam);outline-offset:2px}
+.tog{display:flex;gap:8px;align-items:center;font-size:15px;color:var(--ink);min-height:44px}
+.tog input{width:22px;height:22px;accent-color:var(--red)}
+.about{color:var(--soft);font-size:15px;margin-top:10px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.fc{border:1px solid var(--line);border-radius:12px;padding:10px 12px;cursor:pointer;background:var(--bg);color:var(--ink);text-align:left;font:inherit}
+.fc b{font-size:20px}
+.fc svg{display:block;width:100%;height:26px;margin-top:4px}
+.fc small{color:var(--soft);display:block}
+.key{display:flex;gap:16px;flex-wrap:wrap;font-size:14px;color:var(--soft);margin:6px 0 14px}
+.inv{display:flex;gap:12px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--line);padding:10px 0}
+.inv div{flex:1 1 220px}.inv small{color:var(--soft);display:block}
+.inv.off{opacity:.55}
+.err{color:var(--red);font-size:14px;min-height:20px}
+@media(prefers-reduced-motion:reduce){.strip{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<div class="scenery" aria-hidden="true"><svg viewBox="0 0 1200 800" preserveAspectRatio="xMidYMax slice">
+<defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop style="stop-color:var(--sky1)" offset="0"/><stop style="stop-color:var(--sky2)" offset="1"/></linearGradient>
+<linearGradient id="mistg" x1="0" y1="0" x2="0" y2="1"><stop style="stop-color:var(--mist)" offset="0" stop-opacity="0"/><stop style="stop-color:var(--mist)" offset=".5"/><stop style="stop-color:var(--mist)" offset="1" stop-opacity="0"/></linearGradient>
+<g id="crane"><path style="stroke:var(--m3)" d="M0 0 q10 -8 20 0 q10 -8 20 0" fill="none" stroke-width="2.2" stroke-linecap="round"/></g></defs>
+<rect width="1200" height="800" fill="url(#sky)"/>
+<circle style="fill:var(--sun)" cx="730" cy="150" r="56" opacity=".85"/>
+<g opacity=".55"><use href="#crane" x="560" y="120"/><use href="#crane" x="610" y="96" transform="scale(1)"/><use href="#crane" x="500" y="150"/></g>
+<path style="fill:var(--m1)" d="M0 520 C90 470 150 420 230 380 C300 345 340 400 400 360 C470 315 520 250 600 300 C660 338 700 330 760 290 C830 245 900 300 980 340 C1060 380 1120 350 1200 330 V800 H0Z"/>
+<rect y="430" width="1200" height="90" fill="url(#mistg)"/>
+<path style="fill:var(--m2)" d="M0 600 C70 560 120 470 200 455 C260 445 280 520 340 500 C420 470 450 400 520 430 C590 460 610 530 690 520 C770 510 800 430 880 440 C960 452 1000 530 1080 520 C1140 512 1170 470 1200 460 V800 H0Z"/>
+<g> style="fill:var(--m2)"<rect x="512" y="378" width="16" height="56"/><path d="M496 392 h48 l-8 -10 h-32z M500 410 h40 l-7 -9 h-26z M504 378 h32 l-16 -18z"/></g>
+<rect y="540" width="1200" height="90" fill="url(#mistg)"/>
+<path style="fill:var(--m3)" d="M0 700 C80 640 140 600 220 610 C300 620 330 680 420 670 C520 660 560 600 650 615 C740 630 760 700 860 690 C960 680 1010 620 1100 630 C1150 636 1180 660 1200 670 V800 H0Z"/>
+<g style="stroke:var(--m3)" stroke-linecap="round" fill="none"><path d="M60 800 C70 700 90 640 120 590" stroke-width="12"/><path d="M110 610 C150 600 190 580 230 585" stroke-width="5"/><path d="M95 660 C60 650 30 640 0 645" stroke-width="5"/></g>
+<g> style="fill:var(--m3)"<ellipse cx="225" cy="578" rx="48" ry="12"/><ellipse cx="190" cy="565" rx="36" ry="10"/><ellipse cx="128" cy="585" rx="40" ry="11"/><ellipse cx="20" cy="638" rx="44" ry="11"/><ellipse cx="60" cy="625" rx="30" ry="9"/></g>
+<g style="stroke:var(--m3)" stroke-linecap="round" opacity=".9"><path d="M1150 800 V430" stroke-width="9"/><path d="M1178 800 V500" stroke-width="7"/>
+<path style="stroke:var(--sky2)" d="M1150 520 h9 M1150 610 h9 M1150 700 h9 M1178 590 h7 M1178 680 h7" stroke-width="2"/>
+<path d="M1150 470 q-30 -10 -60 6 M1150 560 q-34 -6 -66 14 M1178 540 q24 -12 40 -6" stroke-width="4" fill="none"/></g>
+<g> style="fill:var(--m3)"<path d="M1090 476 q-14 2 -26 14 q16 0 26 -14z M1084 574 q-16 4 -26 18 q18 -2 26 -18z"/></g>
+</svg></div>
+<main>
+<section class="band">
+<div class="titlerow"><span class="seal" lang="zh">簫</span><h1>Xiao practice player</h1></div>
+<p class="sub">Pick a tune and press Play. Copy each finger position as the holes change.</p>
+
+<div class="stage">
+  <div class="now"><span class="big" id="big">–</span><span class="hint" id="hint">Hole 1 is nearest your mouth. Red = finger down.</span></div>
+  <div class="fluteWrap"><svg id="flute" viewBox="0 0 1000 170" role="img" aria-label="Flute fingering diagram"></svg></div>
+  <div class="strip" id="strip" aria-label="Notes in this tune"></div>
+  <div class="legend"><span><i></i>Each box fills while you hold that note; wider box = longer note. Red = time to move on</span><span><b style="color:#2f7fc1">’</b> = take a breath here</span></div>
+
+  <div class="ctrl">
+    <div><label for="song">Tune</label><select id="song"></select></div>
+    <div><label for="tempo">Speed: <span id="tv">60</span> beats a minute</label><input id="tempo" type="range" min="30" max="140" value="60"></div>
+    <div class="btns"><button class="main" id="play">Play</button><button class="main alt" id="stop">Stop</button></div>
+  </div>
+  <div class="ctrl">
+    <label class="tog"><input type="checkbox" id="pitch" checked> Match my flute's pitch (all holes ≈ C♯5)</label>
+    <label class="tog"><input type="checkbox" id="count" checked> Count in 4 clicks</label>
+    <label class="tog"><input type="checkbox" id="loop"> Loop the tune</label>
+    <label class="tog"><input type="checkbox" id="mute"> Silent (show fingers only)</label>
+    <label class="tog"><input type="checkbox" id="mic"> Listen to me while it plays (mic)</label>
+  </div>
+  <p class="about" id="about"></p>
+  <div class="status" id="status"></div>
+  <div class="score" id="score" aria-live="polite"></div>
+</div>
+</section>
+
+<section class="band">
+<h2>Check a recording</h2>
+<p class="sub">Record yourself playing the selected tune with your phone's voice recorder or camera, then choose the file here. Each note gets marked under the tune: <b style="color:#1f9d55">green</b> = right note, <b style="color:#e08a00">orange</b> = close (a semitone off, wrong octave, or out of tune), <b style="color:#c4302b">red</b> = wrong or missed. A ↑ or ↓ means the right note but sharp or flat.</p>
+<input class="file" type="file" id="rec" accept="audio/*,video/*">
+<div class="status" id="recStatus"></div>
+</section>
+
+<section class="band">
+<h2>Type in your own notes</h2>
+<p class="sub">Use note names from any sheet or video, separated by spaces. Add a length after a colon if you like: <b>E:2</b> = two beats, <b>G:.5</b> = half a beat. Octave numbers are optional (E5 = the higher E).</p>
+<textarea id="custom" rows="3" placeholder="e.g. E F# G A B:2 A G F# E:2"></textarea>
+<div class="err" id="err"></div>
+<div class="btns"><button class="main" id="load">Load my notes</button></div>
+</section>
+
+<section class="band" id="admin" hidden>
+<h2>Invite players</h2>
+<p class="sub">Give someone their own login to this flute player. They sign in at <b>portal.highwaydigital.com.au</b> with the email you add here and see only Flute Practice. No email is sent, so let them know yourself.</p>
+<form id="invForm" class="ctrl" style="margin-top:0">
+  <div><label for="invName">Name</label><textarea id="invName" rows="1" style="resize:none" placeholder="e.g. Sam Lee"></textarea></div>
+  <div><label for="invEmail">Email</label><textarea id="invEmail" rows="1" style="resize:none" placeholder="name@example.com"></textarea></div>
+  <div class="btns"><button class="main" type="submit">Invite</button></div>
+</form>
+<div class="err" id="invMsg" aria-live="polite"></div>
+<div id="invList"></div>
+</section>
+
+<section class="band">
+<h2>Fingering chart</h2>
+<p class="sub">Tap any note to hear it and see it on the big flute. Same fingers for the higher octave, just blow a little faster.</p>
+<div class="key"><span>● covered</span><span>◐ half covered</span><span>○ open</span><span>Hole 1 = top (mouth end)</span></div>
+<div class="grid" id="chart"></div>
+<p class="about">Fingerings are for a six-hole flute played like a D flute (all holes covered = D). Your flute sounds about a semitone lower, which the "match my flute" switch accounts for.</p>
+</section>
+</main>
+
+<script>
+{
+const NAMES=['C','C♯','D','D♯','E','F','F♯','G','G♯','A','B♭','B'];
+const PC={C:0,D:2,E:4,F:5,G:7,A:9,B:11};
+// holes 1..6: 1 covered, .5 half, 0 open — index = semitones above D
+const FING=[[1,1,1,1,1,1],[1,1,1,1,1,.5],[1,1,1,1,1,0],[1,1,1,1,.5,0],[1,1,1,1,0,0],[1,1,1,0,0,0],[1,1,.5,0,0,0],[1,1,0,0,0,0],[1,.5,0,0,0,0],[1,0,0,0,0,0],[0,1,1,0,0,0],[0,0,0,0,0,0]];
+const TIPS={1:'half-cover hole 6',3:'half-cover hole 5',6:'half-cover hole 3',8:'half-cover hole 2',10:'cross-fingering: lift hole 1, cover 2 and 3'};
+const SONGS=[
+ {n:'Amazing Grace',a:'Traditional hymn tune (1835), key of G. Slow and smooth: great for long notes.',t:60,s:'D4:1 G4:2 B4:.5 G4:.5 B4:2 A4:1 G4:2 E4:1 D4:2 , D4:1 G4:2 B4:.5 G4:.5 B4:2 A4:1 D5:2 , B4:1 D5:2 B4:.5 G4:.5 B4:2 A4:1 G4:2 E4:1 D4:2 , D4:1 G4:2 B4:.5 G4:.5 B4:2 A4:1 G4:3'},
+ {n:'Twinkle Twinkle Little Star',a:'Traditional French tune. Only the bottom-half notes: the easiest start.',t:80,s:'D4 D4 A4 A4 B4 B4 A4:2 G4 G4 F#4 F#4 E4 E4 D4:2 A4 A4 G4 G4 F#4 F#4 E4:2 A4 A4 G4 G4 F#4 F#4 E4:2 D4 D4 A4 A4 B4 B4 A4:2 G4 G4 F#4 F#4 E4 E4 D4:2'},
+ {n:'When the Saints Go Marching In',a:'Traditional spiritual. Four notes most of the way.',t:90,s:'D4 F#4 G4 A4:4 , D4 F#4 G4 A4:4 , D4 F#4 G4 A4:2 F#4:2 D4:2 F#4:2 E4:4 , F#4 F#4 E4 D4:3 , D4 F#4 A4 A4:2 G4:3 , F#4 G4 A4:2 F#4:2 D4:2 E4:2 D4:4'},
+ {n:'Jingle Bells (chorus)',a:'James Lord Pierpont, 1857. Bouncy, mostly F♯.',t:100,s:'F#4 F#4 F#4:2 F#4 F#4 F#4:2 F#4 A4 D4:1.5 E4:.5 F#4:4 , G4 G4 G4:1.5 G4:.5 G4 F#4 F#4 F#4:.5 F#4:.5 F#4 E4 E4 F#4 E4:2 A4:2 , F#4 F#4 F#4:2 F#4 F#4 F#4:2 F#4 A4 D4:1.5 E4:.5 F#4:4 , G4 G4 G4:1.5 G4:.5 G4 F#4 F#4 F#4:.5 F#4:.5 A4 A4 G4 E4 D4:4'},
+ {n:'Auld Lang Syne (verse)',a:'Traditional Scottish tune, key of G. Dotted rhythms: long-short, long-short.',t:70,s:'D4:1 G4:1.5 G4:.5 G4:1 B4:1 A4:1.5 G4:.5 A4:1 B4:1 G4:1.5 G4:.5 B4:1 D5:1 E5:3 , E5:1 D5:1.5 B4:.5 B4:1 G4:1 A4:1.5 G4:.5 A4:1 B4:1 G4:1.5 E4:.5 E4:1 D4:1 G4:3'},
+ {n:'Ode to Joy',a:'Beethoven, 1824, key of G. Introduces C natural (cross-fingering).',t:90,s:'B4 B4 C5 D5 D5 C5 B4 A4 G4 G4 A4 B4 B4:1.5 A4:.5 A4:2 , B4 B4 C5 D5 D5 C5 B4 A4 G4 G4 A4 B4 A4:1.5 G4:.5 G4:2 , A4 A4 B4 G4 A4 B4:.5 C5:.5 B4 G4 A4 B4:.5 C5:.5 B4 A4 G4 A4 D4:2 , B4 B4 C5 D5 D5 C5 B4 A4 G4 G4 A4 B4 A4:1.5 G4:.5 G4:2'},
+ {n:'Frère Jacques',a:'Traditional French round, key of G. Has high D and E: blow a little faster.',t:90,s:'G4 A4 B4 G4 G4 A4 B4 G4 , B4 C5 D5:2 B4 C5 D5:2 , D5:.5 E5:.5 D5:.5 C5:.5 B4 G4 D5:.5 E5:.5 D5:.5 C5:.5 B4 G4 , G4 D4 G4:2 G4 D4 G4:2'},
+ {n:'Mo Li Hua (Jasmine Flower), opening',a:'Traditional Chinese folk song, a classic on the xiao. Uses the higher octave.',t:60,s:'B4 B4:.5 D5:.5 E5:.5 G5:.5 G5:.5 E5:.5 D5 D5:.5 E5:.5 D5:2 , B4 B4:.5 D5:.5 E5:.5 G5:.5 G5:.5 E5:.5 D5 D5:.5 E5:.5 D5:2 , D5 D5 D5 B4:.5 D5:.5 E5 E5 D5:2 , B4 A4:.5 B4:.5 D5 B4:.5 A4:.5 G4 G4:.5 A4:.5 G4:2'},
+ {n:'Greensleeves (harder)',a:'Traditional English tune, A minor. Needs C natural and half-holed G♯.',t:70,s:'A4:1 C5:2 D5:1 E5:1.5 F#5:.5 E5:1 D5:2 B4:1 G4:1.5 A4:.5 B4:1 C5:2 A4:1 A4:1.5 G#4:.5 A4:1 B4:2 G#4:1 E4:2 , A4:1 C5:2 D5:1 E5:1.5 F#5:.5 E5:1 D5:2 B4:1 G4:1.5 A4:.5 B4:1 C5:1.5 B4:.5 A4:1 G#4:1.5 F#4:.5 G#4:1 A4:3'},
+ {n:'Warm-up: long notes',a:'Hold each note for four beats with a steady, quiet tone.',t:60,s:'D4:4 , E4:4 , F#4:4 , G4:4 , A4:4 , B4:4 , C#5:4 , D5:4'},
+ {n:'Warm-up: D major scale',a:'Up and down the flute\'s home scale.',t:80,s:'D4 E4 F#4 G4 A4 B4 C#5 D5:2 , D5 C#5 B4 A4 G4 F#4 E4 D4:2'},
+ {n:'Warm-up: E minor scale',a:'The scale most pop songs in E minor use. C natural is the tricky one.',t:70,s:'E4 F#4 G4 A4 B4 C5 D5 E5:2 , E5 D5 C5 B4 A4 G4 F#4 E4:2'}
+];
+
+function parse(str){
+  const out=[];let bad=[];
+  for(let tok of str.trim().split(/\s+/).filter(Boolean)){
+    if(/^[,'’|]+$/.test(tok)){if(out.length)out[out.length-1].br=1;continue}
+    let brk=false;if(/[,'’|]$/.test(tok)){brk=true;tok=tok.replace(/[,'’|]+$/,'')}
+    const m=tok.replace('♯','#').replace('♭','b').match(/^([A-Ga-g])([#b]?)(\d)?(?::(\d*\.?\d+))?$/);
+    if(!m){bad.push(tok);continue}
+    let pc=PC[m[1].toUpperCase()]+(m[2]=='#'?1:m[2]=='b'?-1:0);
+    let oct=m[3]!==undefined?+m[3]:null;
+    let midi;
+    if(oct===null){pc=(pc+12)%12;midi=pc>=2?60+pc:72+pc}else midi=12*(oct+1)+pc;
+    out.push({m:midi,d:m[4]?+m[4]:1,br:brk?1:0});
+  }
+  autoBreath(out);
+  return {notes:out,bad};
+}
+// Suggested breaths, unless the tune already marks its own (a comma after a note):
+// after a held note (2+ beats) once 4+ beats have passed, or any note boundary after 10 beats without one.
+function autoBreath(ns){
+  if(ns.some(n=>n.br))return;
+  let since=0;
+  ns.forEach((n,i)=>{since+=n.d;if(i===ns.length-1)return;
+    if((n.d>=2&&since>=4)||(since>=10&&n.d>=1)){n.br=2;since=0}});
+}
+function info(midi){
+  const s=midi-62;if(s<0)return {name:NAMES[((midi%12)+12)%12],f:null,oct:-1};
+  return {name:NAMES[midi%12],f:FING[s%12],oct:Math.floor(s/12),tip:TIPS[s%12]};
+}
+
+// flute drawing
+const svg=document.getElementById('flute');
+const HX=[400,470,540,640,710,780];
+function holeSvg(x,y,r,v,big){
+  const rim=`<circle cx="${x}" cy="${y}" r="${r}" fill="var(--hole)"/>`;
+  let fill='';
+  if(v===1)fill=`<circle cx="${x}" cy="${y}" r="${r+(big?4:1)}" fill="var(--red)"/>`;
+  else if(v===.5)fill=`<path d="M${x-r-(big?4:1)} ${y} A${r+(big?4:1)} ${r+(big?4:1)} 0 0 0 ${x+r+(big?4:1)} ${y}Z" fill="var(--red)"/>`;
+  return rim+fill;
+}
+function drawFlute(f){
+  let h=`<defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f3c66a"/><stop offset=".45" stop-color="#e0a63a"/><stop offset="1" stop-color="#a86f17"/></linearGradient></defs>
+  <rect x="20" y="58" width="960" height="64" rx="32" fill="url(#bg)"/>
+  <rect x="20" y="62" width="960" height="10" rx="5" fill="#fff" opacity=".25"/>
+  <rect x="250" y="58" width="22" height="64" fill="var(--red)" opacity=".9"/>
+  <rect x="880" y="58" width="16" height="64" fill="#1b1915" opacity=".8"/>
+  <rect x="902" y="58" width="14" height="64" fill="var(--red)" opacity=".9"/>
+  <path d="M20 90 a32 32 0 0 1 32 -32 h6 v64 h-6 a32 32 0 0 1 -32 -32z" fill="#7a4e10" opacity=".5"/>
+  <text x="34" y="44" font-size="20" fill="var(--soft)" font-family="Outfit">mouth end</text>
+  <text x="900" y="152" font-size="20" fill="var(--soft)" font-family="Outfit" text-anchor="middle">foot</text>`;
+  HX.forEach((x,i)=>{h+=holeSvg(x,90,15,f?f[i]:0,true)+`<text x="${x}" y="152" font-size="22" font-weight="600" fill="var(--ink)" text-anchor="middle" font-family="Outfit">${i+1}</text>`});
+  h+=`<text x="${(HX[0]+HX[2])/2}" y="40" font-size="19" fill="var(--soft)" text-anchor="middle" font-family="Outfit">left hand</text><text x="${(HX[3]+HX[5])/2}" y="40" font-size="19" fill="var(--soft)" text-anchor="middle" font-family="Outfit">right hand</text>`;
+  svg.innerHTML=h;
+}
+function miniSvg(f){
+  let h='<svg viewBox="0 0 180 26" aria-hidden="true"><rect x="0" y="4" width="180" height="18" rx="9" fill="#e0a63a"/>';
+  [18,46,74,106,134,162].forEach((x,i)=>{h+=holeSvg(x,13,6,f[i],false)});return h+'</svg>';
+}
+const big=document.getElementById('big'),hint=document.getElementById('hint');
+function show(midi){
+  const i=info(midi);big.textContent=i.name;
+  if(!i.f){drawFlute(null);hint.innerHTML='<b>Too low</b> for this flute. Try it an octave higher.';return}
+  drawFlute(i.f);
+  const parts=[];if(i.oct===1)parts.push('<b>Higher octave:</b> blow a little faster');if(i.oct>=2)parts.push('<b>Very high:</b> may not sound on your flute');if(i.tip)parts.push(i.tip);
+  hint.innerHTML=parts.join(' · ')||'Lower octave: gentle, slow air';
+}
+
+// audio
+let ctx=null,master=null,timer=null,raf=null,cur=[],playing=false;
+function ac(){if(!ctx){ctx=new (window.AudioContext||window.webkitAudioContext)()}return ctx}
+const shift=()=>document.getElementById('pitch').checked?11:0;
+function freq(m){return 440*2**((m+shift()-69)/12)}
+function tone(m,t,dur,out){
+  const c=ctx,o=c.createOscillator(),o2=c.createOscillator(),g=c.createGain(),g2=c.createGain(),lfo=c.createOscillator(),lg=c.createGain();
+  o.type='sine';o2.type='triangle';o.frequency.value=o2.frequency.value=freq(m);
+  lfo.frequency.value=5;lg.gain.value=freq(m)*.004;lfo.connect(lg);lg.connect(o.frequency);lg.connect(o2.frequency);
+  g2.gain.value=.25;o2.connect(g2);g2.connect(g);o.connect(g);g.connect(out);
+  const end=t+Math.max(.08,dur*.92);
+  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.32,t+.06);g.gain.setValueAtTime(.3,end-.06);g.gain.linearRampToValueAtTime(0,end);
+  [o,o2,lfo].forEach(x=>{x.start(t);x.stop(end+.02)});
+}
+function click(t,out,hi){const o=ctx.createOscillator(),g=ctx.createGain();o.frequency.value=hi?1500:1000;g.gain.setValueAtTime(.25,t);g.gain.exponentialRampToValueAtTime(.001,t+.06);o.connect(g);g.connect(out);o.start(t);o.stop(t+.07)}
+
+const strip=document.getElementById('strip'),scoreEl=document.getElementById('score'),statusEl=document.getElementById('status');
+function lab(m){const i=info(m);return i.name+(i.oct>=1?'′':'')}
+const med=a=>{const s=[...a].sort((x,y)=>x-y);return s.length?s[s.length>>1]:null};
+function grade(exp,p){
+  if(p==null)return {c:'m',t:'–'};
+  const r=Math.round(p),ct=Math.round((p-r)*100),d=Math.abs(r-exp);
+  let c=d===0?(Math.abs(ct)<=40?'g':'o'):(d===1||d===12)?'o':'r';
+  return {c,t:lab(r)+(d===0&&Math.abs(ct)>40?(ct>0?'↑':'↓'):'')};
+}
+const chips=()=>strip.querySelectorAll('.chip');
+function setRes(i,g){const e=chips()[i]?.querySelector('.res');if(e){e.className='res '+g.c;e.textContent=g.t}}
+function clearRes(){strip.querySelectorAll('.res').forEach(e=>{e.className='res';e.textContent=''});scoreEl.innerHTML=''}
+function showScore(gs){const k={g:0,o:0,r:0,m:0};gs.forEach(g=>k[g.c]++);
+  scoreEl.innerHTML=`<span style="background:#1f9d55">${k.g} right</span><span style="background:#e08a00">${k.o} close</span><span style="background:#c4302b">${k.r} wrong</span>${k.m?`<span style="background:#8a8378">${k.m} not heard</span>`:''}`}
+function range(){const s=shift();return [440*2**((58+s-69)/12),440*2**((90+s-69)/12)]}
+// YIN pitch detector: returns Hz or null
+function yin(x,off,sr,fmin,fmax,W){
+  const minL=Math.max(2,Math.floor(sr/fmax)),maxL=Math.ceil(sr/fmin);
+  const d=new Float32Array(maxL+2);let run=0,best=-1;
+  for(let t=1;t<=maxL+1;t++){let s=0;for(let i=0;i<W;i++){const v=x[off+i]-x[off+i+t];s+=v*v}d[t]=s}
+  for(let t=1;t<=maxL+1;t++){run+=d[t];d[t]=run?d[t]*t/run:1}
+  for(let t=minL;t<=maxL;t++){if(d[t]<0.15){while(t+1<=maxL&&d[t+1]<d[t])t++;best=t;break}}
+  if(best<0)return null;
+  const a=d[best-1],b=d[best],c=d[best+1],den=a-2*b+c,sh=den?(a-c)/(2*den):0;
+  return sr/(best+sh);
+}
+const toWritten=f=>12*Math.log2(f/440)+69-shift();
+function renderStrip(){
+  const bl=d=>d===1?'1 beat':(+d.toFixed(2))+' beats';
+  strip.innerHTML=cur.map((n,i)=>`<button class="chip" data-i="${i}" style="min-width:${Math.round(34+Math.min(n.d,4)*16)}px" title="${bl(n.d)}"><b class="bar"></b><span>${lab(n.m)}</span><span class="len">${bl(n.d)}</span><i class="res"></i></button>`+(n.br?`<span class="br" title="Breathe here">’<small>breathe</small></span>`:'')).join('');scoreEl.innerHTML='';
+}
+strip.addEventListener('click',e=>{const b=e.target.closest('.chip');if(!b)return;stop();const n=cur[+b.dataset.i];mark(+b.dataset.i);show(n.m);preview(n.m)});
+function mark(i){chips().forEach((c,j)=>{c.classList.toggle('on',j===i);c.classList.toggle('done',j<i);if(j>=i)c.style.setProperty('--p',0)});const c=chips()[i];if(c)strip.scrollLeft=c.offsetLeft-strip.clientWidth/2+c.clientWidth/2}
+function preview(m){if(document.getElementById('mute').checked)return;try{ac();ctx.resume();const g=ctx.createGain();g.connect(ctx.destination);tone(m,ctx.currentTime+.02,.9,g)}catch(e){}}
+
+let stream=null,an=null,buckets=[],liveG=[];
+async function play(){
+  stop();if(!cur.length)return;
+  try{ac();ctx.resume()}catch(e){return}
+  clearRes();statusEl.textContent='';
+  if(document.getElementById('mic').checked){
+    try{stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+      const src=ctx.createMediaStreamSource(stream);an=ctx.createAnalyser();an.fftSize=4096;src.connect(an);
+      statusEl.textContent='Listening… the tune plays silently so the mic only hears you. Watch the holes and play along.';
+    }catch(e){an=null;statusEl.textContent='The microphone is blocked on this page. Record yourself and use “Check a recording” below instead.'}
+  }
+  buckets=cur.map(()=>[]);liveG=[];
+  playing=true;document.getElementById('play').textContent='Restart';
+  master=ctx.createGain();master.connect(ctx.destination);
+  const spb=60/+document.getElementById('tempo').value,mute=document.getElementById('mute').checked||!!an;
+  let t=ctx.currentTime+.15;
+  if(document.getElementById('count').checked){for(let k=0;k<4;k++)click(t+k*spb,master,k===0);t+=4*spb}
+  const times=[];let tt=t;
+  cur.forEach(n=>{times.push(tt);if(!mute)tone(n.m,tt,n.d*spb,master);tt+=n.d*spb});
+  const endT=tt;let last=-1;
+  const tick=()=>{
+    if(!playing)return;const now=ctx.currentTime;let i=-1;
+    for(let k=0;k<times.length;k++){if(now>=times[k])i=k;else break}
+    if(an&&i>=0){const buf=new Float32Array(an.fftSize);an.getFloatTimeDomainData(buf);let e=0;for(const v of buf)e+=v*v;
+      if(Math.sqrt(e/buf.length)>0.01){const [lo,hi]=range();const f=yin(buf,0,ctx.sampleRate,lo,hi,2048);if(f)buckets[i].push(toWritten(f))}}
+    if(i!==last&&i>=0){if(an&&last>=0)fin(last);last=i;mark(i);show(cur[i].m)}
+    if(i>=0){const fr=Math.min(1,(now-times[i])/(cur[i].d*spb)),c=chips()[i];
+      if(c){c.style.setProperty('--p',fr.toFixed(3));c.style.setProperty('--fill',`hsl(${Math.round(45-43*fr)} ${75+fr*5}% ${55-fr*5}%)`)}
+      if(cur[i].br&&fr>0.55)hint.innerHTML='<b style="color:#2f7fc1">’ Breathe</b> after this note';}
+    if(i<0&&last<0){const left=Math.ceil((t-now)/spb);big.textContent=left>0?left:'–'}
+    if(now>=endT){if(an&&last>=0){fin(last);showScore(liveG)}if(document.getElementById('loop').checked&&!an){play();return}stopMic();playing=false;document.getElementById('play').textContent='Play';return}
+    raf=requestAnimationFrame(tick)};
+  // pre-show first note during count-in
+  show(cur[0].m);big.textContent='4';
+  raf=requestAnimationFrame(tick);
+}
+function fin(i){const b=buckets[i].slice(Math.floor(buckets[i].length*.3));const g=grade(cur[i].m,b.length>=2?med(b):null);liveG[i]=g;setRes(i,g)}
+function stopMic(){if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}an=null}
+function stop(){playing=false;stopMic();if(raf)cancelAnimationFrame(raf);if(master){try{master.disconnect()}catch(e){}master=null}document.getElementById('play').textContent='Play'}
+
+const sel=document.getElementById('song');
+sel.innerHTML=SONGS.map((s,i)=>`<option value="${i}">${s.n}</option>`).join('')+'<option value="c">My own notes</option>';
+function loadSong(i){
+  stop();const s=SONGS[i];cur=parse(s.s).notes;document.getElementById('about').textContent=s.a;
+  document.getElementById('tempo').value=s.t;document.getElementById('tv').textContent=s.t;renderStrip();mark(0);show(cur[0].m);
+}
+sel.addEventListener('change',()=>{if(sel.value==='c'){loadCustom();return}loadSong(+sel.value)});
+document.getElementById('tempo').addEventListener('input',e=>document.getElementById('tv').textContent=e.target.value);
+document.getElementById('play').addEventListener('click',play);
+document.getElementById('stop').addEventListener('click',stop);
+document.getElementById('pitch').addEventListener('change',()=>{if(playing)play()});
+
+const ta=document.getElementById('custom'),err=document.getElementById('err');
+try{ta.value=localStorage.getItem('xiaoNotes')||''}catch(e){}
+function loadCustom(){
+  const r=parse(ta.value);
+  if(!r.notes.length){err.textContent='Type some notes first, e.g. E F# G A';sel.value='0';return}
+  err.textContent=r.bad.length?'Skipped: '+r.bad.join(' '):'';
+  try{localStorage.setItem('xiaoNotes',ta.value)}catch(e){}
+  stop();cur=r.notes;sel.value='c';document.getElementById('about').textContent='Your own notes. '+cur.length+' notes loaded.';renderStrip();mark(0);show(cur[0].m);
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+document.getElementById('load').addEventListener('click',loadCustom);
+
+// recording analysis
+const recStatus=document.getElementById('recStatus');
+document.getElementById('rec').addEventListener('change',async e=>{
+  const file=e.target.files[0];if(!file)return;stop();
+  recStatus.textContent='Reading the recording…';await new Promise(r=>setTimeout(r,30));
+  let ab;try{const arr=await file.arrayBuffer();ac();ab=await new Promise((res,rej)=>{const p=ctx.decodeAudioData(arr,res,rej);if(p&&p.catch)p.catch(rej)})}
+  catch(err){recStatus.textContent='Could not read that file. Try an .m4a, .mp3, .wav or a phone video.';return}
+  recStatus.textContent='Listening to your notes…';await new Promise(r=>setTimeout(r,30));
+  const sr=ab.sampleRate,len=ab.length,x=new Float32Array(len);
+  for(let c=0;c<ab.numberOfChannels;c++){const d=ab.getChannelData(c);for(let i=0;i<len;i++)x[i]+=d[i]/ab.numberOfChannels}
+  const [lo,hi]=range(),W=1024,maxL=Math.ceil(sr/lo)+2,hop=512,fr=[];let top=0;
+  for(let off=0;off+W+maxL<len;off+=hop){let s=0;for(let i=0;i<W;i++)s+=x[off+i]*x[off+i];const r=Math.sqrt(s/W);fr.push({off,r});if(r>top)top=r}
+  for(const f of fr){f.m=null;if(f.r>top*0.12){const hz=yin(x,f.off,sr,lo,hi,W);if(hz)f.m=toWritten(hz)}}
+  // split into notes
+  const minF=Math.max(3,Math.round(0.08*sr/hop)),played=[];let s=null,gap=0,pend=[];
+  const close=()=>{if(s&&s.ms.length>=minF)played.push(med(s.ms.slice(2)));s=null;pend=[]};
+  for(const f of fr){
+    if(f.m==null){if(s&&++gap>=3)close();continue}gap=0;
+    if(s){const ref=med(s.ms.slice(-5));
+      if(Math.abs(f.m-ref)>0.6){pend.push(f);if(pend.length>=3){const p=pend;close();s={ms:p.map(q=>q.m),peak:Math.max(...p.map(q=>q.r)),dip:false}}continue}
+      if(s.dip&&f.r>0.8*s.peak){close()}}
+    pend=[];
+    if(!s)s={ms:[],peak:0,dip:false};
+    s.ms.push(f.m);s.peak=Math.max(s.peak,f.r);if(f.r<0.4*s.peak)s.dip=true;
+  }
+  close();
+  if(!played.length){recStatus.textContent='No flute notes found. Check the recording isn\'t silent, or try the “match my flute” switch.';return}
+  // line played notes up with the tune
+  const E=cur.map(n=>n.m),n=E.length,p=played.length,D=[],B=[];
+  const cost=(i,j)=>{const d=Math.abs(Math.round(played[j])-E[i]);return d===0?0:(d===1||d===12)?0.5:d===2?0.9:1.6};
+  for(let i=0;i<=n;i++){D.push(new Float32Array(p+1));B.push(new Uint8Array(p+1))}
+  for(let i=1;i<=n;i++){D[i][0]=i;B[i][0]=1}for(let j=1;j<=p;j++){D[0][j]=j*0.8;B[0][j]=2}
+  for(let i=1;i<=n;i++)for(let j=1;j<=p;j++){const a=D[i-1][j-1]+cost(i-1,j-1),b=D[i-1][j]+1,c=D[i][j-1]+0.8;
+    if(a<=b&&a<=c){D[i][j]=a;B[i][j]=0}else if(b<=c){D[i][j]=b;B[i][j]=1}else{D[i][j]=c;B[i][j]=2}}
+  const gs=new Array(n);let i=n,j=p,extra=0;
+  while(i>0||j>0){const b=B[i][j];if(i>0&&j>0&&b===0){gs[i-1]=grade(E[i-1],played[j-1]);i--;j--}else if(i>0&&(j===0||b===1)){gs[i-1]=grade(E[i-1],null);i--}else{extra++;j--}}
+  clearRes();gs.forEach((g,k)=>setRes(k,g));showScore(gs);mark(-1);
+  recStatus.textContent=`Heard ${p} notes${extra?`, including ${extra} extra that weren't in the tune`:''}. Results are under each note above.`;
+  e.target.value='';
+  window.scrollTo({top:0,behavior:'smooth'});
+});
+
+// chart
+const chartNotes=[62,64,65,66,67,68,69,70,71,72,73,74];
+document.getElementById('chart').innerHTML=chartNotes.map(m=>{const i=info(m);return `<button class="fc" data-m="${m}"><b>${i.name}</b>${m===74?' (high)':''}${miniSvg(i.f)}<small>${i.f.map(v=>v===1?'●':v===.5?'◐':'○').join('')}${i.tip?' · '+i.tip:''}${m===74?' · blow faster':''}</small></button>`}).join('');
+document.getElementById('chart').addEventListener('click',e=>{const b=e.target.closest('.fc');if(!b)return;stop();const m=+b.dataset.m;show(m);preview(m);window.scrollTo({top:0,behavior:'smooth'})});
+
+// Flute Practice admins (portal only): invite and remove players. The page works without this.
+{
+  const box=document.getElementById('admin'),list=document.getElementById('invList'),msg=document.getElementById('invMsg');
+  const esc=t=>String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const when=d=>d?new Date(d).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}):'';
+  async function api(path,body){const r=await fetch('/flute/api/'+path,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{credentials:'same-origin'});return r.json()}
+  async function load(){
+    let j;try{j=await api('invites')}catch(e){return}
+    if(!j||!j.ok)return;box.hidden=false;
+    list.innerHTML=j.invites.length?j.invites.map(v=>`<div class="inv${v.revoked?' off':''}"><div><b>${esc(v.name||v.email)}</b><small>${esc(v.email)} · invited ${when(v.created)}${v.revoked?' · removed':v.last_sign_in?' · last signed in '+when(v.last_sign_in):' · not signed in yet'}</small></div>${v.revoked?`<button class="main alt" data-re="${esc(v.email)}" data-n="${esc(v.name||'')}">Invite again</button>`:`<button class="main alt" data-rm="${v.id}">Remove</button>`}</div>`).join(''):'<p class="about">No one invited yet.</p>';
+  }
+  async function invite(email,name){
+    msg.textContent='Saving…';
+    let j;try{j=await api('invite',{email,name})}catch(e){j={ok:false,error:'No connection. Try again.'}}
+    msg.textContent=j.ok?(j.existing?email+' already has access.':email+' can now sign in to Flute Practice.'):(j.error||'Couldn\'t invite.');
+    if(j.ok){document.getElementById('invEmail').value='';document.getElementById('invName').value=''}
+    load();
+  }
+  document.getElementById('invForm').addEventListener('submit',e=>{e.preventDefault();const em=document.getElementById('invEmail').value.trim(),nm=document.getElementById('invName').value.trim();if(!em){msg.textContent='Add their email address.';return}invite(em,nm)});
+  ['invEmail','invName'].forEach(id=>document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();document.getElementById('invForm').requestSubmit()}}));
+  list.addEventListener('click',async e=>{
+    const rm=e.target.closest('[data-rm]'),re=e.target.closest('[data-re]');
+    if(re){invite(re.dataset.re,re.dataset.n);return}
+    if(!rm)return;
+    if(rm.dataset.sure!=='1'){rm.dataset.sure='1';rm.textContent='Tap again to remove';setTimeout(()=>{rm.dataset.sure='';rm.textContent='Remove'},4000);return}
+    let j;try{j=await api('revoke',{id:+rm.dataset.rm})}catch(err){j={ok:false}}
+    msg.textContent=j.ok?'Removed. They can no longer open Flute Practice.':(j.error||'Couldn\'t remove.');load();
+  });
+  if(location.protocol==='https:'&&/highwaydigital\.com\.au$/.test(location.hostname))load();
+}
+loadSong(0);
+}
+</script>
+</body>
+</html>

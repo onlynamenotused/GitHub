@@ -4,11 +4,12 @@
 // shared portal menu (nav.js + nav.css) added at the top, with their old cross-links removed.
 const SB_URL = "https://sfuuzcgwbbhdjqzrchvv.supabase.co";
 const SB_KEY = "sb_publishable_uu0N60ZMVjJ1kl14FW1NBA_v-cm_U3_"; // publishable key: safe, RLS protects data
-const V = "35";
+const V = "36";
 const GATED = {
   kb: { page: "/_p/kb/", flag: "kb", name: "Knowledge Base" },
   catalogue: { page: "/_p/catalogue/", flag: "cat", name: "Parts Catalogue" },
-  vector: { page: "/_p/vector/", flag: "vector", name: "Vector Converter" },   // staff, supervisors, customers with vector_access
+  vector: { page: "/_p/vector/", flag: "vector", name: "Vector Converter" },  // staff, supervisors, customers with vector_access
+  flute: { page: "/_p/flute/", flag: "flute", name: "Flute Practice player" },   // staff, customers with flute_access (off by default)
   warehousing: { page: "/_p/warehousing/", flag: "intranet", name: "Warehousing" } // purchase orders, parts & stock: hello@ only
 };
 // Files the Warehousing page loads next to itself (served only to the same signed-in hello@ account).
@@ -47,7 +48,7 @@ function filterCatalogue(html, allow) {
 }
 const attr = (s) => String(s).replace(/&/g, "&amp;").replace(/'/g, "&#39;").replace(/</g, "&lt;");
 function navBlock(f, active) {
-  const flags = JSON.stringify({ signedIn: true, email: f.email, staff: !!f.staff, intranet: !!f.intranet, kb: !!f.kb, cat: !!f.cat, vector: !!f.vector, supervisor: !!f.supervisor, active });
+  const flags = JSON.stringify({ signedIn: true, email: f.email, staff: !!f.staff, intranet: !!f.intranet, kb: !!f.kb, cat: !!f.cat, vector: !!f.vector, flute: !!f.flute, appsOnly: !!f.apps_only, supervisor: !!f.supervisor, active });
   return `<div id="hd-nav" class="hdn-static" data-flags='${attr(flags)}'></div><script src="/nav.js?v=${V}"></script>`;
 }
 function notAvailable(name) {
@@ -94,6 +95,18 @@ async function apiRoute(req, env, url, p) {
   }
   const token = readCookie(req, "hd_at");
   if (!token) return jres({ ok: false, error: "Please sign in again." }, 401);
+  // Flute Practice admins: invite / list / remove flute-only users (the database checks the caller is a flute admin).
+  if (p === "/flute/api/invites") {
+    const r = await rpc("flute_invites_list", {}, token);
+    return jres(r.ok ? { ok: true, invites: r.j || [] } : { ok: false, error: "Not allowed." }, r.ok ? 200 : 403);
+  }
+  if ((p === "/flute/api/invite" || p === "/flute/api/revoke") && req.method === "POST") {
+    const b = await req.json().catch(() => ({}));
+    const r = p === "/flute/api/invite"
+      ? await rpc("flute_invite", { p_email: String(b.email || ""), p_name: String(b.name || "") }, token)
+      : await rpc("flute_revoke", { p_id: Number(b.id) || 0 }, token);
+    return jres(r.ok ? r.j || { ok: true } : { ok: false, error: (r.j && (r.j.message || r.j.error)) || "Couldn't save that." });
+  }
   if (p === "/vector/log" && req.method === "POST") {
     const b = await req.json().catch(() => ({}));
     await rpc("log_vector_export", { p_kind: String(b.kind || "file").slice(0, 40) }, token);
@@ -153,13 +166,13 @@ export default {
   async fetch(req, env) {
     const url = new URL(req.url);
     const p = url.pathname;
-    if (p === "/_src/catalogue" || p === "/vector/log" || p.startsWith("/catalogue/quote") || p.startsWith("/service/")) {
+    if (p === "/_src/catalogue" || p === "/vector/log" || p.startsWith("/flute/api/") || p.startsWith("/catalogue/quote") || p.startsWith("/service/")) {
       const r = await apiRoute(req, env, url, p);
       if (r) return r;
     }
     if (p.startsWith("/_p/")) return new Response("Not found", { status: 404 });
     if (/^\/po(\/|$)/.test(p)) return Response.redirect(url.origin + "/warehousing/", 302);
-    const key = /^\/kb(\/|$)/.test(p) ? "kb" : /^\/catalogue(\/|$)/.test(p) ? "catalogue" : /^\/vector(\/|$)/.test(p) ? "vector" : /^\/warehousing(\/|$)/.test(p) ? "warehousing" : null;
+    const key = /^\/kb(\/|$)/.test(p) ? "kb" : /^\/catalogue(\/|$)/.test(p) ? "catalogue" : /^\/vector(\/|$)/.test(p) ? "vector" : /^\/flute(\/|$)/.test(p) ? "flute" : /^\/warehousing(\/|$)/.test(p) ? "warehousing" : null;
     if (!key) return env.ASSETS.fetch(req);
     const whFile = key === "warehousing" ? p.slice("/warehousing/".length) : "";
     if (whFile && WH_FILES.has(whFile)) {
@@ -202,6 +215,7 @@ export default {
     const h = new Headers(out.headers);
     h.set("Cache-Control", "private, no-store");
     h.set("X-Robots-Tag", "noindex");
+    if (key === "flute") h.set("Permissions-Policy", "microphone=(self)");   // the player listens to the customer playing
     h.delete("Content-Length");
     return new Response(out.body, { status: page.status, headers: h });
   }

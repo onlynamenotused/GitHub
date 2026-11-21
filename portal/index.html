@@ -8,12 +8,12 @@
 <meta name="theme-color" content="#000000">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="styles.css?v=34">
-<link rel="stylesheet" href="nav.css?v=32">
+<link rel="stylesheet" href="styles.css?v=35">
+<link rel="stylesheet" href="nav.css?v=35">
 <link rel="icon" href="favicon.ico">
-<script src="config.js?v=32"></script>
-<script src="nav.js?v=35"></script>
-<script type="module" src="app.js?v=34"></script>
+<script src="config.js?v=35"></script>
+<script src="nav.js?v=36"></script>
+<script type="module" src="app.js?v=35"></script>
 </head>
 <body>
 <div id="hd-nav"></div>
@@ -93,10 +93,10 @@
       <button class="btn primary" type="submit">Add customer</button>
       <span id="addCustMsg" class="saved"></span>
     </form>
-    <p class="muted small">Tick <b>Knowledge Base</b> to give that customer's logins the Knowledge Base, tick <b>Vector Converter</b> to give them the image-to-vector and print &amp; cut tool, and pick the <b>Parts Catalogue</b> brands (Mimaki, Mutoh, Brother, Epilog, Others) that customer can see, with prices. Untick every brand to remove catalogue access. New customers start with the Knowledge Base and Vector Converter unticked and only <b>Others</b> ticked in the catalogue; tick the brands of the machines they own. Changes save straight away. Sub-contractor logins always get the Knowledge Base and never the catalogue. <b>Vector exports</b> counts every file that customer's logins have downloaded from the Vector Converter (hover the number for the file types and last date).</p>
+    <p class="muted small">Tick <b>Knowledge Base</b> to give that customer's logins the Knowledge Base, tick <b>Vector Converter</b> to give them the image-to-vector and print &amp; cut tool, tick <b>Flute Practice</b> to give them the flute practice player (off for every customer unless ticked), tick <b>Apps only</b> for a login that should only see its apps (no machines or booking), and pick the <b>Parts Catalogue</b> brands (Mimaki, Mutoh, Brother, Epilog, Others) that customer can see, with prices. Untick every brand to remove catalogue access. New customers start with the Knowledge Base and Vector Converter unticked and only <b>Others</b> ticked in the catalogue; tick the brands of the machines they own. Changes save straight away. Sub-contractor logins always get the Knowledge Base and never the catalogue. <b>Vector exports</b> counts every file that customer's logins have downloaded from the Vector Converter (hover the number for the file types and last date).</p>
     <div class="card" style="padding:0;overflow-x:auto">
       <table class="tbl">
-        <thead><tr><th>Customer</th><th>Machines</th><th>Portal logins</th><th>Knowledge Base</th><th>Vector Converter</th><th title="Files downloaded from the Vector Converter by this customer's logins, all time">Vector exports</th><th>Parts Catalogue</th></tr></thead>
+        <thead><tr><th>Customer</th><th>Machines</th><th>Portal logins</th><th>Knowledge Base</th><th>Vector Converter</th><th>Flute Practice</th><th title="Apps only: no machines, booking or catalogue in the menu, just the apps ticked">Apps only</th><th title="Files downloaded from the Vector Converter by this customer's logins, all time">Vector exports</th><th>Parts Catalogue</th></tr></thead>
         <tbody id="custRows"></tbody>
       </table>
     </div>
