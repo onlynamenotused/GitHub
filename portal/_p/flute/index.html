@@ -30,14 +30,23 @@ h2{font-size:24px;margin:0 0 10px}
 .strip{display:flex;gap:6px;overflow-x:auto;padding:12px 2px 6px;scroll-behavior:smooth}
 .chip{flex:none;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:10px;padding:6px 10px;font:600 15px Outfit,sans-serif;min-height:40px;cursor:pointer}
 .chip{display:flex;flex-direction:column;align-items:center;gap:3px}
-.chip.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 .res{font-style:normal;font-size:12px;font-weight:600;border-radius:6px;padding:0 6px;min-height:17px;line-height:17px}
 .res.g{background:#1f9d55;color:#fff}.res.o{background:#e08a00;color:#fff}.res.r{background:#c4302b;color:#fff}.res.m{color:var(--soft)}
 .score{display:flex;gap:10px;flex-wrap:wrap;font-weight:600;margin-top:10px;min-height:24px}
 .score span{border-radius:8px;padding:2px 10px;color:#fff}
 .file{display:block;margin-top:8px;font:16px Outfit,sans-serif;color:var(--ink)}
 .status{font-size:15px;color:var(--soft);min-height:22px;margin-top:6px}
-.chip.done{opacity:.45}
+.chip.done{opacity:.55}
+.chip{position:relative;overflow:hidden;justify-content:flex-end}
+.chip>span,.chip>.len,.chip>.res{position:relative;z-index:1}
+.chip .bar{position:absolute;left:0;top:0;bottom:0;width:calc(var(--p,0)*100%);background:var(--fill,#e0a63a);z-index:0;pointer-events:none}
+.chip.on{background:var(--card);color:var(--ink);border-color:var(--ink);border-width:2px}
+.chip.done .bar{width:100%;background:light-dark(#e9dcc4,#3a3226)}
+.chip .len{font-size:11px;font-weight:400;color:var(--soft);line-height:1}
+.br{flex:none;align-self:center;font:700 22px Outfit,sans-serif;color:#2f7fc1;padding:0 2px;line-height:1}
+.br small{display:block;font-size:10px;font-weight:600;text-align:center}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:14px;color:var(--soft);margin-top:4px}
+.legend i{display:inline-block;width:46px;height:12px;border-radius:4px;vertical-align:middle;margin-right:6px;background:linear-gradient(90deg,hsl(45 75% 55%),hsl(25 80% 52%),hsl(2 70% 50%))}
 .ctrl{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:14px;margin-top:16px;align-items:end}
 label{font-size:14px;color:var(--soft);display:block}
 select,textarea,input[type=range]{width:100%;font:16px Outfit,sans-serif}
@@ -69,6 +78,7 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,.chip:focus-vis
   <div class="now"><span class="big" id="big">–</span><span class="hint" id="hint">Hole 1 is nearest your mouth. Red = finger down.</span></div>
   <div class="fluteWrap"><svg id="flute" viewBox="0 0 1000 170" role="img" aria-label="Flute fingering diagram"></svg></div>
   <div class="strip" id="strip" aria-label="Notes in this tune"></div>
+  <div class="legend"><span><i></i>Each box fills while you hold that note; wider box = longer note. Red = time to move on</span><span><b style="color:#2f7fc1">’</b> = take a breath here</span></div>
 
   <div class="ctrl">
     <div><label for="song">Tune</label><select id="song"></select></div>
@@ -120,32 +130,43 @@ const PC={C:0,D:2,E:4,F:5,G:7,A:9,B:11};
 const FING=[[1,1,1,1,1,1],[1,1,1,1,1,.5],[1,1,1,1,1,0],[1,1,1,1,.5,0],[1,1,1,1,0,0],[1,1,1,0,0,0],[1,1,.5,0,0,0],[1,1,0,0,0,0],[1,.5,0,0,0,0],[1,0,0,0,0,0],[0,1,1,0,0,0],[0,0,0,0,0,0]];
 const TIPS={1:'half-cover hole 6',3:'half-cover hole 5',6:'half-cover hole 3',8:'half-cover hole 2',10:'cross-fingering: lift hole 1, cover 2 and 3'};
 const SONGS=[
- {n:'Amazing Grace',a:'Traditional hymn tune (1835), key of G. Slow and smooth: great for long notes.',t:60,s:'D4:1 G4:2 B4:.5 G4:.5 B4:2 A4:1 G4:2 E4:1 D4:2 D4:1 G4:2 B4:.5 G4:.5 B4:2 A4:1 D5:2 B4:1 D5:2 B4:.5 G4:.5 B4:2 A4:1 G4:2 E4:1 D4:2 D4:1 G4:2 B4:.5 G4:.5 B4:2 A4:1 G4:3'},
+ {n:'Amazing Grace',a:'Traditional hymn tune (1835), key of G. Slow and smooth: great for long notes.',t:60,s:'D4:1 G4:2 B4:.5 G4:.5 B4:2 A4:1 G4:2 E4:1 D4:2 , D4:1 G4:2 B4:.5 G4:.5 B4:2 A4:1 D5:2 , B4:1 D5:2 B4:.5 G4:.5 B4:2 A4:1 G4:2 E4:1 D4:2 , D4:1 G4:2 B4:.5 G4:.5 B4:2 A4:1 G4:3'},
  {n:'Twinkle Twinkle Little Star',a:'Traditional French tune. Only the bottom-half notes: the easiest start.',t:80,s:'D4 D4 A4 A4 B4 B4 A4:2 G4 G4 F#4 F#4 E4 E4 D4:2 A4 A4 G4 G4 F#4 F#4 E4:2 A4 A4 G4 G4 F#4 F#4 E4:2 D4 D4 A4 A4 B4 B4 A4:2 G4 G4 F#4 F#4 E4 E4 D4:2'},
- {n:'When the Saints Go Marching In',a:'Traditional spiritual. Four notes most of the way.',t:90,s:'D4 F#4 G4 A4:4 D4 F#4 G4 A4:4 D4 F#4 G4 A4:2 F#4:2 D4:2 F#4:2 E4:4 F#4 F#4 E4 D4:3 D4 F#4 A4 A4:2 G4:3 F#4 G4 A4:2 F#4:2 D4:2 E4:2 D4:4'},
- {n:'Jingle Bells (chorus)',a:'James Lord Pierpont, 1857. Bouncy, mostly F♯.',t:100,s:'F#4 F#4 F#4:2 F#4 F#4 F#4:2 F#4 A4 D4:1.5 E4:.5 F#4:4 G4 G4 G4:1.5 G4:.5 G4 F#4 F#4 F#4:.5 F#4:.5 F#4 E4 E4 F#4 E4:2 A4:2 F#4 F#4 F#4:2 F#4 F#4 F#4:2 F#4 A4 D4:1.5 E4:.5 F#4:4 G4 G4 G4:1.5 G4:.5 G4 F#4 F#4 F#4:.5 F#4:.5 A4 A4 G4 E4 D4:4'},
- {n:'Auld Lang Syne (verse)',a:'Traditional Scottish tune, key of G. Dotted rhythms: long-short, long-short.',t:70,s:'D4:1 G4:1.5 G4:.5 G4:1 B4:1 A4:1.5 G4:.5 A4:1 B4:1 G4:1.5 G4:.5 B4:1 D5:1 E5:3 E5:1 D5:1.5 B4:.5 B4:1 G4:1 A4:1.5 G4:.5 A4:1 B4:1 G4:1.5 E4:.5 E4:1 D4:1 G4:3'},
- {n:'Ode to Joy',a:'Beethoven, 1824, key of G. Introduces C natural (cross-fingering).',t:90,s:'B4 B4 C5 D5 D5 C5 B4 A4 G4 G4 A4 B4 B4:1.5 A4:.5 A4:2 B4 B4 C5 D5 D5 C5 B4 A4 G4 G4 A4 B4 A4:1.5 G4:.5 G4:2 A4 A4 B4 G4 A4 B4:.5 C5:.5 B4 G4 A4 B4:.5 C5:.5 B4 A4 G4 A4 D4:2 B4 B4 C5 D5 D5 C5 B4 A4 G4 G4 A4 B4 A4:1.5 G4:.5 G4:2'},
- {n:'Frère Jacques',a:'Traditional French round, key of G. Has high D and E: blow a little faster.',t:90,s:'G4 A4 B4 G4 G4 A4 B4 G4 B4 C5 D5:2 B4 C5 D5:2 D5:.5 E5:.5 D5:.5 C5:.5 B4 G4 D5:.5 E5:.5 D5:.5 C5:.5 B4 G4 G4 D4 G4:2 G4 D4 G4:2'},
- {n:'Mo Li Hua (Jasmine Flower), opening',a:'Traditional Chinese folk song, a classic on the xiao. Uses the higher octave.',t:60,s:'B4 B4:.5 D5:.5 E5:.5 G5:.5 G5:.5 E5:.5 D5 D5:.5 E5:.5 D5:2 B4 B4:.5 D5:.5 E5:.5 G5:.5 G5:.5 E5:.5 D5 D5:.5 E5:.5 D5:2 D5 D5 D5 B4:.5 D5:.5 E5 E5 D5:2 B4 A4:.5 B4:.5 D5 B4:.5 A4:.5 G4 G4:.5 A4:.5 G4:2'},
- {n:'Greensleeves (harder)',a:'Traditional English tune, A minor. Needs C natural and half-holed G♯.',t:70,s:'A4:1 C5:2 D5:1 E5:1.5 F#5:.5 E5:1 D5:2 B4:1 G4:1.5 A4:.5 B4:1 C5:2 A4:1 A4:1.5 G#4:.5 A4:1 B4:2 G#4:1 E4:2 A4:1 C5:2 D5:1 E5:1.5 F#5:.5 E5:1 D5:2 B4:1 G4:1.5 A4:.5 B4:1 C5:1.5 B4:.5 A4:1 G#4:1.5 F#4:.5 G#4:1 A4:3'},
- {n:'Warm-up: long notes',a:'Hold each note for four beats with a steady, quiet tone.',t:60,s:'D4:4 E4:4 F#4:4 G4:4 A4:4 B4:4 C#5:4 D5:4'},
- {n:'Warm-up: D major scale',a:'Up and down the flute\'s home scale.',t:80,s:'D4 E4 F#4 G4 A4 B4 C#5 D5:2 D5 C#5 B4 A4 G4 F#4 E4 D4:2'},
- {n:'Warm-up: E minor scale',a:'The scale most pop songs in E minor use. C natural is the tricky one.',t:70,s:'E4 F#4 G4 A4 B4 C5 D5 E5:2 E5 D5 C5 B4 A4 G4 F#4 E4:2'}
+ {n:'When the Saints Go Marching In',a:'Traditional spiritual. Four notes most of the way.',t:90,s:'D4 F#4 G4 A4:4 , D4 F#4 G4 A4:4 , D4 F#4 G4 A4:2 F#4:2 D4:2 F#4:2 E4:4 , F#4 F#4 E4 D4:3 , D4 F#4 A4 A4:2 G4:3 , F#4 G4 A4:2 F#4:2 D4:2 E4:2 D4:4'},
+ {n:'Jingle Bells (chorus)',a:'James Lord Pierpont, 1857. Bouncy, mostly F♯.',t:100,s:'F#4 F#4 F#4:2 F#4 F#4 F#4:2 F#4 A4 D4:1.5 E4:.5 F#4:4 , G4 G4 G4:1.5 G4:.5 G4 F#4 F#4 F#4:.5 F#4:.5 F#4 E4 E4 F#4 E4:2 A4:2 , F#4 F#4 F#4:2 F#4 F#4 F#4:2 F#4 A4 D4:1.5 E4:.5 F#4:4 , G4 G4 G4:1.5 G4:.5 G4 F#4 F#4 F#4:.5 F#4:.5 A4 A4 G4 E4 D4:4'},
+ {n:'Auld Lang Syne (verse)',a:'Traditional Scottish tune, key of G. Dotted rhythms: long-short, long-short.',t:70,s:'D4:1 G4:1.5 G4:.5 G4:1 B4:1 A4:1.5 G4:.5 A4:1 B4:1 G4:1.5 G4:.5 B4:1 D5:1 E5:3 , E5:1 D5:1.5 B4:.5 B4:1 G4:1 A4:1.5 G4:.5 A4:1 B4:1 G4:1.5 E4:.5 E4:1 D4:1 G4:3'},
+ {n:'Ode to Joy',a:'Beethoven, 1824, key of G. Introduces C natural (cross-fingering).',t:90,s:'B4 B4 C5 D5 D5 C5 B4 A4 G4 G4 A4 B4 B4:1.5 A4:.5 A4:2 , B4 B4 C5 D5 D5 C5 B4 A4 G4 G4 A4 B4 A4:1.5 G4:.5 G4:2 , A4 A4 B4 G4 A4 B4:.5 C5:.5 B4 G4 A4 B4:.5 C5:.5 B4 A4 G4 A4 D4:2 , B4 B4 C5 D5 D5 C5 B4 A4 G4 G4 A4 B4 A4:1.5 G4:.5 G4:2'},
+ {n:'Frère Jacques',a:'Traditional French round, key of G. Has high D and E: blow a little faster.',t:90,s:'G4 A4 B4 G4 G4 A4 B4 G4 , B4 C5 D5:2 B4 C5 D5:2 , D5:.5 E5:.5 D5:.5 C5:.5 B4 G4 D5:.5 E5:.5 D5:.5 C5:.5 B4 G4 , G4 D4 G4:2 G4 D4 G4:2'},
+ {n:'Mo Li Hua (Jasmine Flower), opening',a:'Traditional Chinese folk song, a classic on the xiao. Uses the higher octave.',t:60,s:'B4 B4:.5 D5:.5 E5:.5 G5:.5 G5:.5 E5:.5 D5 D5:.5 E5:.5 D5:2 , B4 B4:.5 D5:.5 E5:.5 G5:.5 G5:.5 E5:.5 D5 D5:.5 E5:.5 D5:2 , D5 D5 D5 B4:.5 D5:.5 E5 E5 D5:2 , B4 A4:.5 B4:.5 D5 B4:.5 A4:.5 G4 G4:.5 A4:.5 G4:2'},
+ {n:'Greensleeves (harder)',a:'Traditional English tune, A minor. Needs C natural and half-holed G♯.',t:70,s:'A4:1 C5:2 D5:1 E5:1.5 F#5:.5 E5:1 D5:2 B4:1 G4:1.5 A4:.5 B4:1 C5:2 A4:1 A4:1.5 G#4:.5 A4:1 B4:2 G#4:1 E4:2 , A4:1 C5:2 D5:1 E5:1.5 F#5:.5 E5:1 D5:2 B4:1 G4:1.5 A4:.5 B4:1 C5:1.5 B4:.5 A4:1 G#4:1.5 F#4:.5 G#4:1 A4:3'},
+ {n:'Warm-up: long notes',a:'Hold each note for four beats with a steady, quiet tone.',t:60,s:'D4:4 , E4:4 , F#4:4 , G4:4 , A4:4 , B4:4 , C#5:4 , D5:4'},
+ {n:'Warm-up: D major scale',a:'Up and down the flute\'s home scale.',t:80,s:'D4 E4 F#4 G4 A4 B4 C#5 D5:2 , D5 C#5 B4 A4 G4 F#4 E4 D4:2'},
+ {n:'Warm-up: E minor scale',a:'The scale most pop songs in E minor use. C natural is the tricky one.',t:70,s:'E4 F#4 G4 A4 B4 C5 D5 E5:2 , E5 D5 C5 B4 A4 G4 F#4 E4:2'}
 ];
 
 function parse(str){
   const out=[];let bad=[];
-  for(const tok of str.trim().split(/[\s,]+/).filter(Boolean)){
+  for(let tok of str.trim().split(/\s+/).filter(Boolean)){
+    if(/^[,'’|]+$/.test(tok)){if(out.length)out[out.length-1].br=1;continue}
+    let brk=false;if(/[,'’|]$/.test(tok)){brk=true;tok=tok.replace(/[,'’|]+$/,'')}
     const m=tok.replace('♯','#').replace('♭','b').match(/^([A-Ga-g])([#b]?)(\d)?(?::(\d*\.?\d+))?$/);
     if(!m){bad.push(tok);continue}
     let pc=PC[m[1].toUpperCase()]+(m[2]=='#'?1:m[2]=='b'?-1:0);
     let oct=m[3]!==undefined?+m[3]:null;
     let midi;
     if(oct===null){pc=(pc+12)%12;midi=pc>=2?60+pc:72+pc}else midi=12*(oct+1)+pc;
-    out.push({m:midi,d:m[4]?+m[4]:1});
+    out.push({m:midi,d:m[4]?+m[4]:1,br:brk?1:0});
   }
+  autoBreath(out);
   return {notes:out,bad};
+}
+// Suggested breaths, unless the tune already marks its own (a comma after a note):
+// after a held note (2+ beats) once 4+ beats have passed, or any note boundary after 10 beats without one.
+function autoBreath(ns){
+  if(ns.some(n=>n.br))return;
+  let since=0;
+  ns.forEach((n,i)=>{since+=n.d;if(i===ns.length-1)return;
+    if((n.d>=2&&since>=4)||(since>=10&&n.d>=1)){n.br=2;since=0}});
 }
 function info(midi){
   const s=midi-62;if(s<0)return {name:NAMES[((midi%12)+12)%12],f:null,oct:-1};
@@ -214,7 +235,8 @@ function grade(exp,p){
   let c=d===0?(Math.abs(ct)<=40?'g':'o'):(d===1||d===12)?'o':'r';
   return {c,t:lab(r)+(d===0&&Math.abs(ct)>40?(ct>0?'↑':'↓'):'')};
 }
-function setRes(i,g){const e=strip.children[i]?.querySelector('.res');if(e){e.className='res '+g.c;e.textContent=g.t}}
+const chips=()=>strip.querySelectorAll('.chip');
+function setRes(i,g){const e=chips()[i]?.querySelector('.res');if(e){e.className='res '+g.c;e.textContent=g.t}}
 function clearRes(){strip.querySelectorAll('.res').forEach(e=>{e.className='res';e.textContent=''});scoreEl.innerHTML=''}
 function showScore(gs){const k={g:0,o:0,r:0,m:0};gs.forEach(g=>k[g.c]++);
   scoreEl.innerHTML=`<span style="background:#1f9d55">${k.g} right</span><span style="background:#e08a00">${k.o} close</span><span style="background:#c4302b">${k.r} wrong</span>${k.m?`<span style="background:#8a8378">${k.m} not heard</span>`:''}`}
@@ -232,10 +254,11 @@ function yin(x,off,sr,fmin,fmax,W){
 }
 const toWritten=f=>12*Math.log2(f/440)+69-shift();
 function renderStrip(){
-  strip.innerHTML=cur.map((n,i)=>`<button class="chip" data-i="${i}"><span>${lab(n.m)}</span><i class="res"></i></button>`).join('');scoreEl.innerHTML='';
+  const bl=d=>d===1?'1 beat':(+d.toFixed(2))+' beats';
+  strip.innerHTML=cur.map((n,i)=>`<button class="chip" data-i="${i}" style="min-width:${Math.round(34+Math.min(n.d,4)*16)}px" title="${bl(n.d)}"><b class="bar"></b><span>${lab(n.m)}</span><span class="len">${bl(n.d)}</span><i class="res"></i></button>`+(n.br?`<span class="br" title="Breathe here">’<small>breathe</small></span>`:'')).join('');scoreEl.innerHTML='';
 }
 strip.addEventListener('click',e=>{const b=e.target.closest('.chip');if(!b)return;stop();const n=cur[+b.dataset.i];mark(+b.dataset.i);show(n.m);preview(n.m)});
-function mark(i){strip.querySelectorAll('.chip').forEach((c,j)=>{c.classList.toggle('on',j===i);c.classList.toggle('done',j<i)});const c=strip.children[i];if(c)strip.scrollLeft=c.offsetLeft-strip.clientWidth/2+c.clientWidth/2}
+function mark(i){chips().forEach((c,j)=>{c.classList.toggle('on',j===i);c.classList.toggle('done',j<i);if(j>=i)c.style.setProperty('--p',0)});const c=chips()[i];if(c)strip.scrollLeft=c.offsetLeft-strip.clientWidth/2+c.clientWidth/2}
 function preview(m){if(document.getElementById('mute').checked)return;try{ac();ctx.resume();const g=ctx.createGain();g.connect(ctx.destination);tone(m,ctx.currentTime+.02,.9,g)}catch(e){}}
 
 let stream=null,an=null,buckets=[],liveG=[];
@@ -264,6 +287,9 @@ async function play(){
     if(an&&i>=0){const buf=new Float32Array(an.fftSize);an.getFloatTimeDomainData(buf);let e=0;for(const v of buf)e+=v*v;
       if(Math.sqrt(e/buf.length)>0.01){const [lo,hi]=range();const f=yin(buf,0,ctx.sampleRate,lo,hi,2048);if(f)buckets[i].push(toWritten(f))}}
     if(i!==last&&i>=0){if(an&&last>=0)fin(last);last=i;mark(i);show(cur[i].m)}
+    if(i>=0){const fr=Math.min(1,(now-times[i])/(cur[i].d*spb)),c=chips()[i];
+      if(c){c.style.setProperty('--p',fr.toFixed(3));c.style.setProperty('--fill',`hsl(${Math.round(45-43*fr)} ${75+fr*5}% ${55-fr*5}%)`)}
+      if(cur[i].br&&fr>0.55)hint.innerHTML='<b style="color:#2f7fc1">’ Breathe</b> after this note';}
     if(i<0&&last<0){const left=Math.ceil((t-now)/spb);big.textContent=left>0?left:'–'}
     if(now>=endT){if(an&&last>=0){fin(last);showScore(liveG)}if(document.getElementById('loop').checked&&!an){play();return}stopMic();playing=false;document.getElementById('play').textContent='Play';return}
     raf=requestAnimationFrame(tick)};
