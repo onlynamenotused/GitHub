@@ -4,18 +4,20 @@
 (function () {
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   function items(f) {
-    const out = [["machines", "/#machines", f.staff ? "Customer Assets" : "My machines"]];
+    // appsOnly: a login that only has apps (Flute Practice, Vector Converter): no machines, no booking.
+    const out = f.appsOnly && !f.staff ? [] : [["machines", "/#machines", f.staff ? "Customer Assets" : "My machines"]];
     if (f.intranet) out.push(["intranet", "/#kb", "Intranet Knowledge"]);
     if (f.kb) out.push(["kb", "/kb/", "Knowledge Base"]);
     if (f.cat) out.push(["catalogue", "/catalogue/", "Parts Catalogue"]);
     if (f.vector) out.push(["vector", "/vector/", "Vector Converter"]);
+    if (f.flute) out.push(["flute", "/flute/", "Flute Practice"]);
     if (f.supervisor) out.push(["reports", "/#reports", "Fleet reports"]);
-    out.push(["contact", "/#contact", "Contact & booking"]);
+    if (!(f.appsOnly && !f.staff)) out.push(["contact", "/#contact", "Contact & booking"]);
     if (f.staff) out.push(["customers", "/#customers", "Customers (staff)"]);
     if (f.staff) out.push(["service-kits", "/#service-kits", "Service kits (staff)"]);
     return out;
   }
-  // f: { signedIn, email, staff, intranet, kb, cat, vector, active }
+  // f: { signedIn, email, staff, intranet, kb, cat, vector, flute, appsOnly, active }
   function render(host, f) {
     if (!host) return;
     f = f || {};

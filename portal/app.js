@@ -60,7 +60,7 @@ async function signOut() { await sb.auth.signOut(); setAccessCookie(null); histo
 const navHost = () => $("#hd-nav");
 function drawNav(active) {
   window.HDNav?.render(navHost(), state.user
-    ? { signedIn: true, email: state.user.email, staff: state.staff, intranet: state.intranet, kb: state.kbAccess || isSupervisor(), cat: state.catAccess, vector: state.vectorAccess, supervisor: isSupervisor() || (state.staff && (state.supervisors || []).length > 0), active }
+    ? { signedIn: true, email: state.user.email, staff: state.staff, intranet: state.intranet, kb: state.kbAccess || isSupervisor(), cat: state.catAccess, vector: state.vectorAccess, flute: state.fluteAccess, appsOnly: state.appsOnly, supervisor: isSupervisor() || (state.staff && (state.supervisors || []).length > 0), active }
     : { signedIn: false });
 }
 
@@ -72,7 +72,7 @@ function setAccessCookie(session) {
     document.cookie = "hd_at=; Path=/; Max-Age=0; Secure; SameSite=Lax";
   }
 }
-const okNext = (p) => typeof p === "string" && /^\/(kb|catalogue)(\/[A-Za-z0-9._\-\/]*)?$/.test(p);
+const okNext = (p) => typeof p === "string" && /^\/(kb|catalogue|vector|flute)(\/[A-Za-z0-9._\-\/]*)?$/.test(p);
 {
   const nx = new URLSearchParams(location.search).get("next");
   if (okNext(nx)) { try { localStorage.setItem("hd_next", nx); } catch (e) {} history.replaceState(null, "", location.pathname + location.hash); }
@@ -89,7 +89,7 @@ sb.auth.onAuthStateChange((evt, session) => {
 // ---------- data ----------
 async function loadCore() {
   const [c, m, k, s, g, it, ...rest] = await Promise.all([
-    sb.from("clients").select("id,name,kb_access,vector_access,catalogue_access,catalogue_brands").order("name"),
+    sb.from("clients").select("id,name,kb_access,vector_access,flute_access,apps_only,catalogue_access,catalogue_brands").order("name"),
     sb.from("machines").select("*").eq("status", "active").order("brand").order("model"),
     sb.rpc("has_kb_access"),
     sb.rpc("is_staff"),
@@ -99,10 +99,14 @@ async function loadCore() {
     sb.from("fb_invoices").select("*").order("issued", { ascending: false }).limit(60),
     sb.from("fb_estimates").select("*").order("issued", { ascending: false }).limit(60),
     sb.from("supervisors").select("id,name,bill_to"),
-    sb.rpc("has_vector_access")
+    sb.rpc("has_vector_access"),
+    sb.rpc("has_flute_access"),
+    sb.rpc("is_apps_only")
   ]);
-  const [mf, inv, est, sv, va] = rest;
+  const [mf, inv, est, sv, va, fa, ao] = rest;
   state.vectorAccess = va?.data === true;
+  state.fluteAccess = fa?.data === true;
+  state.appsOnly = ao?.data === true;
   state.supervisors = sv?.data || [];
   if (c.error) throw c.error;
   if (m.error) throw m.error;
@@ -358,10 +362,10 @@ async function renderCustomers() {
   if (!state.staff) { body.replaceChildren(); return; }
   if (!renderCustomers.sup) { renderCustomers.sup = true; renderSupervisorsAdmin($("#supAdmin")); }
   if (!state.access) {
-    body.replaceChildren(el("tr", {}, el("td", { colspan: "7", class: "muted" }, "Loading…")));
+    body.replaceChildren(el("tr", {}, el("td", { colspan: "9", class: "muted" }, "Loading…")));
     const [{ data, error }, vx] = await Promise.all([sb.from("portal_access").select("client_id,email"), sb.rpc("vector_export_counts")]);
     state.vexp = (vx && vx.data) || {};
-    if (error) { body.replaceChildren(el("tr", {}, el("td", { colspan: "7", class: "msg err" }, "Couldn't load customers."))); return; }
+    if (error) { body.replaceChildren(el("tr", {}, el("td", { colspan: "9", class: "msg err" }, "Couldn't load customers."))); return; }
     state.access = data;
   }
   const q = norm($("#custSearch").value);
@@ -394,10 +398,12 @@ async function renderCustomers() {
       el("td", {}, acount[c.id] || 0),
       tick("kb_access", "Knowledge Base"),
       tick("vector_access", "Vector Converter"),
+      tick("flute_access", "Flute Practice"),
+      tick("apps_only", "Apps only"),
       el("td", { class: "num", title: vexpTitle(c.id) }, String(((state.vexp || {})[c.id] || {}).n || 0)),
       el("td", {}, catPicker(c, "clients", c.name))));
     if (open) {
-      const cell = el("td", { colspan: "7", class: "panelcell" }, el("p", { class: "muted small" }, "Loading…"));
+      const cell = el("td", { colspan: "9", class: "panelcell" }, el("p", { class: "muted small" }, "Loading…"));
       rows.push(el("tr", { class: "panelrow" }, cell));
       renderManage(c, cell);
     }
@@ -558,7 +564,7 @@ $("#addCustForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const name = $("#newCustName").value.trim(); if (!name) return;
   const msg = $("#addCustMsg");
-  const { data, error } = await sb.from("clients").insert({ name }).select("id,name,kb_access,vector_access,catalogue_access,catalogue_brands").single();
+  const { data, error } = await sb.from("clients").insert({ name }).select("id,name,kb_access,vector_access,flute_access,apps_only,catalogue_access,catalogue_brands").single();
   if (error) return flash(msg, "Customer not added", false);
   state.clients.push(data); state.clients.sort((x, y) => x.name.localeCompare(y.name));
   $("#newCustName").value = ""; $("#custSearch").value = name; state.openClient = data.id;
@@ -1712,6 +1718,8 @@ function route() {
   if (!state.user) return;
   const h = location.hash.replace(/^#/, "") || "machines";
   if (h === "signout") { signOut(); return; }
+  // App-only logins have no machines or booking: send them to their first app.
+  if (state.appsOnly && !state.staff && (state.fluteAccess || state.vectorAccess)) { location.replace(state.fluteAccess ? "/flute/" : "/vector/"); return; }
   const top = h.split("/")[0];
   window.HDNav?.setActive(navHost(), top === "machine" || top === "add-machine" ? "machines" : top === "reports" ? "reports" : top === "kb" ? "intranet" : top === "book" ? "contact" : top);
   if (h === "book" || h.startsWith("book/")) { show("view-book"); renderBook(decodeURIComponent(h.slice(5))); }
