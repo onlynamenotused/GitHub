@@ -1213,7 +1213,14 @@ function saluteHtml(html,to){const hit=[].concat(to||[]).map(x=>MAIL_SALUTE[Stri
    Service Desk app via the Supabase connector. */
 async function bridgeMail(d){
   if(MODE==="portal")return whTool(Object.assign({op:"mail_send"},d));
-  const r=await sb(`select fbw.call(${sqlStr(JSON.stringify(Object.assign({op:"mail_send",ref:"warehousing-po"},d)))}::jsonb)::text as r;`);
+  // The Supabase connector limits one call's size, so attachments go up in pieces first, then one small call sends.
+  const batch="po"+Date.now().toString(36)+Math.random().toString(36).slice(2,7),CH=120000;
+  const atts=d.attachments||[];
+  for(let i=0;i<atts.length;i++){const a=atts[i],b64=String(a.b64||"");
+    await sb(`insert into fbw.mail_att(batch,seq,name,content_type,b64) values(${sqlStr(batch)},${i},${sqlStr(a.name)},${sqlStr(a.contentType||"application/octet-stream")},${sqlStr(b64.slice(0,CH))}) returning seq;`);
+    for(let o=CH;o<b64.length;o+=CH)await sb(`update fbw.mail_att set b64=b64||${sqlStr(b64.slice(o,o+CH))} where batch=${sqlStr(batch)} and seq=${i} returning seq;`)}
+  const rest=Object.assign({ref:"warehousing-po"},d,{batch});delete rest.attachments;
+  const r=await sb(`select fbw.mail_send_staged(${sqlStr(JSON.stringify(rest))}::jsonb)::text as r;`);
   if(!r||r.ok===false)throw new Error((r&&(r.error||r.detail))||"The email wasn't sent");return r;
 }
 /* Email the PO straight to the vendor from hello@, PO PDF (and the Mimaki warranty form) attached. Asks first. */
