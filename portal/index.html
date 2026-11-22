@@ -13,7 +13,7 @@
 <link rel="icon" href="favicon.ico">
 <script src="config.js?v=35"></script>
 <script src="nav.js?v=36"></script>
-<script type="module" src="app.js?v=36"></script>
+<script type="module" src="app.js?v=37"></script>
 </head>
 <body>
 <div id="hd-nav"></div>
@@ -122,13 +122,14 @@
           <label><input type="radio" name="bkKind" value="service" checked> Scheduled service</label>
           <label><input type="radio" name="bkKind" value="fault"> Fault or repair</label>
           <label><input type="radio" name="bkKind" value="install"> Installation</label>
+          <label><input type="radio" name="bkKind" value="consumables"> Consumables order</label>
         </fieldset>
-        <label class="f"><span>What's happening? (error codes, symptoms, anything we should bring)</span><textarea id="bkDesc" class="field" rows="4"></textarea></label>
+        <label class="f"><span id="bkDescLbl">What's happening? (error codes, symptoms, anything we should bring)</span><textarea id="bkDesc" class="field" rows="4"></textarea></label>
         <div class="row2">
           <label class="f"><span>Contact name*</span><input id="bkName" class="field" required autocomplete="name"></label>
           <label class="f"><span>Phone*</span><input id="bkPhone" class="field" type="tel" required autocomplete="tel"></label>
         </div>
-        <h3>Choose a time <span class="muted small">(Perth time)</span></h3>
+        <h3 id="bkTimeHd">Choose a time <span class="muted small">(Perth time)</span></h3>
         <div id="bkSlots" class="slots"><p class="muted small">Loading available times…</p></div>
         <p id="bkPicked" class="picked" hidden></p>
         <button id="bkSubmit" class="btn primary send" type="submit" disabled>Book this time</button>

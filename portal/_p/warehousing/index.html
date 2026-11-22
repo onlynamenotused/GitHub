@@ -173,6 +173,10 @@ th.num .sorth{flex-direction:row-reverse}
     </div>
     <div id="wPanel" style="display:none;margin-top:12px">
       <h3>Warranty claim details</h3>
+      <div class="suggest" style="margin-bottom:10px"><label>Fill from the machine register</label>
+        <input id="wMach" placeholder="Type a serial number, customer or model…" autocomplete="off">
+        <div class="suggest-list" id="wMachList"></div>
+        <div class="muted" id="wMachInfo" style="font-size:12px;margin-top:2px">Picking a machine fills the end user, model, serial, install date, ink and last known firmware. Blank fields only, unless you choose Replace.</div></div>
       <div class="wgrid" id="wFields"></div>
     </div>
   </div>
@@ -204,7 +208,7 @@ th.num .sorth{flex-direction:row-reverse}
       <button class="btn" id="btnPdf">Download PDF</button>
       <button class="btn" id="btnWForm" style="display:none">Download Mimaki form (.xlsx)</button>
       <button class="btn" id="btnOneDrive">Save PDF to OneDrive</button>
-      <button class="btn deskonly" id="btnEmail">Create Outlook draft</button><button class="btn portalonly" id="btnSend">Email PO to vendor…</button>
+      <button class="btn deskonly" id="btnEmail">Create Outlook draft</button><button class="btn primary" id="btnSend">Email PO to vendor…</button>
       <span style="flex:1"></span>
       <button class="btn" id="btnSent">Mark sent</button>
       <button class="btn good" id="btnReceive">Receive into stock</button>
@@ -264,7 +268,7 @@ th.num .sorth{flex-direction:row-reverse}
     <div class="toolbar">
       <div class="grow"><label>Search</label><input id="hSearch" placeholder="PO number, part code, note…"></div>
       <div style="min-width:180px"><label>Vendor</label><select id="hVendor"></select></div>
-      <div style="min-width:150px"><label>Status</label><select id="hStatus"><option value="">Any</option><option value="draft">Draft</option><option value="sent">Sent</option><option value="received">Received</option></select></div>
+      <div style="min-width:150px"><label>Status</label><select id="hStatus"><option value="">Any</option><option value="requested">Requested (not raised)</option><option value="draft">Draft</option><option value="sent">Sent</option><option value="received">Received</option></select></div>
     </div>
     <div class="scroll">
       <table>
@@ -1046,7 +1050,7 @@ $("#btnEmail").onclick=async()=>{
   const body=poEmailHtml(v,t,rows);
   const btn=$("#btnEmail");btn.disabled=true;
   try{
-    const inp={subject:poSubject(),body,bodyType:"html"};if(v.email)inp.to=[v.email];
+    const inp={subject:poSubject(),body,bodyType:"html"};if(isW()&&isMimakiVendor()){inp.to=[MIMAKI_WARRANTY.to];inp.cc=[MIMAKI_WARRANTY.cc]}else if(v.email)inp.to=[v.email];if(inp.to)inp.body=saluteHtml(inp.body,inp.to);
     const r=payloadOf(await mcp.callTool("Microsoft 365","outlook_create_draft",inp));
     const url=r&&(typeof r==="string"?((r.match(/webLink:\s*(\S+)/)||[])[1]):(r.webLink||r.weblink));
     toast(`Draft created in Outlook${v.email?"":" (no vendor email set — add the recipient)"}${url?` — <a href="${esc(url)}" target="_blank" rel="noopener">open draft</a>`:""}. Attach the ${isW()&&wForm()==="mimaki"?"Mimaki form":"PDF"} before sending.`,7000);
@@ -1061,36 +1065,173 @@ function poEmailHtml(v,t,rows){
   const w=cur.warranty||{},wm=isW()&&wForm()==="mimaki";
   const wInfo=isW()?`<table>${[["Machine",[w.model,w.serial?"S/N "+w.serial:"",w.firmware?"firmware "+w.firmware:""].filter(Boolean).join(" · ")],["End user",w.endUser],["Issue occurred",w.issueDate?auDate(w.issueDate):""],["Installed",w.installDate?auDate(w.installDate):""],["Ink",[w.ink,w.inkLot?"lot "+w.inkLot:""].filter(Boolean).join(", ")],["Machine status",w.machineStatus],["Problem",w.problem],["Troubleshooting",w.troubleshoot],["Cause",w.cause],["Comments",w.comments]].filter(x=>x[1]).map(x=>`<tr><td><b>${esc(x[0])}</b></td><td>${esc(x[1])}</td></tr>`).join("")}</table>`:"";
   const sig=`<p>Thank you,<br>Sean Hannan | Proprietor<br>Highway Digital<br>1300 880 815 · hello@highwaydigital.com.au</p>`;
-  if(isW())return`<p>Hi ${esc(v.attention||"team")},</p><p>Please find warranty claim PO <b>${esc(cur.number)}</b>${wm?" attached on the Mimaki warranty form":""}. Details below.<br><b>Delivery: ${esc(delLabel(cur.delivery))}</b></p>${wInfo}<p><b>Parts required</b></p>
+  if(isW())return`<p>Hi ${esc(v.attention||"team")},</p><p>Please find warranty claim PO <b>${esc(cur.number)}</b> attached as a PDF${wm?", together with the completed Mimaki warranty form":""}. Details below.<br><b>Delivery: ${esc(delLabel(cur.delivery))}</b></p>${wInfo}<p><b>Parts required</b></p>
    <table><tr><th>Qty</th><th>Item #</th><th>Description</th></tr>${cur.lines.map(l=>`<tr><td>${Number(l.qty)||0}</td><td>${esc(l.code)}</td><td>${esc(l.desc)}</td></tr>`).join("")}</table>
-   <p><b>Ship to:</b><br>${esc(cur.shipTo).replace(/\n/g,"<br>")}</p><p>Please confirm approval and shipping.</p>${sig}`;
+   ${emFilesHtml()}<p><b>Ship to:</b><br>${esc(cur.shipTo).replace(/\n/g,"<br>")}</p><p>Please confirm approval and shipping.</p>${sig}`;
   return`<p>Hi ${esc(v.attention||"team")},</p><p>Please find purchase order <b>${esc(cur.number)}</b> below.<br><b>Delivery: ${esc(delLabel(cur.delivery))}</b>${cur.notes?"<br>"+esc(cur.notes):""}</p>
    <table><tr><th>Qty</th><th>Item #</th><th>Description</th><th>Unit price</th><th>Line total</th></tr>${rows}
    <tr><td></td><td></td><td></td><td><b>Subtotal</b></td><td>${money(t.sub)}</td></tr><tr><td></td><td></td><td></td><td>GST</td><td>${money(t.gst)}</td></tr><tr><td></td><td></td><td></td><td><b>Total</b></td><td><b>${money(t.tot)}</b></td></tr></table>
    <p><b>Ship to:</b><br>${esc(cur.shipTo).replace(/\n/g,"<br>")}</p><p>Please confirm pricing and availability.</p>${sig}`;
 }
-/* Portal: email the PO straight to the vendor from hello@, PDF (and Mimaki form) attached. Asks first. */
+/* The machine's most recent Mimaki log file and parameter file (OneDrive Client Folders), shared as download links
+   in the warranty email. Found with the Microsoft 365 connector; links made by the bridge (share_items). */
+let emFiles=[];
+function emFilesHtml(){const f=emFiles.filter(x=>x.on&&x.url),h=emHist&&emHist.on&&emHist.url?emHist:null;if(!f.length&&!h)return"";
+  return`<p><b>Machine files</b> (download):<br>${[...f.map(x=>`${x.kind==="log"?"Latest log file":"Latest parameter file"}: <a href="${esc(x.url)}">${esc(x.name)}</a> (${esc(auDate(x.date))})`),
+    ...(h?[`Service history of this machine (${h.count} visit${h.count===1?"":"s"}): <a href="${esc(h.url)}">${esc(h.name)}</a>`]:[])].join("<br>")}</p>`}
+async function findMachineFiles(){
+  if(MODE!=="desk"||!mcp)throw new Error("Finding the log files needs the Service Desk app (Microsoft 365 connector)");
+  const w=cur.warranty||{},serial=String(w.serial||"").trim().toUpperCase();
+  const cust=String((cur.ref&&cur.ref.client)||String(w.endUser||"").split(",")[0]||"");
+  const trade=(cust.split(/\bt\/?as\b/i)[1]||"").trim();
+  const stop=/^(pty|ltd|limited|the|and|group|trading|australia|wa)$/i;
+  const words=(trade||cust).replace(/[^A-Za-z0-9 ]/g," ").split(/\s+/).filter(x=>x&&!stop.test(x));
+  const terms=[...new Set([trade,words.join(" "),...words.filter(x=>x.length>2)].filter(x=>x&&x.length>2))].slice(0,3);
+  const ck=v=>String(v||"").toLowerCase().replace(/[^a-z0-9]/g,"");
+  const short=ck((String(w.model||"").match(/^[A-Za-z]+-?\d+/)||[""])[0]);
+  const seen=new Map();
+  const look=async a=>{try{const r=await mcp.callTool("Microsoft 365","sharepoint_search",Object.assign({limit:50,offset:0},a));const txt=(r&&r.content?r.content.map(c=>c.text||"").join(""):"");
+    for(const ch of txt.split(/(?<=\})(?=\{"(?:uri|totalResultCount|moreResults)")/)){try{const o=JSON.parse(ch.trim());if(o&&o.uri)seen.set(o.uri,o)}catch(e){}}}catch(e){}};
+  if(serial.length>=6)await look({query:serial});
+  for(const t of terms)await look({query:"FW Ver",folderName:t});
+  const pathOf=x=>{try{return decodeURIComponent(String(x.webUrl||"").split(/\/Documents\//i)[1]||"")}catch(e){return""}};
+  let files=[...seen.values()].map(x=>Object.assign({},x,{path:pathOf(x),head:String(x.content||x.summary||"")}))
+    .filter(x=>/\.(csv|txt|log)$/i.test(x.name||"")&&/FW Ver/i.test(x.head)&&/^Client Folders\//i.test(x.path));
+  files=files.filter(x=>{const fm=ck((x.head.match(/;Upload Download File\s*;\s*(?:EPL5_)?([^\s;]+)/i)||[])[1]);const inSer=serial&&ck(x.path).includes(ck(serial));
+    const custOk=inSer||terms.some(t=>ck(x.path.split("/")[1]||"").includes(ck(t)));return custOk&&(!fm||!short||fm.includes(short))});
+  const kind=x=>/(^|[^a-z])log/i.test(x.name)||/\blog\s+0000/i.test(x.head)?"log":"param";
+  // newest file for this machine: skip folders named for a different serial (another machine at the same customer)
+  const other=x=>{const toks=x.path.toUpperCase().match(/\b[A-Z]{1,3}\d[A-Z0-9]{4,6}\b/g)||[];return serial&&toks.length&&!toks.includes(serial)};
+  const pick=k=>files.filter(x=>kind(x)===k&&!other(x)).sort((a,b)=>String(b.lastModifiedDateTime||"").localeCompare(String(a.lastModifiedDateTime||"")))[0];
+  const out=["log","param"].map(k=>{const f=pick(k);return f?{kind:k,id:f.id,name:f.name,path:f.path,date:String(f.lastModifiedDateTime||"").slice(0,10),on:true}:null}).filter(Boolean);
+  if(!out.length)return[];
+  const r=await sb(`select fbw.call(${sqlStr(JSON.stringify({op:"share_items",ids:out.map(x=>x.id)}))}::jsonb)::text as r;`);
+  const links=(r&&r.links)||{};
+  out.forEach(x=>{const l=links[x.id];if(l&&l.ok&&l.url){x.url=l.url+(l.url.includes("?")?"&":"?")+"download=1";x.scope=l.scope}else x.err=(l&&l.error)||"no link"});
+  return out;
+}
+/* Service history of the machine: every ticket on it (date, job, issue, work performed, parts) as a short PDF,
+   uploaded to OneDrive (Ticket media/<PO number>) by the bridge and shared as a link in the warranty email. */
+let emHist=null,emWait=[];
+async function machineHistory(){
+  const w=cur.warranty||{},cust=String((cur.ref&&cur.ref.client)||String(w.endUser||"").split(",")[0]||"").trim();
+  const mid=String(w.machineId||"").trim(),ser=String(w.serial||"").trim(),model=String(w.model||"").trim();
+  const q=`with m as (select id from public.machines where id=${sqlStr(mid)} or (${sqlStr(ser)}<>'' and upper(serial)=upper(${sqlStr(ser)})))
+    select coalesce(json_agg(json_build_object('num',t.num,'created',t.created,'type',t.type,'subtype',t.subtype,'status',t.status,'summary',t.summary,
+      'error',p.data->>'errorCode','descr',p.data->>'description','notes',p.data->>'notes','sched',t.sched_date,'linked',p.data->'linked',
+      'lines',(select json_agg(json_build_object('code',l->>'code','desc',l->>'desc','qty',l->>'qty','src',l->>'src')) from jsonb_array_elements(coalesce(p.data->'lines','[]'::jsonb)) l)) order by t.num desc),'[]')::text as r
+    from public.tickets t left join public.ticket_private p on p.num=t.num
+    where not coalesce(t.sample,false) and (t.machine_id in (select id from m) or (not exists(select 1 from m) and ${sqlStr(cust)}<>'' and t.customer_name ilike ${sqlStr(cust)} and t.model ilike ${sqlStr("%"+model.replace(/^mimaki\s+/i,"")+"%")}));`;
+  return (await sb(q))||[];
+}
+/* Invoiced work on this machine from FreshBooks: the customer's own invoices plus work billed to Mimaki Australia,
+   Embroidery Source, Avery Dennison and ALFEX that names the machine (serial, or customer + model). */
+async function invoiceHistory(){
+  if(MODE!=="desk"||!mcp)return[];
+  const w=cur.warranty||{},serial=String(w.serial||"").trim().toUpperCase(),cust=String((cur.ref&&cur.ref.client)||String(w.endUser||"").split(",")[0]||"").trim();
+  const ck=v=>String(v||"").toLowerCase().replace(/[^a-z0-9]/g,"");
+  const short=ck((String(w.model||"").replace(/^mimaki\s+/i,"").match(/^[A-Za-z]+-?\d+/)||[""])[0]);
+  const custKey=ck(cust.replace(/\b(pty|ltd|limited|t\/?as.*)\b/gi,""));
+  const findClient=async name=>{try{const r=await fb("accounting__list_clients",{name,per_page:10,page:1});return(r.clients||[])}catch(e){return[]}};
+  const own=cust?(await findClient(cust.replace(/\s+(pty|ltd).*$/i,""))).filter(c=>ck(c.organization||c.display_name).includes(custKey.slice(0,12))):[];
+  const payers=[];for(const n of ["Mimaki Australia","Embroidery Source","Avery Dennison","ALFEX"]){const c=(await findClient(n))[0];if(c)payers.push(c)}
+  const out=[],seen=new Set();
+  const scan=async(c,isOwn)=>{for(let page=1;page<=3;page++){let r;try{r=await fb("accounting__list_invoices",{client_id:+c.client_id,per_page:100,page})}catch(e){break}
+    for(const inv of r.invoices||[]){if(seen.has(inv.invoice_number))continue;const txt=JSON.stringify([inv.po_number,inv.notes,(inv.lines||[]).map(l=>[l.name,l.description])]);const t=ck(txt);
+      const hit=(serial&&t.includes(ck(serial)))||(!isOwn&&custKey.length>=4&&t.includes(custKey)&&(!short||t.includes(short)))||(isOwn&&(!short||t.includes(short)||!serial));
+      if(!hit)continue;if(!isOwn&&serial&&!t.includes(ck(serial))&&/[A-Z]{2}\d[A-Z0-9]{5}/.test(txt)&&!new RegExp(serial,"i").test(txt))continue;
+      seen.add(inv.invoice_number);out.push({inv,billTo:(inv.client&&(inv.client.organization||inv.client.name))||c.organization||c.display_name})}
+    if(page>=(r.total_pages||1))break}};
+  for(const c of own)await scan(c,true);for(const c of payers)await scan(c,false);
+  const NON=/^(labour|callout|call-out|reports?|travel|allowance|mimaki full-day rate|.*day rate|.*callout.*|kilomet.*)$/i;
+  return out.map(({inv,billTo})=>{const ls=inv.lines||[];const txt=ls.map(l=>l.description||"").join("\n");
+    const grab=re=>((txt.match(re)||[])[1]||"").trim();
+    const issue=grab(/Reported Issue\s*:\s*([^\n]*)/i)||grab(/Job Type\s*:\s*([^\n]*)/i);
+    const done=grab(/Work Performed\s*:\s*([\s\S]*?)(?:\n\s*Work Outstanding|$)/i)||grab(/Job Notes\s*:\s*([\s\S]*?)(?:\n\n|$)/i);
+    const parts=ls.filter(l=>l.name&&!NON.test(String(l.name).trim())&&!/^https?:/i.test(l.description||"")).map(l=>`${Number(l.quantity)||1}× ${l.name}`).join(", ");
+    return{date:inv.create_date,num:inv.invoice_number,billTo,po:inv.po_number||"",issue,done:done.replace(/\s+/g," "),parts}});
+}
+function historyPDF(list){
+  const {jsPDF}=window.jspdf;const d=new jsPDF({unit:"mm",format:"a4"});const W=210,M=15,w=cur.warranty||{};
+  d.setFont("helvetica","bold");d.setFontSize(16);d.setTextColor(22,32,44);d.text("Service history",M,20);
+  d.setFont("helvetica","normal");d.setFontSize(10);d.setTextColor(60,70,80);
+  d.text([w.model,w.serial?"S/N "+w.serial:"",w.endUser].filter(Boolean).join(" · "),M,27);
+  d.text(`Highway Digital · prepared ${auDate(today())} for warranty claim ${cur.number}`,M,32);
+  const NONPART=/labou?r|hourly|callout|call-out|travel|allowance|day rate|full-day|half-day|kilomet/i;
+  const invs=(list&&list.invoices)||[];list=(list&&list.tickets)||list||[];
+  const linked=new Set(list.flatMap(t=>(t.linked||[]).map(String)));
+  const body=list.map(t=>{const notes=String(t.notes||"");const om=notes.match(/(?:^|\n)\s*(?:work\s+)?outstanding\s*:/i);
+    const done=(om?notes.slice(0,om.index):notes).trim().replace(/\s+/g," ");
+    const parts=(t.lines||[]).filter(l=>l&&(l.code||l.desc)&&!["labour","callout","regional","travel"].includes(l.src)&&!NONPART.test((l.code||"")+" "+(l.desc||""))).map(l=>`${Number(l.qty)||1}× ${l.code||l.desc}`).join(", ");
+    const issue=[t.summary,t.error?"Error "+t.error:""].filter(Boolean).join(" · ");
+    return[auDate(String(t.sched||t.created||"").slice(0,10)),"HSD-"+t.num+"\n"+[t.subtype||t.type,t.status].filter(Boolean).join(", "),issue,(done.length>420?done.slice(0,417)+"…":done)||"—",parts||"—"]});
+  invs.filter(v=>!linked.has(String(v.num))).forEach(v=>body.push([auDate(String(v.date||"").slice(0,10)),"Invoice "+v.num+"\n"+[v.billTo,v.po?"PO "+v.po:""].filter(Boolean).join(", "),v.issue||"—",(v.done.length>420?v.done.slice(0,417)+"…":v.done)||"—",v.parts||"—"]));
+  body.sort((a,b)=>{const k=x=>x[0].split("/").reverse().join("");return k(b).localeCompare(k(a))});
+  d.autoTable({startY:38,head:[["Date","Job","Issue","Work performed","Parts"]],body:body.length?body:[["","","No earlier jobs recorded for this machine","",""]],margin:{left:M,right:M},theme:"grid",
+    styles:{font:"helvetica",fontSize:8.5,cellPadding:1.8,lineColor:[210,215,222],textColor:[22,32,44],valign:"top"},headStyles:{fillColor:[22,32,44],textColor:255,fontStyle:"bold"},
+    columnStyles:{0:{cellWidth:20},1:{cellWidth:26},2:{cellWidth:38},4:{cellWidth:34}}});
+  return d;
+}
+async function shareHistory(){
+  if(MODE!=="desk"||!mcp)throw new Error("The service history link needs the Service Desk app");
+  const [tickets,invoices]=await Promise.all([machineHistory(),invoiceHistory().catch(()=>[])]);
+  if(!window.jspdf)throw new Error("PDF library didn't load");
+  const list={tickets,invoices},d=historyPDF(list),b64=d.output("datauristring").split(",")[1],size=Math.floor(b64.length*3/4)-(b64.endsWith("==")?2:b64.endsWith("=")?1:0);
+  const w=cur.warranty||{},name=`Service history ${String(w.serial||w.model||cur.number).replace(/[^\w .-]+/g,"")} ${today()}.pdf`;
+  const st=await sb(`select fbw.call(${sqlStr(JSON.stringify({op:"media_start",ticket:String(cur.number),name,size}))}::jsonb)::text as r;`);
+  if(!st||st.ok===false||!st.upload)throw new Error((st&&st.error)||"OneDrive upload didn't start");
+  const fin=await sb(`select fbw.call(${sqlStr(JSON.stringify({op:"media_chunk",upload:st.upload,start:0,data:b64}))}::jsonb)::text as r;`);
+  if(!fin||fin.ok===false||!fin.shareUrl)throw new Error((fin&&fin.error)||"OneDrive didn't return a link");
+  return{count:tickets.length+invoices.length,name,url:fin.shareUrl,scope:fin.shareScope,on:true};
+}
+/* Mimaki Australia warranty claims go to Satoshi Abe, cc Mery Kho. */
+const MIMAKI_WARRANTY={to:"abe-s@mimaki.com",cc:"mery.kho@mimaki.com",attention:"Abe-san"};
+/* People addressed by a fixed form in every email: Satoshi Abe at Mimaki is always "Abe-san". */
+const MAIL_SALUTE={"abe-s@mimaki.com":"Abe-san"};
+function saluteHtml(html,to){const hit=[].concat(to||[]).map(x=>MAIL_SALUTE[String(x).trim().toLowerCase()]).find(Boolean);return hit?String(html).replace(/<p>(Hi|Hello|Dear)\s+[^,<]{0,40},<\/p>/i,(m,w)=>`<p>${w} ${hit},</p>`):html}
+/* Send through the Supabase bridge (Microsoft Graph sendMail with attachments): the portal via wh_tool, the
+   Service Desk app via the Supabase connector. */
+async function bridgeMail(d){
+  if(MODE==="portal")return whTool(Object.assign({op:"mail_send"},d));
+  const r=await sb(`select fbw.call(${sqlStr(JSON.stringify(Object.assign({op:"mail_send",ref:"warehousing-po"},d)))}::jsonb)::text as r;`);
+  if(!r||r.ok===false)throw new Error((r&&(r.error||r.detail))||"The email wasn't sent");return r;
+}
+/* Email the PO straight to the vendor from hello@, PO PDF (and the Mimaki warranty form) attached. Asks first. */
 $("#btnSend").onclick=async()=>{
-  if(!validate())return;const v=vById(cur.vendorId)||{};const t=totals();
+  if(!validate())return;const v0=vById(cur.vendorId)||{};const t=totals();
+  const mw=isW()&&isMimakiVendor(),v=mw?Object.assign({},v0,{attention:MIMAKI_WARRANTY.attention}):v0;
   const rows=cur.lines.map(l=>`<tr><td>${Number(l.qty)||0}</td><td>${esc(l.code)}</td><td>${esc(l.desc)}</td><td>${Number(l.price)?money(l.price):"TBC"}</td><td>${Number(l.price)?money(lineTotal(l)):""}</td></tr>`).join("");
   const m=modal(`<h2>Email PO ${esc(cur.number)} to ${esc(v.name||"the vendor")}<button class="x">×</button></h2>
-   <div class="grid2"><div><label>To</label><input id="em_to" value="${esc(v.email||"")}" placeholder="parts@vendor.com.au"></div><div><label>Cc (optional)</label><input id="em_cc" value=""></div></div>
+   <div class="grid2"><div><label>To</label><input id="em_to" value="${esc(mw?MIMAKI_WARRANTY.to:(v.email||""))}" placeholder="parts@vendor.com.au"></div><div><label>Cc (optional)</label><input id="em_cc" value="${esc(mw?MIMAKI_WARRANTY.cc:"")}"></div></div>
+   ${mw?`<p class="muted" style="font-size:12.5px;margin:6px 0 0">Mimaki warranty claims go to Satoshi Abe (addressed as Abe-san), cc Mery Kho.</p>`:""}
+   ${isW()?`<div id="em_files" class="muted" style="font-size:12.5px;margin-top:10px">Looking for the machine's latest log and parameter files…</div>`:""}
+   ${isW()?`<div id="em_hist" class="muted" style="font-size:12.5px;margin-top:8px">Preparing the machine's service history…</div>`:""}
    <div style="margin-top:10px"><label>Subject</label><input id="em_sub" value="${esc(poSubject())}"></div>
-   <p class="muted" style="font-size:12.5px">Sends from hello@highwaydigital.com.au now, with ${isW()&&wForm()==="mimaki"?"the PO PDF and the Mimaki warranty form":"the PO PDF"} attached, and marks the PO sent. A copy goes to Sent Items.</p>
+   <p class="muted" style="font-size:12.5px">Sends from hello@highwaydigital.com.au now, with <b>${esc(fileName())}</b>${isW()&&wForm()==="mimaki"?` and <b>${esc(wFileName())}</b>`:""} attached, and marks the PO sent. A copy goes to Sent Items.</p>
    <div class="actions"><button class="btn primary" id="em_go">Send email</button><button class="btn" id="em_no">Cancel</button><span class="muted" id="em_msg" style="font-size:12.5px;align-self:center"></span></div>`,true);
   m.querySelector("#em_no").onclick=closeModal;
+  emFiles=[];
+  if(isW()){const box=m.querySelector("#em_files");
+    const draw=()=>{box.innerHTML=emFiles.length?`<b>Download links included in the email:</b>${emFiles.map((f,i)=>`<label style="display:flex;gap:6px;align-items:center;margin-top:4px;font-weight:400"><input type="checkbox" data-emf="${i}" ${f.on&&f.url?"checked":""} ${f.url?"":"disabled"}> ${f.kind==="log"?"Latest log file":"Latest parameter file"}: ${esc(f.name)} · ${esc(auDate(f.date))} · <span title="${esc(f.path)}">${esc(f.path.split("/").slice(1,-1).join(" / "))}</span>${f.url?(f.scope==="organisation"?' <span style="color:var(--bad)">(link only works inside Highway Digital)</span>':""):` <span style="color:var(--bad)">couldn't share: ${esc(f.err||"")}</span>`}</label>`).join("")}`:"No log or parameter file found for this machine in OneDrive Client Folders, so none is linked.";
+      box.querySelectorAll("[data-emf]").forEach(c=>c.onchange=()=>{emFiles[+c.dataset.emf].on=c.checked})};
+    emWait=[];emWait.push(findMachineFiles().then(f=>{emFiles=f;draw()}).catch(e=>{box.textContent="Log and parameter files: "+(e.message||e)}));
+    const hb=m.querySelector("#em_hist");emHist=null;
+    emWait.push(shareHistory().then(h=>{emHist=h;hb.innerHTML=`<label style="display:flex;gap:6px;align-items:center;font-weight:400"><input type="checkbox" id="em_hon" checked> Service history link: ${esc(h.name)} (${h.count} visit${h.count===1?"":"s"} from tickets and FreshBooks invoices)${h.scope==="organisation"?' <span style="color:var(--bad)">(link only works inside Highway Digital)</span>':""} · <a href="${esc(h.url)}" target="_blank" rel="noopener">preview</a></label>`;
+      hb.querySelector("#em_hon").onchange=e=>{emHist.on=e.target.checked}}).catch(e=>{hb.textContent="Service history: "+(e.message||e)}))}
   m.querySelector("#em_go").onclick=async()=>{
     const to=m.querySelector("#em_to").value.split(/[,;\s]+/).filter(Boolean),cc=m.querySelector("#em_cc").value.split(/[,;\s]+/).filter(Boolean);
     if(!to.length){m.querySelector("#em_msg").textContent="Add the vendor's email address";return}
-    const go=m.querySelector("#em_go");go.disabled=true;m.querySelector("#em_msg").textContent="Sending…";
+    const go=m.querySelector("#em_go");go.disabled=true;
+    if(emWait.length){m.querySelector("#em_msg").textContent="Waiting for the file links…";await Promise.allSettled(emWait)}
+    m.querySelector("#em_msg").textContent="Sending…";
     try{
       const d=buildPDF();if(!d)throw new Error("PDF library didn't load");
       const att=[{name:fileName(),contentType:"application/pdf",b64:d.output("datauristring").split(",")[1]}];
       if(isW()&&wForm()==="mimaki")att.push({name:wFileName(),contentType:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",b64:await blobB64(await mimakiXlsx())});
-      const r=await whTool({op:"mail_send",to,cc,subject:m.querySelector("#em_sub").value,html:poEmailHtml(v,t,rows),attachments:att});
+      const r=await bridgeMail({to,cc,subject:m.querySelector("#em_sub").value,html:saluteHtml(poEmailHtml(v,t,rows),to),attachments:att});
       if(cur.status==="draft")cur.status="sent";await savePO(true);closeModal();
       toast(`PO ${esc(cur.number)} emailed to ${esc((r.sentTo||to).join(", "))}`,6000);
-    }catch(e){go.disabled=false;m.querySelector("#em_msg").textContent=e.message==="needs_mail_send"?"Microsoft needs reconnecting in the Service Desk before email can be sent.":"Couldn't send: "+(e.message||e.code)}
+    }catch(e){go.disabled=false;m.querySelector("#em_msg").textContent=/needs_mail_send/.test(e.message||"")?"Microsoft needs reconnecting in the Service Desk before email can be sent.":"Couldn't send: "+(e.message||e.code)}
   };
 };
 /* Draft POs can be deleted (stock isn't touched). */
@@ -1119,7 +1260,16 @@ function renderHistory(){
   $("#histBody").innerHTML=list.map(p=>`<tr class="click" data-po="${esc(p._id)}"><td class="mono"><b>${esc(p.number)}</b></td><td>${auDate(p.date)}</td><td>${esc(p.vendorName||(vById(p.vendorId)||{}).name||"")}</td>
     <td style="font-size:12.5px">${(p.lines||[]).slice(0,3).map(l=>`<span class="mono">${esc(l.qty)}× ${esc(l.code)}</span>`).join(", ")}${(p.lines||[]).length>3?` <span class="muted">+${p.lines.length-3} more</span>`:""}</td>
     <td class="num">${money(p.total)}</td><td><span class="pill ${esc(p.status)}">${esc(p.status)}</span>${p.type==="warranty"?' <span class="pill warranty">warranty</span>':""}${p.delivery==="overnight"?' <span class="pill" style="color:var(--bad)">overnight</span>':""}</td></tr>`).join("");
-  $("#histEmpty").style.display=list.length?"none":"block";
+  // warranty / PO requests from the Service Desk that haven't been raised as a PO yet
+  let allReqs=[];try{allReqs=wReqs||[]}catch(e){}
+  const reqs=allReqs.filter(r=>{const pl=r.payload||{},vn=String(r.vendor||pl.vendor||"");
+    if(sf&&sf!=="requested")return false;if(vf){const v=vById(vf);if(!v||(v.name||"").toLowerCase()!==vn.toLowerCase())return false}
+    return !q||[r.ticket,pl.customer,pl.model,vn,...(pl.parts||[]).map(x=>x.code+" "+(x.desc||""))].join(" ").toLowerCase().includes(q)});
+  $("#histBody").insertAdjacentHTML("afterbegin",reqs.map(r=>{const pl=r.payload||{};return`<tr class="click" data-hreq="${esc(r.id)}"><td class="mono"><b>Request #${esc(r.id)}</b><div class="muted" style="font-size:11.5px">${esc(r.ticket||pl.ticket||"")}</div></td><td>${auDate(String(r.created||"").slice(0,10))}</td><td>${esc(r.vendor||pl.vendor||"")}</td>
+    <td style="font-size:12.5px">${(pl.parts||[]).slice(0,3).map(l=>`<span class="mono">${esc(l.qty)}× ${esc(l.code)}</span>`).join(", ")}${(pl.parts||[]).length>3?` <span class="muted">+${pl.parts.length-3} more</span>`:""}<div class="muted" style="font-size:11.5px">${esc(pl.customer||"")}</div></td>
+    <td class="num muted">—</td><td><span class="pill draft">requested</span> <span class="pill warranty">warranty</span><div class="muted" style="font-size:11.5px">Not raised yet: click to open as a PO</div></td></tr>`}).join(""));
+  $$("[data-hreq]").forEach(r=>r.onclick=()=>openReq(allReqs.find(x=>String(x.id)===r.dataset.hreq)));
+  $("#histEmpty").style.display=(list.length||reqs.length)?"none":"block";
   $$("[data-po]").forEach(r=>r.onclick=()=>{const p=pos.find(x=>x._id===r.dataset.po);if(!p)return;cur=Object.assign(blankPO(),JSON.parse(JSON.stringify(p)),{id:p._id});delete cur._id;loadPOtoForm();show("po")});
 }
 ["#hSearch","#hVendor","#hStatus"].forEach(s=>$(s).addEventListener("input",renderHistory));
@@ -1130,7 +1280,7 @@ function renderHistory(){
    (warranty-mimaki.xlsx, filled in the browser); other makers get the standard PO marked WARRANTY. */
 const SB_PROJECT="sfuuzcgwbbhdjqzrchvv";
 const W_STATUS=["Running (parts replaced)","Running (temporary fix)","Running (issue intermittent)","Down (waiting for parts)","Down (other)"];
-const W_KEYS=[["endUser","End user (customer)"],["dealer","Dealer"],["model","Machine model"],["serial","Serial number"],["firmware","Firmware version"],["ink","Ink type"],["inkLot","Ink lot no."],["issueDate","Date issue occurred","date"],["installDate","Installation date","date"],["machineStatus","Machine status","status"],["problem","Problem","area"],["troubleshoot","Troubleshooting done","area"],["cause","Cause","area"],["comments","Comments for the maker","area"]];
+const W_KEYS=[["endUser","End user (customer)"],["dealer","Dealer (purchased from)"],["model","Machine model"],["serial","Serial number"],["firmware","Firmware version"],["ink","Ink type"],["inkLot","Ink lot no."],["issueDate","Date issue occurred","date"],["installDate","Installation date","date"],["machineStatus","Machine status","status"],["problem","Problem","area"],["troubleshoot","Troubleshooting done","area"],["cause","Cause","area"],["comments","Comments for the maker","area"]];
 const isW=()=>cur&&cur.type==="warranty";
 const isMimakiVendor=()=>{const v=vById(cur.vendorId)||{};return /mimaki/i.test((v.brand||"")+" "+(v.name||""))};
 function wBlank(){return{endUser:"",dealer:"Highway Digital",model:"",serial:"",firmware:"",ink:"",inkLot:"",issueDate:"",installDate:"",machineStatus:"",problem:"",troubleshoot:"",cause:"",comments:"",form:"",ticket:""}}
@@ -1147,6 +1297,55 @@ function renderWarranty(){
     return`<div><label>${l}</label><input data-w="${k}" ${ty==="date"?'type="date"':""} value="${v}"></div>`}).join("");
   $$("#wFields [data-w]").forEach(el=>el.oninput=el.onchange=()=>{cur.warranty[el.dataset.w]=el.value;try{localStorage.setItem("hd-po-draft",JSON.stringify(cur))}catch(e){}});
 }
+/* Machine register (public.machines, kept in step with the Service Desk's asset register) for the warranty form. */
+let wMachines=null,wMachBusy=null;
+async function loadMachines(){
+  if(wMachines)return wMachines;if(wMachBusy)return wMachBusy;
+  wMachBusy=(async()=>{
+    if(MODE==="portal"){
+      const[m,c]=await Promise.all([sbc.from("machines").select("id,client_id,brand,model,serial,ink_set,ink_type,purchased_from,mimaki_care,firmware,install_date,warranty_end,location,site,status").limit(2000),sbc.from("clients").select("id,name").limit(5000)]);
+      if(m.error)throw new Error(m.error.message);const cn=new Map((c.data||[]).map(x=>[x.id,x.name]));
+      return(m.data||[]).map(x=>Object.assign(x,{customer:cn.get(x.client_id)||""}));
+    }
+    if(!mcp)return[];
+    return await sb(`select coalesce(json_agg(json_build_object('id',m.id,'brand',m.brand,'model',m.model,'serial',m.serial,'ink_set',m.ink_set,'install_date',m.install_date,'warranty_end',m.warranty_end,'location',coalesce(m.location,m.site),'status',m.status,'customer',c.name,'purchased_from',m.purchased_from,'ink_type',m.ink_type,'mimaki_care',m.mimaki_care,'at_firmware',m.firmware,
+      'firmware',(select coalesce(p.data#>>'{mimakiReport,fields,fwAfter}',p.data#>>'{warranty,firmware}',p.data#>>'{mimakiReport,fields,fwBefore}') from public.tickets t join public.ticket_private p on p.num=t.num where t.machine_id=m.id and coalesce(p.data#>>'{mimakiReport,fields,fwAfter}',p.data#>>'{warranty,firmware}',p.data#>>'{mimakiReport,fields,fwBefore}','')<>'' order by t.num desc limit 1),
+      'inkType',(select p.data#>>'{mimakiReport,fields,inkType}' from public.tickets t join public.ticket_private p on p.num=t.num where t.machine_id=m.id and coalesce(p.data#>>'{mimakiReport,fields,inkType}','')<>'' order by t.num desc limit 1))),'[]')::text as r
+      from public.machines m left join public.clients c on c.id=m.client_id where coalesce(m.status,'active')<>'retired';`)||[];
+  })();
+  try{wMachines=await wMachBusy}catch(e){wMachines=null;throw e}finally{wMachBusy=null}
+  return wMachines;
+}
+function machFill(m,replace){
+  const w=cur.warranty||(cur.warranty=wBlank());
+  const ink=[m.inkType||m.ink_type,m.ink_set].filter(Boolean);
+  const vals={endUser:[m.customer,m.location].filter(Boolean).join(", "),model:[m.brand&&!/mimaki/i.test(m.brand)?m.brand:"",m.model].filter(Boolean).join(" "),serial:m.serial||"",
+    installDate:String(m.install_date||"").slice(0,10),ink:ink.length>1?`${ink[0]} (${ink[1]})`:(ink[0]||""),firmware:m.firmware||m.at_firmware||"",dealer:m.purchased_from||""};
+  if(vals.dealer&&(replace||!w.dealer||w.dealer==="Highway Digital")){w.dealer=vals.dealer;delete vals.dealer}
+  let n=0;Object.entries(vals).forEach(([k,v])=>{if(v&&(replace||!String(w[k]||"").trim())){w[k]=v;n++}});
+  w.machineId=m.id;
+  if(!cur.notes||/^Warranty claim$/.test(cur.notes)){cur.notes=`Warranty claim · Customer: ${m.customer||""}`;$("#poNotes").value=cur.notes}
+  try{localStorage.setItem("hd-po-draft",JSON.stringify(cur))}catch(e){}
+  renderWarranty();
+  const warn=m.warranty_end&&String(m.warranty_end).slice(0,10)<today()?` Note: the register shows warranty ended ${auDate(String(m.warranty_end).slice(0,10))}.`:"";
+  $("#wMachInfo").innerHTML=`${n?`Filled ${n} field${n>1?"s":""}`:"Nothing blank to fill"} from <b>${esc(m.customer||"")}</b> · ${esc([m.brand,m.model].filter(Boolean).join(" "))}${m.serial?" · S/N "+esc(m.serial):""}. <a href="#" id="wMachRep">Replace all with the register's details</a>${esc(warn)}`;
+  $("#wMachRep").onclick=e=>{e.preventDefault();machFill(m,true)};
+}
+async function machSearch(){
+  const L=$("#wMachList"),q=$("#wMach").value.trim().toLowerCase();
+  if(q.length<2){L.style.display="none";return}
+  let list;try{list=await loadMachines()}catch(e){L.innerHTML=`<div class="muted">Couldn't load the machine register: ${esc(e.message||e)}</div>`;L.style.display="block";return}
+  const words=q.split(/\s+/);
+  const hits=list.filter(m=>{const h=[m.serial,m.customer,m.brand,m.model,m.location].join(" ").toLowerCase();return words.every(w=>h.includes(w))})
+    .sort((a,b)=>(/mimaki/i.test(b.brand||"")-/mimaki/i.test(a.brand||""))).slice(0,12);
+  L.innerHTML=hits.length?hits.map((m,i)=>`<div data-mi="${i}"><b>${esc(m.customer||"(no customer)")}</b><span>${esc([m.brand,m.model].filter(Boolean).join(" "))}</span><span class="mono muted">${esc(m.serial||"no serial")}</span></div>`).join(""):`<div class="muted">No machine matches</div>`;
+  L.style.display="block";
+  L.querySelectorAll("[data-mi]").forEach(d=>d.onmousedown=e=>{e.preventDefault();L.style.display="none";$("#wMach").value="";machFill(hits[+d.dataset.mi])});
+}
+$("#wMach").oninput=()=>machSearch();
+$("#wMach").onfocus=()=>{loadMachines().catch(()=>{});machSearch()};
+$("#wMach").onblur=()=>setTimeout(()=>{$("#wMachList").style.display="none"},150);
+
 $("#poType").onchange=e=>{cur.type=e.target.value;if(isW()&&!cur.warranty)cur.warranty=wBlank();if(isW()&&!cur.notes){cur.notes="Warranty claim";$("#poNotes").value=cur.notes}renderWarranty();renderLines()};
 $("#wForm").onchange=e=>{cur.warranty.form=e.target.value;renderWarranty()};
 
@@ -1167,11 +1366,11 @@ async function sb(q){
 }
 let wReqs=[],wReqErr="";
 async function loadReqs(){
-  if(MODE==="portal"){try{const{data,error}=await sbc.rpc("wh_requests",{p:{}});if(error)throw new Error(error.message);wReqs=data||[];wReqErr=""}catch(e){wReqErr="Couldn't load warranty requests: "+(e.message||e)}renderInbox();return}
+  if(MODE==="portal"){try{const{data,error}=await sbc.rpc("wh_requests",{p:{}});if(error)throw new Error(error.message);wReqs=data||[];wReqErr=""}catch(e){wReqErr="Couldn't load warranty requests: "+(e.message||e)}renderInbox();try{renderHistory()}catch(e){}return}
   if(!mcp)return;
   try{wReqs=await sb(`select coalesce(json_agg(json_build_object('id',id,'ticket',ticket_num,'vendor',vendor,'status',status,'payload',payload,'created',created_at) order by id desc),'[]')::text as r from fbw.po_requests where kind='warranty' and status='pending';`)||[];wReqErr=""}
   catch(e){wReqErr=mcpErr(e,"Supabase")}
-  renderInbox();
+  renderInbox();try{renderHistory()}catch(e){}
 }
 function renderInbox(){
   const box=$("#wInbox");
@@ -1192,13 +1391,16 @@ function openReq(r){
   cur=blankPO();cur.type="warranty";
   const v=vendors.find(x=>(x.name||"").toLowerCase()===String(r.vendor||p.vendor||"").toLowerCase())||brandToVendor(p.brand);
   if(v){cur.vendorId=v._id;cur.vendorAddr=vendorAddr(v)}
-  const digits=String(p.ticket||r.ticket||"").replace(/\D/g,"");
-  cur.number="W"+(digits||r.id);
-  cur.warranty=Object.assign(wBlank(),{endUser:p.endUser||p.customer||"",model:p.model||"",serial:p.serial||"",firmware:p.firmware||"",ink:p.ink||"",inkLot:p.inkLot||"",issueDate:p.issueDate||"",installDate:p.installDate||"",machineStatus:p.machineStatus||"",problem:p.problem||"",troubleshoot:p.troubleshoot||"",cause:p.cause||"",comments:p.comments||"",ticket:p.ticket||r.ticket||""});
+  // the PO number is the job's ticket number (HSD-1001043); a second claim on the same job gets -2, -3…
+  const tk=String(p.ticket||r.ticket||"").trim()||("Request "+r.id);
+  let num=tk,n=1;while(pos.some(x=>String(x.number).toLowerCase()===num.toLowerCase())){n++;num=tk+"-"+n}
+  cur.number=num;
+  cur.warranty=Object.assign(wBlank(),p.dealer?{dealer:p.dealer}:{},{endUser:p.endUser||p.customer||"",model:p.model||"",serial:p.serial||"",firmware:p.firmware||"",ink:p.ink||"",inkLot:p.inkLot||"",issueDate:p.issueDate||"",installDate:p.installDate||"",machineStatus:p.machineStatus||"",problem:p.problem||"",troubleshoot:p.troubleshoot||"",cause:p.cause||"",comments:p.comments||"",ticket:p.ticket||r.ticket||""});
   cur.notes=`Warranty claim · Customer: ${p.customer||""} · Job ${p.ticket||r.ticket||""}`;
   cur.ref={kind:"ticket",reqId:r.id,number:p.ticket||r.ticket||"",client:p.customer||"",po:""};
   cur.lines=(p.parts||[]).map(x=>({code:x.code||"",desc:x.desc||"",qty:Number(x.qty)||1,price:0,disc:0,supply:x.supply||"order",billable:!!x.billable}));
   loadPOtoForm();show("po");window.scrollTo(0,0);
+  loadMachines().then(list=>{const sn=String(p.serial||"").toLowerCase();const nz=v=>String(v||"").toLowerCase().replace(/[^a-z0-9]/g,""),L=list||[];let m=L.find(x=>p.assetId&&x.id===p.assetId)||(sn?L.find(x=>String(x.serial||"").toLowerCase()===sn):null);if(!m){const mine=L.filter(x=>nz(x.customer)===nz(p.customer));const bm=mine.filter(x=>nz(x.model)===nz(p.model));m=bm.length===1?bm[0]:(!bm.length&&mine.length===1?mine[0]:null)}if(m&&cur.ref&&cur.ref.reqId===r.id)machFill(m,false)}).catch(()=>{});
   toast(`Warranty request #${esc(r.id)} loaded as PO ${esc(cur.number)}. Check the details, then Save.`,5000);
 }
 async function syncReq(){

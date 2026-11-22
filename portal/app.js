@@ -659,7 +659,19 @@ async function renderBook(machineId) {
   loadBookings();
 }
 const bkKind = () => bk.moving ? bk.moving.kind : (document.querySelector('input[name="bkKind"]:checked') || {}).value || "service";
+/* "Consumables order" needs no visit: no time to pick, the customer just describes the items. */
+function bkModeUI() {
+  const cons = !bk.moving && bkKind() === "consumables";
+  $("#bkTimeHd").hidden = cons; $("#bkSlots").hidden = cons; if (cons) $("#bkPicked").hidden = true;
+  $("#bkDescLbl").textContent = cons ? "What items do you need? (ink colours and sizes, cleaning kits, wipers, blades, part numbers if you have them, and quantities)"
+    : "What's happening? (error codes, symptoms, anything we should bring)";
+  $("#bkDesc").placeholder = cons ? "e.g. 2 x LUS-170 Cyan 1L, 1 x cleaning kit, 10 wipers" : "";
+  $("#bkSubmit").textContent = cons ? "Send order request" : "Book this time";
+  if (cons) $("#bkSubmit").disabled = false;
+  return cons;
+}
 async function loadSlots() {
+  if (bkModeUI()) return;
   const box = $("#bkSlots");
   bk.slot = null; $("#bkSubmit").disabled = true; $("#bkPicked").hidden = true;
   box.replaceChildren(el("p", { class: "muted small" }, "Loading available times…"));
@@ -750,6 +762,20 @@ $("#bookForm").addEventListener("submit", async (e) => {
     return;
   }
   const name = $("#bkName").value.trim(), phone = $("#bkPhone").value.trim();
+  if (bkKind() === "consumables") {
+    const items = $("#bkDesc").value.trim();
+    if (!items) { msg.className = "msg err"; msg.textContent = "Describe the items you need."; $("#bkDesc").focus(); return; }
+    if (!name || !phone) { msg.className = "msg err"; msg.textContent = "Please add a contact name and phone number."; return; }
+    btn.disabled = true; msg.className = "msg"; msg.textContent = "Sending your order request…";
+    try {
+      const id = await logJob($("#bkMachine").value, { kind: "consumables", desc: items, code: "", name, phone });
+      msg.className = "msg ok";
+      msg.textContent = "Thanks, your consumables order request is in (request " + id + "). We'll check stock and pricing and get back to you, usually with a quote or invoice.";
+      $("#bkDesc").value = "";
+    } catch (err) { msg.className = "msg err"; msg.textContent = err.message || "Couldn't send the order request."; }
+    btn.disabled = false;
+    return;
+  }
   if (!bk.slot) { msg.className = "msg err"; msg.textContent = "Pick a time first."; return; }
   if (!name || !phone) { msg.className = "msg err"; msg.textContent = "Please add a contact name and phone number."; return; }
   btn.disabled = true; msg.className = "msg"; msg.textContent = "Booking…";
@@ -768,7 +794,7 @@ const PLATE_BRANDS = ["Mimaki", "Mutoh", "Roland", "Epilog", "Brother", "Kyocera
 const PLATE_MODELS = ["UCJV300-160", "UCJV330-160", "CJV150-160", "CJV150-130", "CJV150-107", "CJV300-160", "CJV330-160", "JV300-160", "JV330-160", "JV150-160", "JV100-160", "TS100-1600", "TS330-1600", "TS55-1800", "TxF150-75", "TxF300-75", "UJF-3042MkII", "UJF-3042MkIIe", "UJF-6042MkII", "UJF-7151plusII", "JFX200-2513", "JFX200-2513EX", "JFX600-2513", "UJV100-160", "UJV55-320", "CG-60AR", "CG-130AR", "CG-130FXII", "CG-160FXII", "CG-75FXII", "CFL-605RT", "XpertJet 1641SR", "XpertJet 1682SR", "XpertJet 1462UF", "XPJ-661", "VJ-1638", "VJ-1624X", "VJ-628", "TrueVIS VG2-540", "TrueVIS SG2-540", "VersaUV LEF2-200", "Helix 24", "Fusion Pro 32", "Fusion Pro 48", "Fusion Edge", "Zing 24", "Mini 24", "GTX-422", "GTXpro", "PR1055X", "PR680W", "PR1050X"];
 const MACHINE_TYPES = ["Sign printer", "Print & cut", "Flatbed UV printer", "Direct-to-film / textile printer", "Cutter / plotter", "Laser engraver", "Embroidery machine", "CNC router", "Office printer / copier", "Other"];
 const compact = (s) => String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
-const JOB_KINDS = [["fault", "Fault or repair"], ["service", "Scheduled service"], ["install", "Installation"], ["other", "Something else"]];
+const JOB_KINDS = [["fault", "Fault or repair"], ["service", "Scheduled service"], ["install", "Installation"], ["consumables", "Consumables order"], ["other", "Something else"]];
 const isCustomer = () => !state.staff && state.clients.length > 0;
 
 function knownModels() {
@@ -1012,7 +1038,7 @@ async function machineExtras(m, host) {
 const isSupervisor = () => !state.staff && (state.supervisors || []).length > 0;
 const supName = () => (state.supervisors || []).map((s) => s.name).join(", ");
 const money = (n) => "$" + (Number(n) || 0).toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const KIND_NAMES = { service: "Service visit", install: "Installation", parts: "Parts order", fault: "Fault or repair", other: "Other" };
+const KIND_NAMES = { service: "Service visit", install: "Installation", parts: "Parts order", consumables: "Consumables order", fault: "Fault or repair", other: "Other" };
 const rep = { data: null, loading: null, f: { from: "", to: "", client: "", machine: "", q: "", tab: "jobs" } };
 
 async function loadReportData(force) {
