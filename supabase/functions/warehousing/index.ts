@@ -4,6 +4,7 @@
 // Uses the same token store (fbw.conn, row-locked refresh) and bridge key as the "freshbooks" function.
 //   POST /warehousing/api  {op:"fb_list", tool:"list_invoices"|"list_estimates"|"list_clients", page, per_page}
 //                          {op:"upload", driveId, parentItemId, filename, contentType, b64}
+//                          {op:"fb_contacts", client_id}  (Service Desk: who to email on a ticket)
 import postgres from "npm:postgres@3.4.4";
 
 const sql = postgres(Deno.env.get("SUPABASE_DB_URL")!, { prepare: false, max: 2 });
@@ -79,6 +80,18 @@ async function fbList(d: any) {
   throw new Error("Unknown FreshBooks list");
 }
 
+/* One client's people: the main contact plus FreshBooks "additional contacts". */
+async function fbContacts(d: any) {
+  const id = parseInt(d.client_id, 10); if (!id) throw new Error("client_id needed");
+  const j = await fb(`/accounting/account/{account}/users/clients/${id}?include[]=contacts`);
+  const c = j?.response?.result?.client || {};
+  const people: any[] = [];
+  const add = (name: string, email: string, role: string, phone = "") => { email = String(email || "").trim(); if (email && !people.some((p) => p.email.toLowerCase() === email.toLowerCase())) people.push({ name: name.trim(), email, role, phone }); };
+  add([c.fname, c.lname].filter(Boolean).join(" "), c.email, "main", c.mob_phone || c.bus_phone || c.home_phone || "");
+  for (const x of c.contacts || []) add([x.fname, x.lname].filter(Boolean).join(" "), x.email, "contact", x.phone1 || x.phone2 || "");
+  return { ok: true, client_id: id, organization: c.organization || "", people };
+}
+
 /* OneDrive: put one PO PDF or warranty form in a vendor's folder. */
 async function upload(d: any) {
   const drive = String(d.driveId || ""), parent = String(d.parentItemId || "");
@@ -104,6 +117,7 @@ Deno.serve(async (req) => {
   try {
     if (b.op === "fb_list") return json(await fbList(b));
     if (b.op === "upload") return json(await upload(b));
+    if (b.op === "fb_contacts") return json(await fbContacts(b));
     return json({ ok: false, error: "unknown op" }, 400);
   } catch (e) {
     return json({ ok: false, error: (e as Error).message });
