@@ -1077,6 +1077,8 @@ function poEmailHtml(v,t,rows){
 /* The machine's most recent Mimaki log file and parameter file (OneDrive Client Folders), shared as download links
    in the warranty email. Found with the Microsoft 365 connector; links made by the bridge (share_items). */
 let emFiles=[];
+/* One row of the send window's download-links table: what it is on the left, the include tick box on the right. */
+function emRow(title,sub,box){return`<label style="display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;padding:8px 12px;border-top:1px solid var(--field-line);margin:0;font-weight:400;cursor:${box?"pointer":"default"}"><span style="min-width:0"><span style="display:block;font-size:13px">${title}</span><span class="muted" style="display:block;font-size:12px;overflow-wrap:anywhere">${sub}</span></span><span style="width:22px;text-align:center">${box}</span></label>`}
 function emFilesHtml(){const f=emFiles.filter(x=>x.on&&x.url),h=emHist&&emHist.on&&emHist.url?emHist:null;if(!f.length&&!h)return"";
   return`<p><b>Machine files</b> (download):<br>${[...f.map(x=>`${x.kind==="log"?"Latest log file":"Latest parameter file"}: <a href="${esc(x.url)}">${esc(x.name)}</a> (${esc(auDate(x.date))})`),
     ...(h?[`Service history of this machine (${h.count} visit${h.count===1?"":"s"}): <a href="${esc(h.url)}">${esc(h.name)}</a>`]:[])].join("<br>")}</p>`}
@@ -1229,11 +1231,13 @@ $("#btnSend").onclick=async()=>{
   const mw=isW()&&isMimakiVendor(),v=mw?Object.assign({},v0,{attention:MIMAKI_WARRANTY.attention}):v0;
   const rows=cur.lines.map(l=>`<tr><td>${Number(l.qty)||0}</td><td>${esc(l.code)}</td><td>${esc(l.desc)}</td><td>${Number(l.price)?money(l.price):"TBC"}</td><td>${Number(l.price)?money(lineTotal(l)):""}</td></tr>`).join("");
   const m=modal(`<h2>Email PO ${esc(cur.number)} to ${esc(v.name||"the vendor")}<button class="x">×</button></h2>
-   <div class="grid2"><div><label>To</label><input id="em_to" value="${esc(mw?MIMAKI_WARRANTY.to:(v.email||""))}" placeholder="parts@vendor.com.au"></div><div><label>Cc (optional)</label><input id="em_cc" value="${esc(mw?MIMAKI_WARRANTY.cc:"")}"></div></div>
+   <div class="grid2"><div><label>To</label><input id="em_to" value="${esc(mw?MIMAKI_WARRANTY.to:(v.email||""))}" placeholder="parts@vendor.com.au"></div><div><label>${mw?"Other Cc (optional)":"Cc (optional)"}</label><input id="em_cc" value="${esc(mw?MIMAKI_WARRANTY.cc:"")}"></div></div>
    ${mw?`<p class="muted" style="font-size:12.5px;margin:6px 0 0">Mimaki warranty claims go to Satoshi Abe (addressed as Abe-san), cc Mery Kho.</p>
    <div id="em_mk" style="margin-top:8px"><span class="muted" style="font-size:12.5px">Loading Mimaki contacts from Outlook…</span></div>`:""}
-   ${isW()?`<div id="em_files" class="muted" style="font-size:12.5px;margin-top:10px">Looking for the machine's latest log and parameter files…</div>`:""}
-   ${isW()?`<div id="em_hist" class="muted" style="font-size:12.5px;margin-top:8px">Preparing the machine's service history…</div>`:""}
+   ${isW()?`<div style="margin-top:14px;border:1px solid var(--field-line);border-radius:6px;overflow:hidden">
+     <div style="display:grid;grid-template-columns:1fr auto;gap:12px;padding:7px 12px;background:var(--soft);font-size:12px;font-weight:600"><span>Download links in the email</span><span>Include</span></div>
+     <div id="em_files">${emRow("Latest log and parameter files","Looking in OneDrive Client Folders…","")}</div>
+     <div id="em_hist">${emRow("Service history","Preparing the machine's service history…","")}</div></div>`:""}
    <div style="margin-top:10px"><label>Subject</label><input id="em_sub" value="${esc(poSubject())}"></div>
    <p class="muted" style="font-size:12.5px">Sends from hello@highwaydigital.com.au now, with <b>${esc(fileName())}</b>${isW()&&wForm()==="mimaki"?` and <b>${esc(wFileName())}</b>`:""} attached, and marks the PO sent. A copy goes to Sent Items.</p>
    <div class="actions"><button class="btn primary" id="em_go">Send email</button><button class="btn" id="em_no">Cancel</button><span class="muted" id="em_msg" style="font-size:12.5px;align-self:center"></span></div>`,true);
@@ -1247,12 +1251,14 @@ $("#btnSend").onclick=async()=>{
     }).catch(e=>{box.innerHTML=`<div class="grid2"><div><label>Cc 1 (Mimaki)</label><select id="em_cc1">${opts([{email:MIMAKI_WARRANTY.cc,name:"Mery Kho"}],MIMAKI_WARRANTY.cc)}</select></div><div><label>Cc 2 (Mimaki)</label><select id="em_cc2">${opts([],"")}</select></div></div>`})}
   emFiles=[];
   if(isW()){const box=m.querySelector("#em_files");
-    const draw=()=>{box.innerHTML=emFiles.length?`<b>Download links included in the email:</b>${emFiles.map((f,i)=>`<label style="display:flex;gap:6px;align-items:center;margin-top:4px;font-weight:400"><input type="checkbox" data-emf="${i}" ${f.on&&f.url?"checked":""} ${f.url?"":"disabled"}> ${f.kind==="log"?"Latest log file":"Latest parameter file"}: ${esc(f.name)} · ${esc(auDate(f.date))} · <span title="${esc(f.path)}">${esc(f.path.split("/").slice(1,-1).join(" / "))}</span>${f.url?(f.scope==="organisation"?' <span style="color:var(--bad)">(link only works inside Highway Digital)</span>':""):` <span style="color:var(--bad)">couldn't share: ${esc(f.err||"")}</span>`}</label>`).join("")}`:"No log or parameter file found for this machine in OneDrive Client Folders, so none is linked.";
+    const draw=()=>{box.innerHTML=emFiles.length?emFiles.map((f,i)=>emRow(`${f.kind==="log"?"Latest log file":"Latest parameter file"} · <span class="mono">${esc(f.name)}</span>`,
+        `${esc(auDate(f.date))} · <span title="${esc(f.path)}">${esc(f.path.split("/").slice(1,-1).join(" / "))}</span>${f.url?(f.scope==="organisation"?' · <span style="color:var(--bad)">link only works inside Highway Digital</span>':""):` · <span style="color:var(--bad)">couldn't share: ${esc(f.err||"")}</span>`}`,
+        `<input type="checkbox" data-emf="${i}" aria-label="Include ${esc(f.name)}" ${f.on&&f.url?"checked":""} ${f.url?"":"disabled"}>`)).join(""):emRow("Latest log and parameter files","None found for this machine in OneDrive Client Folders","");
       box.querySelectorAll("[data-emf]").forEach(c=>c.onchange=()=>{emFiles[+c.dataset.emf].on=c.checked})};
-    emWait=[];emWait.push(findMachineFiles().then(f=>{emFiles=f;draw()}).catch(e=>{box.textContent="Log and parameter files: "+(e.message||e)}));
+    emWait=[];emWait.push(findMachineFiles().then(f=>{emFiles=f;draw()}).catch(e=>{box.innerHTML=emRow("Latest log and parameter files",esc(e.message||e),"")}));
     const hb=m.querySelector("#em_hist");emHist=null;
-    emWait.push(shareHistory().then(h=>{emHist=h;hb.innerHTML=`<label style="display:flex;gap:6px;align-items:center;font-weight:400"><input type="checkbox" id="em_hon" checked> Service history link: ${esc(h.name)} (${h.count} visit${h.count===1?"":"s"} from tickets and FreshBooks invoices)${h.scope==="organisation"?' <span style="color:var(--bad)">(link only works inside Highway Digital)</span>':""} · <a href="${esc(h.url)}" target="_blank" rel="noopener">preview</a></label>`;
-      hb.querySelector("#em_hon").onchange=e=>{emHist.on=e.target.checked}}).catch(e=>{hb.textContent="Service history: "+(e.message||e)}))}
+    emWait.push(shareHistory().then(h=>{emHist=h;hb.innerHTML=emRow(`Service history · <span class="mono">${esc(h.name)}</span>`,`${h.count} visit${h.count===1?"":"s"} from tickets and FreshBooks invoices · <a href="${esc(h.url)}" target="_blank" rel="noopener">preview</a>${h.scope==="organisation"?' · <span style="color:var(--bad)">link only works inside Highway Digital</span>':""}`,`<input type="checkbox" id="em_hon" aria-label="Include the service history" checked>`);
+      hb.querySelector("#em_hon").onchange=e=>{emHist.on=e.target.checked}}).catch(e=>{hb.innerHTML=emRow("Service history",esc(e.message||e),"")}))}
   m.querySelector("#em_go").onclick=async()=>{
     const to=m.querySelector("#em_to").value.split(/[,;\s]+/).filter(Boolean),cc=[...new Set([(m.querySelector("#em_cc1")||{}).value,(m.querySelector("#em_cc2")||{}).value,...m.querySelector("#em_cc").value.split(/[,;\s]+/)].map(x=>String(x||"").trim()).filter(Boolean))];
     if(!to.length){m.querySelector("#em_msg").textContent="Add the vendor's email address";return}
