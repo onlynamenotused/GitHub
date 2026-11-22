@@ -149,8 +149,7 @@ th.num .sorth{flex-direction:row-reverse}
     <h2 id="poTitle">New purchase order</h2>
     <div class="actions potop">
       <button class="btn primary" id="btnSave">Save</button>
-      <button class="btn" id="btnPdf">Download PDF</button>
-      <button class="btn" id="btnWForm" style="display:none">Download Mimaki form (.xlsx)</button>
+      <button class="btn" id="btnPdf" title="Downloads the PO as a PDF">Download</button>
       <button class="btn" id="btnOneDrive">Save PDF to OneDrive</button>
       <button class="btn primary" id="btnSend">Email PO to vendor…</button><button class="btn" id="btnSendInt" title="Email this PO to hello@highwaydigital.com.au">Email PO internal…</button>
       <span style="flex:1"></span>
@@ -1047,9 +1046,13 @@ function buildPDF(){
   d.setFont("helvetica","bold");d.setFontSize(10);d.text("Thank you",W-M,fy,{align:"right"});
   return d;
 }
+/* One Download button: the PO PDF, plus the Mimaki warranty form (.xlsx) when this is a Mimaki warranty PO. */
 $("#btnPdf").onclick=async()=>{
   if(!validate())return;const d=buildPDF();if(!d)return;
-  try{await saveFile(fileName(),d.output("blob"),"application/pdf");if(!cur.id)savePO(true)}catch(e){toast("Couldn't download: "+(e.code||e.message))}
+  const both=isW()&&wForm()==="mimaki";
+  try{await saveFile(fileName(),d.output("blob"),"application/pdf")}catch(e){toast("Couldn't download the PDF: "+esc(e.code||e.message));return}
+  if(both){try{const b=await mimakiXlsx();await saveFile(wFileName(),b,"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}catch(e){if(!(e&&e.code==="declined"))toast("PDF downloaded, but the Mimaki form couldn't be built: "+esc(e.message||e.code),6000)}}
+  if(!cur.id)savePO(true);
 };
 $("#btnOneDrive").onclick=async()=>{
   if(!validate())return;const v=vById(cur.vendorId);
@@ -1368,7 +1371,7 @@ function wInk(w){return wNoInk(w)?"":[w.ink,w.inkLot?"lot "+w.inkLot:""].filter(
 function wForm(){const w=cur.warranty||{};return w.form||(isMimakiVendor()?"mimaki":"standard")}
 function renderWarranty(){
   const on=isW();$("#poType").value=on?"warranty":"normal";$("#wPanel").style.display=on?"block":"none";$("#wFormWrap").style.display=on?"block":"none";
-  $("#btnWForm").style.display=on&&wForm()==="mimaki"?"":"none";
+  $("#btnPdf").title=on&&wForm()==="mimaki"?"Downloads the PO as a PDF and the Mimaki warranty form (.xlsx)":"Downloads the PO as a PDF";
   if(!on)return;
   if(!cur.warranty)cur.warranty=wBlank();
   const w=cur.warranty;$("#wForm").value=wForm();
@@ -1528,7 +1531,7 @@ async function mimakiXlsx(){
 }
 function wFileName(){return"Mimaki Warranty PO "+String(cur.number).trim()+".xlsx"}
 function blobB64(b){return new Promise((ok,no)=>{const fr=new FileReader();fr.onload=()=>ok(String(fr.result).split(",")[1]);fr.onerror=no;fr.readAsDataURL(b)})}
-$("#btnWForm").onclick=async()=>{
+if($("#btnWForm"))$("#btnWForm").onclick=async()=>{   /* merged into Download, 22 Nov 2026 */
   if(!validate())return;
   try{const b=await mimakiXlsx();await saveFile(wFileName(),b);if(!cur.id)savePO(true)}
   catch(e){if(e&&e.code==="declined")return;toast("Couldn't build the Mimaki form: "+esc(e.message||e.code),6000)}
