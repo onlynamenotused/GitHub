@@ -43,6 +43,7 @@ textarea{resize:vertical;min-height:70px}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .btn.primary:hover{background:var(--accent-hover)}
 .btn.good{background:var(--good);border-color:var(--good);color:var(--panel)}
+.btn.sentv{background:#7c3aed;border-color:#7c3aed;color:#fff}.btn.sentv:hover{background:#6d28d9;border-color:#6d28d9}
 .btn.danger{color:var(--bad);border-color:var(--bad-line)}
 .btn.sm{padding:3px 8px;font-size:12px}
 .btn:disabled{opacity:.45;cursor:default}
@@ -208,7 +209,7 @@ th.num .sorth{flex-direction:row-reverse}
       <button class="btn" id="btnPdf">Download PDF</button>
       <button class="btn" id="btnWForm" style="display:none">Download Mimaki form (.xlsx)</button>
       <button class="btn" id="btnOneDrive">Save PDF to OneDrive</button>
-      <button class="btn deskonly" id="btnEmail">Create Outlook draft</button><button class="btn primary" id="btnSend">Email PO to vendor…</button>
+      <button class="btn deskonly" id="btnEmail">Create Outlook draft</button><button class="btn primary" id="btnSend">Email PO to vendor…</button><button class="btn" id="btnSendInt" title="Email this PO to hello@highwaydigital.com.au">Email PO internal…</button>
       <span style="flex:1"></span>
       <button class="btn" id="btnSent">Mark sent</button>
       <button class="btn good" id="btnReceive">Receive into stock</button>
@@ -347,12 +348,12 @@ let MODE="",sbc=null;
 const MAPS={
  parts:{t:"po_parts",pk:"id",f:{code:"code",desc:"descr",brand:"brand",models:"models",cost:"cost",sell:"sell",min:"min_qty",soh:"soh",lastPO:"last_po",lastDate:"last_date",countDate:"count_date",notes:"notes"}},
  vendors:{t:"po_vendors",pk:"id",f:{name:"name",brand:"brand",line1:"line1",line2:"line2",line3:"line3",street:"street",street2:"street2",suburb:"suburb",state:"state",postcode:"postcode",country:"country",email:"email",attention:"attention",phone:"phone",account:"account",fbClientId:"fb_client_id",folderPath:"folder_path",folderId:"folder_id",order:"sort"}},
- pos:{t:"po_orders",pk:"id",f:{number:"number",vendorId:"vendor_id",vendorName:"vendor_name",date:"po_date",vendorAddr:"vendor_addr",shipTo:"ship_to",shipName:"ship_name",notes:"notes",delivery:"delivery",type:"po_type",warranty:"warranty",lines:"lines",status:"status",ref:"ref",stockApplied:"stock_applied",receivedAt:"received_at",subtotal:"subtotal",gst:"gst",total:"total"}},
+ pos:{t:"po_orders",pk:"id",f:{number:"number",vendorId:"vendor_id",vendorName:"vendor_name",date:"po_date",vendorAddr:"vendor_addr",shipTo:"ship_to",shipName:"ship_name",notes:"notes",delivery:"delivery",type:"po_type",warranty:"warranty",lines:"lines",status:"status",ref:"ref",stockApplied:"stock_applied",receivedAt:"received_at",subtotal:"subtotal",gst:"gst",total:"total",sent:"sent_info"}},
  catalog:{t:"po_catalog",pk:"id",json:"data"},
  settings:{t:"po_settings",pk:"key",json:"value"},
  cache:{t:"po_settings",pk:"key",json:"value",pre:"cache_"}
 };
-const SB_DATES=new Set(["last_date","count_date","po_date","received_at"]),SB_NUMS=new Set(["cost","sell","min_qty","soh","subtotal","gst","total","sort"]),SB_JSON=new Set(["warranty","ref"]);
+const SB_DATES=new Set(["last_date","count_date","po_date","received_at"]),SB_NUMS=new Set(["cost","sell","min_qty","soh","subtotal","gst","total","sort"]),SB_JSON=new Set(["warranty","ref","sent_info"]);
 function toRow(m,data){if(m.json)return{[m.json]:data};const r={};for(const[k,v]of Object.entries(data)){const c=m.f[k];if(!c)continue;let x=v;if(SB_DATES.has(c)&&!x)x=null;else if(SB_NUMS.has(c))x=(x===""||x==null)?(c==="sort"?null:0):Number(x)||0;else if(c==="models")x=Array.isArray(x)?x.map(String):[];else if(c==="fb_client_id")x=x==null?"":String(x);r[c]=x}return r}
 function fromRow(m,row){if(m.json)return row[m.json]||{};const d={};for(const[k,c]of Object.entries(m.f)){let v=row[c];if(SB_NUMS.has(c))v=Number(v)||0;else if(v==null)v=c==="models"||c==="lines"?[]:SB_JSON.has(c)||c==="received_at"?null:c==="stock_applied"?false:c==="po_type"?"normal":c==="delivery"?"standard":"";d[k]=v}return d}
 function sqlBackend(mcp){
@@ -892,6 +893,10 @@ function renderState(){
   if(ex)s+=` · <span style="color:var(--bad)">PO ${esc(cur.number)} already exists in history</span>`;
   if(cur.stockApplied)s+=" · received into stock";
   $("#poState").innerHTML=s;
+  { const sv=(cur.sent||{}),sent=!!cur.id&&(cur.status==="sent"||cur.status==="received"||!!sv.vendorAt), b=$("#btnSend");
+    b.classList.toggle("sentv",sent);b.classList.toggle("primary",!sent);
+    b.textContent=sent?"Email PO to vendor again…":"Email PO to vendor…";
+    b.title=sent?("Already sent to the vendor"+(sv.vendorAt?" on "+auDate(sv.vendorAt.slice(0,10))+(sv.vendorTo?" ("+sv.vendorTo+")":""):"")):"";}
   $("#poTitle").textContent=cur.id?("Purchase order "+cur.number):"New purchase order";
   $("#btnReceive").disabled=!!cur.stockApplied;
   const saved=cur.id&&pos.find(p=>p._id===cur.id);$("#btnDelete").style.display=(saved&&saved.status==="draft"&&cur.status==="draft")?"":"none";
@@ -955,7 +960,7 @@ function validate(){
   if(!cur.lines.length){toast("Add at least one line");return false}
   return true;
 }
-function poDoc(){const t=totals();return{number:cur.number,vendorId:cur.vendorId,vendorName:(vById(cur.vendorId)||{}).name||"",date:cur.date,vendorAddr:cur.vendorAddr,shipTo:cur.shipTo,shipName:cur.shipName||"",notes:cur.notes,delivery:cur.delivery||"standard",type:cur.type||"normal",warranty:isW()?Object.assign(wBlank(),cur.warranty||{},{form:wForm()}):null,lines:cur.lines.map(l=>Object.assign({code:String(l.code||"").trim(),desc:l.desc||"",qty:Number(l.qty)||0,price:Number(l.price)||0,disc:Number(l.disc)||0},l.supply?{supply:l.supply}:{},l.billable!==undefined?{billable:!!l.billable}:{})),status:cur.status||"draft",ref:cur.ref||null,stockApplied:!!cur.stockApplied,receivedAt:cur.receivedAt||null,subtotal:t.sub,gst:t.gst,total:t.tot,updated:today()}}
+function poDoc(){const t=totals();return{number:cur.number,vendorId:cur.vendorId,vendorName:(vById(cur.vendorId)||{}).name||"",date:cur.date,vendorAddr:cur.vendorAddr,shipTo:cur.shipTo,shipName:cur.shipName||"",notes:cur.notes,delivery:cur.delivery||"standard",type:cur.type||"normal",warranty:isW()?Object.assign(wBlank(),cur.warranty||{},{form:wForm()}):null,lines:cur.lines.map(l=>Object.assign({code:String(l.code||"").trim(),desc:l.desc||"",qty:Number(l.qty)||0,price:Number(l.price)||0,disc:Number(l.disc)||0},l.supply?{supply:l.supply}:{},l.billable!==undefined?{billable:!!l.billable}:{})),status:cur.status||"draft",ref:cur.ref||null,stockApplied:!!cur.stockApplied,receivedAt:cur.receivedAt||null,subtotal:t.sub,gst:t.gst,total:t.tot,sent:cur.sent||null,updated:today()}}
 async function savePO(quiet){
   if(!db){toast("Database unavailable");return false}
   if(!validate())return false;
@@ -1235,20 +1240,24 @@ async function bridgeMail(d){
   if(!r||r.ok===false)throw new Error((r&&(r.error||r.detail))||"The email wasn't sent");return r;
 }
 /* Email the PO straight to the vendor from hello@, PO PDF (and the Mimaki warranty form) attached. Asks first. */
-$("#btnSend").onclick=async()=>{
+const INTERNAL_TO="hello@highwaydigital.com.au";
+$("#btnSend").onclick=()=>emailPO(false);
+$("#btnSendInt").onclick=()=>emailPO(true);
+/* internal=true: same email, PDF, form and links, but to hello@ only; the PO isn't marked sent to the vendor. */
+async function emailPO(internal){
   if(!validate())return;const v0=vById(cur.vendorId)||{};const t=totals();
-  const mw=isW()&&isMimakiVendor(),v=mw?Object.assign({},v0,{attention:MIMAKI_WARRANTY.attention}):v0;
+  const mw=!internal&&isW()&&isMimakiVendor(),v=internal?Object.assign({},v0,{attention:"team"}):mw?Object.assign({},v0,{attention:MIMAKI_WARRANTY.attention}):v0;
   const rows=cur.lines.map(l=>`<tr><td>${Number(l.qty)||0}</td><td>${esc(l.code)}</td><td>${esc(l.desc)}</td><td>${Number(l.price)?money(l.price):"TBC"}</td><td>${Number(l.price)?money(lineTotal(l)):""}</td></tr>`).join("");
-  const m=modal(`<h2>Email PO ${esc(cur.number)} to ${esc(v.name||"the vendor")}<button class="x">×</button></h2>
-   <div class="grid2"><div><label>To</label><input id="em_to" value="${esc(mw?MIMAKI_WARRANTY.to:(v.email||""))}" placeholder="parts@vendor.com.au"></div><div><label>${mw?"Other Cc (optional)":"Cc (optional)"}</label><input id="em_cc" value="${esc(mw?MIMAKI_WARRANTY.cc:"")}"></div></div>
+  const m=modal(`<h2>Email PO ${esc(cur.number)} ${internal?"internally (hello@)":"to "+esc(v.name||"the vendor")}<button class="x">×</button></h2>
+   <div class="grid2"><div><label>To</label><input id="em_to" value="${esc(internal?INTERNAL_TO:mw?MIMAKI_WARRANTY.to:(v.email||""))}" placeholder="parts@vendor.com.au"></div><div><label>${mw?"Other Cc (optional)":"Cc (optional)"}</label><input id="em_cc" value="${internal?"":esc(mw?MIMAKI_WARRANTY.cc:"")}"></div></div>
    ${mw?`<p class="muted" style="font-size:12.5px;margin:6px 0 0">Mimaki warranty claims go to Satoshi Abe (addressed as Abe-san), cc Mery Kho.</p>
    <div id="em_mk" style="margin-top:8px"><span class="muted" style="font-size:12.5px">Loading Mimaki contacts from Outlook…</span></div>`:""}
    ${isW()?`<div style="margin-top:14px;border:1px solid var(--field-line);border-radius:6px;overflow:hidden">
      <div style="display:grid;grid-template-columns:1fr auto;gap:12px;padding:7px 12px;background:var(--soft);font-size:12px;font-weight:600"><span>Download links in the email</span><span>Include</span></div>
      <div id="em_files">${emRow("Latest log and parameter files","Looking in OneDrive Client Folders…","")}</div>
      <div id="em_hist">${emRow("Service history","Preparing the machine's service history…","")}</div></div>`:""}
-   <div style="margin-top:10px"><label>Subject</label><input id="em_sub" value="${esc(poSubject())}"></div>
-   <p class="muted" style="font-size:12.5px">Sends from hello@highwaydigital.com.au now, with <b>${esc(fileName())}</b>${isW()&&wForm()==="mimaki"?` and <b>${esc(wFileName())}</b>`:""} attached, and marks the PO sent. A copy goes to Sent Items.</p>
+   <div style="margin-top:10px"><label>Subject</label><input id="em_sub" value="${esc((internal?"[Internal copy] ":"")+poSubject())}"></div>
+   <p class="muted" style="font-size:12.5px">Sends from hello@highwaydigital.com.au now, with <b>${esc(fileName())}</b>${isW()&&wForm()==="mimaki"?` and <b>${esc(wFileName())}</b>`:""} attached, ${internal?"to hello@ only. The PO isn't marked as sent to the vendor.":"and marks the PO sent."} A copy goes to Sent Items.</p>
    <div class="actions"><button class="btn primary" id="em_go">Send email</button><button class="btn" id="em_no">Cancel</button><span class="muted" id="em_msg" style="font-size:12.5px;align-self:center"></span></div>`,true);
   m.querySelector("#em_no").onclick=closeModal;
   if(mw){const box=m.querySelector("#em_mk"),ccIn=m.querySelector("#em_cc");
@@ -1279,11 +1288,11 @@ $("#btnSend").onclick=async()=>{
       const att=[{name:fileName(),contentType:"application/pdf",b64:d.output("datauristring").split(",")[1]}];
       if(isW()&&wForm()==="mimaki")att.push({name:wFileName(),contentType:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",b64:await blobB64(await mimakiXlsx())});
       const r=await bridgeMail({to,cc,subject:m.querySelector("#em_sub").value,html:saluteHtml(poEmailHtml(v,t,rows),to),attachments:att});
-      if(cur.status==="draft")cur.status="sent";await savePO(true);closeModal();
+      cur.sent=Object.assign({},cur.sent||{},internal?{internalAt:new Date().toISOString()}:{vendorAt:new Date().toISOString(),vendorTo:to.join(", ")});if(!internal&&cur.status==="draft")cur.status="sent";await savePO(true);closeModal();
       toast(`PO ${esc(cur.number)} emailed to ${esc((r.sentTo||to).join(", "))}`,6000);
     }catch(e){go.disabled=false;m.querySelector("#em_msg").textContent=/needs_mail_send/.test(e.message||"")?"Microsoft needs reconnecting in the Service Desk before email can be sent.":"Couldn't send: "+(e.message||e.code)}
   };
-};
+}
 /* Draft POs can be deleted (stock isn't touched). */
 function deleteDraft(id){
   const p=pos.find(x=>x._id===id);if(!p)return;
