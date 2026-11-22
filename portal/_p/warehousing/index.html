@@ -336,7 +336,7 @@ $("#modalBg").addEventListener("mousedown",e=>{if(e.target.id==="modalBg")closeM
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeModal()});
 
 /* ---------- capabilities ---------- */
-let logoData=null,logoRatio=161/900;
+let logoData=null,logoRatio=208/1200;
 async function loadLogo(){try{const r=await fetch("logo-bw.png");if(!r.ok)return;const b=await r.blob();logoData=await new Promise(ok=>{const fr=new FileReader();fr.onload=()=>ok(fr.result);fr.readAsDataURL(b)});const img=new Image();img.onload=()=>{logoRatio=img.naturalHeight/img.naturalWidth};img.src=logoData}catch(e){}}
 async function loadStatic(){
   try{const r=await fetch("catalog-mimaki.json");if(!r.ok)return;const j=await r.json();staticCats=[{_id:"static-mimaki",vendorId:j.vendorId,brand:j.brand,source:j.source,imported:j.issued,items:j.items}];pmKits=Object.assign(pmKits,{Mimaki:j.pm||{}});rebuildCatalog();fillQaModels();refreshAll()}catch(e){}
@@ -462,6 +462,7 @@ async function init(){
   setTimeout(()=>loadClients(false),300);
   setTimeout(loadReqs,500);
   db.doc("settings/main").onSnapshot(s=>{settings=s.exists?s.data():{};renderSyncInfo()},fail);
+  db.doc("settings/signature").onSnapshot(s=>{poSig=s.exists?s.data():null},()=>{});
 }
 function refreshAll(){fillQaModels();renderLines();if($("#v-parts").classList.contains("on"))renderParts();if($("#v-vendors").classList.contains("on"))renderVendors()}
 
@@ -1064,7 +1065,7 @@ function poSubject(){const w=cur.warranty||{};return(isW()?"Warranty claim PO "+
 function poEmailHtml(v,t,rows){
   const w=cur.warranty||{},wm=isW()&&wForm()==="mimaki";
   const wInfo=isW()?`<table>${[["Machine",[w.model,w.serial?"S/N "+w.serial:"",w.firmware?"firmware "+w.firmware:""].filter(Boolean).join(" · ")],["End user",w.endUser],["Issue occurred",w.issueDate?auDate(w.issueDate):""],["Installed",w.installDate?auDate(w.installDate):""],["Ink",[w.ink,w.inkLot?"lot "+w.inkLot:""].filter(Boolean).join(", ")],["Machine status",w.machineStatus],["Problem",w.problem],["Troubleshooting",w.troubleshoot],["Cause",w.cause],["Comments",w.comments]].filter(x=>x[1]).map(x=>`<tr><td><b>${esc(x[0])}</b></td><td>${esc(x[1])}</td></tr>`).join("")}</table>`:"";
-  const sig=`<p>Thank you,<br>Sean Hannan | Proprietor<br>Highway Digital<br>1300 880 815 · hello@highwaydigital.com.au</p>`;
+  const sig=(poSig&&poSig.html)?poSig.html:`<p>Thank you,<br>Sean Hannan | Proprietor<br>Highway Digital<br>1300 880 815 · hello@highwaydigital.com.au</p>`;
   if(isW())return`<p>Hi ${esc(v.attention||"team")},</p><p>Please find warranty claim PO <b>${esc(cur.number)}</b> attached as a PDF${wm?", together with the completed Mimaki warranty form":""}. Details below.<br><b>Delivery: ${esc(delLabel(cur.delivery))}</b></p>${wInfo}<p><b>Parts required</b></p>
    <table><tr><th>Qty</th><th>Item #</th><th>Description</th></tr>${cur.lines.map(l=>`<tr><td>${Number(l.qty)||0}</td><td>${esc(l.code)}</td><td>${esc(l.desc)}</td></tr>`).join("")}</table>
    ${emFilesHtml()}<p><b>Ship to:</b><br>${esc(cur.shipTo).replace(/\n/g,"<br>")}</p><p>Please confirm approval and shipping.</p>${sig}`;
@@ -1184,6 +1185,25 @@ async function shareHistory(){
   if(!fin||fin.ok===false||!fin.shareUrl)throw new Error((fin&&fin.error)||"OneDrive didn't return a link");
   return{count:tickets.length+invoices.length,name,url:fin.shareUrl,scope:fin.shareScope,on:true};
 }
+/* Everyone at @mimaki.com in Outlook (senders and recipients of mail in the Mimaki folder and mail to/from mimaki.com),
+   most-emailed first. The app reads Outlook; the list is saved to po_settings/mimaki_contacts so the portal can offer it too. */
+let mkCache=null;
+async function mimakiContacts(){
+  if(mkCache)return mkCache;
+  const saved=async()=>{try{const s=await db.doc("settings/mimaki_contacts").get();return s.exists?(s.data().list||[]):[]}catch(e){return[]}};
+  if(MODE!=="desk"||!mcp)return(mkCache=await saved());
+  const seen=new Map(),skip=/^(techinfo|learning|noreply|no-reply|info|newsletter)@/i;
+  const add=(email,name,w)=>{email=String(email||"").trim().toLowerCase();if(!/@([a-z0-9-]+\.)*mimaki\.com$/.test(email)||skip.test(email))return;const o=seen.get(email)||{email,name:"",n:0};if(name&&!o.name&&!/@/.test(name))o.name=String(name).replace(/^.*\/\s*/,"").trim();o.n+=w;seen.set(email,o)};
+  const scan=async args=>{try{const r=await mcp.callTool("Microsoft 365","outlook_email_search",Object.assign({limit:25},args));const txt=(r&&r.content?r.content.map(c=>c.text||"").join(""):"");
+    for(const ch of txt.split(/(?<=\})(?=\{"(?:uri|moreResults|totalResultCount)")/)){let o;try{o=JSON.parse(ch.trim())}catch(e){continue}if(!o||!o.uri)continue;
+      add(o.sender,o.senderName,2);(o.namedRecipients||[]).forEach(x=>add(x.address,x.name,1));(o.recipients||[]).forEach(x=>add(x,"",1))}}catch(e){}};
+  for(let off=0;off<100;off+=25)await scan({folderName:"Mimaki",offset:off});
+  await scan({query:"mimaki.com"});await scan({sender:"mimaki.com"});
+  let list=[...seen.values()].sort((a,b)=>b.n-a.n||a.email.localeCompare(b.email)).map(({email,name})=>({email,name}));
+  if(!list.length)list=await saved();
+  else try{await db.doc("settings/mimaki_contacts").set({list,updated:new Date().toISOString()})}catch(e){}
+  return(mkCache=list);
+}
 /* Mimaki Australia warranty claims go to Satoshi Abe, cc Mery Kho. */
 const MIMAKI_WARRANTY={to:"abe-s@mimaki.com",cc:"mery.kho@mimaki.com",attention:"Abe-san"};
 /* People addressed by a fixed form in every email: Satoshi Abe at Mimaki is always "Abe-san". */
@@ -1203,13 +1223,21 @@ $("#btnSend").onclick=async()=>{
   const rows=cur.lines.map(l=>`<tr><td>${Number(l.qty)||0}</td><td>${esc(l.code)}</td><td>${esc(l.desc)}</td><td>${Number(l.price)?money(l.price):"TBC"}</td><td>${Number(l.price)?money(lineTotal(l)):""}</td></tr>`).join("");
   const m=modal(`<h2>Email PO ${esc(cur.number)} to ${esc(v.name||"the vendor")}<button class="x">×</button></h2>
    <div class="grid2"><div><label>To</label><input id="em_to" value="${esc(mw?MIMAKI_WARRANTY.to:(v.email||""))}" placeholder="parts@vendor.com.au"></div><div><label>Cc (optional)</label><input id="em_cc" value="${esc(mw?MIMAKI_WARRANTY.cc:"")}"></div></div>
-   ${mw?`<p class="muted" style="font-size:12.5px;margin:6px 0 0">Mimaki warranty claims go to Satoshi Abe (addressed as Abe-san), cc Mery Kho.</p>`:""}
+   ${mw?`<p class="muted" style="font-size:12.5px;margin:6px 0 0">Mimaki warranty claims go to Satoshi Abe (addressed as Abe-san), cc Mery Kho.</p>
+   <div id="em_mk" style="margin-top:8px"><span class="muted" style="font-size:12.5px">Loading Mimaki contacts from Outlook…</span></div>`:""}
    ${isW()?`<div id="em_files" class="muted" style="font-size:12.5px;margin-top:10px">Looking for the machine's latest log and parameter files…</div>`:""}
    ${isW()?`<div id="em_hist" class="muted" style="font-size:12.5px;margin-top:8px">Preparing the machine's service history…</div>`:""}
    <div style="margin-top:10px"><label>Subject</label><input id="em_sub" value="${esc(poSubject())}"></div>
    <p class="muted" style="font-size:12.5px">Sends from hello@highwaydigital.com.au now, with <b>${esc(fileName())}</b>${isW()&&wForm()==="mimaki"?` and <b>${esc(wFileName())}</b>`:""} attached, and marks the PO sent. A copy goes to Sent Items.</p>
    <div class="actions"><button class="btn primary" id="em_go">Send email</button><button class="btn" id="em_no">Cancel</button><span class="muted" id="em_msg" style="font-size:12.5px;align-self:center"></span></div>`,true);
   m.querySelector("#em_no").onclick=closeModal;
+  if(mw){const box=m.querySelector("#em_mk"),ccIn=m.querySelector("#em_cc");
+    ccIn.value="";ccIn.placeholder="other address (optional)";
+    const opts=(list,pick)=>`<option value="">None</option>${list.map(c=>`<option value="${esc(c.email)}" ${c.email===pick?"selected":""}>${esc(c.name?c.name+" — "+c.email:c.email)}</option>`).join("")}`;
+    mimakiContacts().then(list=>{list=list.filter(c=>c.email.toLowerCase()!==MIMAKI_WARRANTY.to);
+      if(!list.some(c=>c.email===MIMAKI_WARRANTY.cc))list.unshift({email:MIMAKI_WARRANTY.cc,name:"Mery Kho"});
+      box.innerHTML=`<div class="grid2"><div><label>Cc 1 (Mimaki)</label><select id="em_cc1">${opts(list,MIMAKI_WARRANTY.cc)}</select></div><div><label>Cc 2 (Mimaki)</label><select id="em_cc2">${opts(list,"")}</select></div></div>`;
+    }).catch(e=>{box.innerHTML=`<div class="grid2"><div><label>Cc 1 (Mimaki)</label><select id="em_cc1">${opts([{email:MIMAKI_WARRANTY.cc,name:"Mery Kho"}],MIMAKI_WARRANTY.cc)}</select></div><div><label>Cc 2 (Mimaki)</label><select id="em_cc2">${opts([],"")}</select></div></div>`})}
   emFiles=[];
   if(isW()){const box=m.querySelector("#em_files");
     const draw=()=>{box.innerHTML=emFiles.length?`<b>Download links included in the email:</b>${emFiles.map((f,i)=>`<label style="display:flex;gap:6px;align-items:center;margin-top:4px;font-weight:400"><input type="checkbox" data-emf="${i}" ${f.on&&f.url?"checked":""} ${f.url?"":"disabled"}> ${f.kind==="log"?"Latest log file":"Latest parameter file"}: ${esc(f.name)} · ${esc(auDate(f.date))} · <span title="${esc(f.path)}">${esc(f.path.split("/").slice(1,-1).join(" / "))}</span>${f.url?(f.scope==="organisation"?' <span style="color:var(--bad)">(link only works inside Highway Digital)</span>':""):` <span style="color:var(--bad)">couldn't share: ${esc(f.err||"")}</span>`}</label>`).join("")}`:"No log or parameter file found for this machine in OneDrive Client Folders, so none is linked.";
@@ -1219,7 +1247,7 @@ $("#btnSend").onclick=async()=>{
     emWait.push(shareHistory().then(h=>{emHist=h;hb.innerHTML=`<label style="display:flex;gap:6px;align-items:center;font-weight:400"><input type="checkbox" id="em_hon" checked> Service history link: ${esc(h.name)} (${h.count} visit${h.count===1?"":"s"} from tickets and FreshBooks invoices)${h.scope==="organisation"?' <span style="color:var(--bad)">(link only works inside Highway Digital)</span>':""} · <a href="${esc(h.url)}" target="_blank" rel="noopener">preview</a></label>`;
       hb.querySelector("#em_hon").onchange=e=>{emHist.on=e.target.checked}}).catch(e=>{hb.textContent="Service history: "+(e.message||e)}))}
   m.querySelector("#em_go").onclick=async()=>{
-    const to=m.querySelector("#em_to").value.split(/[,;\s]+/).filter(Boolean),cc=m.querySelector("#em_cc").value.split(/[,;\s]+/).filter(Boolean);
+    const to=m.querySelector("#em_to").value.split(/[,;\s]+/).filter(Boolean),cc=[...new Set([(m.querySelector("#em_cc1")||{}).value,(m.querySelector("#em_cc2")||{}).value,...m.querySelector("#em_cc").value.split(/[,;\s]+/)].map(x=>String(x||"").trim()).filter(Boolean))];
     if(!to.length){m.querySelector("#em_msg").textContent="Add the vendor's email address";return}
     const go=m.querySelector("#em_go");go.disabled=true;
     if(emWait.length){m.querySelector("#em_msg").textContent="Waiting for the file links…";await Promise.allSettled(emWait)}
@@ -1365,6 +1393,8 @@ async function sb(q){
   return sbParse(txt);
 }
 let wReqs=[],wReqErr="";
+/* Email signature for PO emails: the Outlook signature kept in the Service Desk (Emails tab, "Purchase order emails"). */
+var poSig=null;
 async function loadReqs(){
   if(MODE==="portal"){try{const{data,error}=await sbc.rpc("wh_requests",{p:{}});if(error)throw new Error(error.message);wReqs=data||[];wReqErr=""}catch(e){wReqErr="Couldn't load warranty requests: "+(e.message||e)}renderInbox();try{renderHistory()}catch(e){}return}
   if(!mcp)return;
