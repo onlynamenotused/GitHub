@@ -1121,7 +1121,7 @@ async function machineHistory(){
   const mid=String(w.machineId||"").trim(),ser=String(w.serial||"").trim(),model=String(w.model||"").trim();
   const q=`with m as (select id from public.machines where id=${sqlStr(mid)} or (${sqlStr(ser)}<>'' and upper(serial)=upper(${sqlStr(ser)})))
     select coalesce(json_agg(json_build_object('num',t.num,'created',t.created,'type',t.type,'subtype',t.subtype,'status',t.status,'summary',t.summary,
-      'error',p.data->>'errorCode','descr',p.data->>'description','notes',p.data->>'notes','sched',t.sched_date,'linked',p.data->'linked',
+      'error',p.data->>'errorCode','descr',p.data->>'description','notes',p.data->>'notes','sched',t.sched_date,'linked',p.data->'linked','folder',coalesce(p.data#>>'{mediaFolder,shareUrl}',p.data#>>'{mediaFolder,folderUrl}',p.data#>>'{mimakiReport,folderUrl}'),
       'lines',(select json_agg(json_build_object('code',l->>'code','desc',l->>'desc','qty',l->>'qty','src',l->>'src')) from jsonb_array_elements(coalesce(p.data->'lines','[]'::jsonb)) l)) order by t.num desc),'[]')::text as r
     from public.tickets t left join public.ticket_private p on p.num=t.num
     where not coalesce(t.sample,false) and (t.machine_id in (select id from m) or (not exists(select 1 from m) and ${sqlStr(cust)}<>'' and t.customer_name ilike ${sqlStr(cust)} and t.model ilike ${sqlStr("%"+model.replace(/^mimaki\s+/i,"")+"%")}));`;
@@ -1152,7 +1152,8 @@ async function invoiceHistory(){
     const issue=grab(/Reported Issue\s*:\s*([^\n]*)/i)||grab(/Job Type\s*:\s*([^\n]*)/i);
     const done=grab(/Work Performed\s*:\s*([\s\S]*?)(?:\n\s*Work Outstanding|$)/i)||grab(/Job Notes\s*:\s*([\s\S]*?)(?:\n\n|$)/i);
     const parts=ls.filter(l=>l.name&&!NON.test(String(l.name).trim())&&!/^https?:/i.test(l.description||"")).map(l=>`${Number(l.quantity)||1}× ${l.name}`).join(", ");
-    return{date:inv.create_date,num:inv.invoice_number,billTo,po:inv.po_number||"",issue,done:done.replace(/\s+/g," "),parts}});
+    const link=(ls.map(l=>String(l.description||"")+" "+String(l.name||"")).join(" ").match(/https:\/\/[^\s"<>]*(?:sharepoint\.com|1drv\.ms|onedrive\.live\.com)[^\s"<>]*/i)||[])[0]||"";
+    return{date:inv.create_date,num:inv.invoice_number,billTo,po:inv.po_number||"",issue,done:done.replace(/\s+/g," "),parts,folder:link}});
 }
 function historyPDF(list){
   const {jsPDF}=window.jspdf;const d=new jsPDF({unit:"mm",format:"a4"});const W=210,M=15,w=cur.warranty||{};
@@ -1163,16 +1164,24 @@ function historyPDF(list){
   const NONPART=/labou?r|hourly|callout|call-out|travel|allowance|day rate|full-day|half-day|kilomet/i;
   const invs=(list&&list.invoices)||[];list=(list&&list.tickets)||list||[];
   const linked=new Set(list.flatMap(t=>(t.linked||[]).map(String)));
+  const links=[];
   const body=list.map(t=>{const notes=String(t.notes||"");const om=notes.match(/(?:^|\n)\s*(?:work\s+)?outstanding\s*:/i);
     const done=(om?notes.slice(0,om.index):notes).trim().replace(/\s+/g," ");
     const parts=(t.lines||[]).filter(l=>l&&(l.code||l.desc)&&!["labour","callout","regional","travel"].includes(l.src)&&!NONPART.test((l.code||"")+" "+(l.desc||""))).map(l=>`${Number(l.qty)||1}× ${l.code||l.desc}`).join(", ");
     const issue=[t.summary,t.error?"Error "+t.error:""].filter(Boolean).join(" · ");
-    return[auDate(String(t.sched||t.created||"").slice(0,10)),"HSD-"+t.num+"\n"+[t.subtype||t.type,t.status].filter(Boolean).join(", "),issue,(done.length>420?done.slice(0,417)+"…":done)||"—",parts||"—"]});
-  invs.filter(v=>!linked.has(String(v.num))).forEach(v=>body.push([auDate(String(v.date||"").slice(0,10)),"Invoice "+v.num+"\n"+[v.billTo,v.po?"PO "+v.po:""].filter(Boolean).join(", "),v.issue||"—",(v.done.length>420?v.done.slice(0,417)+"…":v.done)||"—",v.parts||"—"]));
-  body.sort((a,b)=>{const k=x=>x[0].split("/").reverse().join("");return k(b).localeCompare(k(a))});
-  d.autoTable({startY:38,head:[["Date","Job","Issue","Work performed","Parts"]],body:body.length?body:[["","","No earlier jobs recorded for this machine","",""]],margin:{left:M,right:M},theme:"grid",
+    links.push(t.folder||"");
+    return[auDate(String(t.sched||t.created||"").slice(0,10)),"HSD-"+t.num+"\n"+[t.subtype||t.type,t.status].filter(Boolean).join(", "),issue,(done.length>420?done.slice(0,417)+"…":done)||"—",parts||"—",t.folder?"Open folder":"—"]});
+  invs.filter(v=>!linked.has(String(v.num))).forEach(v=>{links.push(v.folder||"");body.push([auDate(String(v.date||"").slice(0,10)),"Invoice "+v.num+"\n"+[v.billTo,v.po?"PO "+v.po:""].filter(Boolean).join(", "),v.issue||"—",(v.done.length>420?v.done.slice(0,417)+"…":v.done)||"—",v.parts||"—",v.folder?"Open folder":"—"])});
+  // keep each row's OneDrive link with it through the date sort
+  const rows=body.map((r,i)=>({r,u:links[i]||""}));
+  rows.sort((a,b)=>{const k=x=>x.r[0].split("/").reverse().join("");return k(b).localeCompare(k(a))});
+  body.length=0;links.length=0;rows.forEach(x=>{body.push(x.r);links.push(x.u)});
+  d.autoTable({startY:38,head:[["Date","Job","Issue","Work performed","Parts","Files"]],body:body.length?body:[["","","No earlier jobs recorded for this machine","","",""]],margin:{left:M,right:M},theme:"grid",
     styles:{font:"helvetica",fontSize:8.5,cellPadding:1.8,lineColor:[210,215,222],textColor:[22,32,44],valign:"top"},headStyles:{fillColor:[22,32,44],textColor:255,fontStyle:"bold"},
-    columnStyles:{0:{cellWidth:20},1:{cellWidth:26},2:{cellWidth:38},4:{cellWidth:34}}});
+    columnStyles:{0:{cellWidth:19},1:{cellWidth:25},2:{cellWidth:34},4:{cellWidth:30},5:{cellWidth:18}},
+    didParseCell:c=>{if(c.section==="body"&&c.column.index===5&&links[c.row.index]){c.cell.styles.textColor=[0,90,170];c.cell.styles.fontStyle="bold"}},
+    didDrawCell:c=>{const u=c.section==="body"&&c.column.index===5&&links[c.row.index];if(u)d.link(c.cell.x,c.cell.y,c.cell.width,c.cell.height,{url:u})}});
+  if(links.some(Boolean)){const y=(d.lastAutoTable&&d.lastAutoTable.finalY||38)+6;d.setFont("helvetica","normal");d.setFontSize(8);d.setTextColor(90,100,110);d.text("“Open folder” links go to the job's OneDrive folder (photos, reports, log and parameter files).",M,y)}
   return d;
 }
 async function shareHistory(){
