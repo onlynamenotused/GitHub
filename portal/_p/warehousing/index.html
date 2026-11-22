@@ -152,7 +152,7 @@ th.num .sorth{flex-direction:row-reverse}
       <button class="btn" id="btnPdf">Download PDF</button>
       <button class="btn" id="btnWForm" style="display:none">Download Mimaki form (.xlsx)</button>
       <button class="btn" id="btnOneDrive">Save PDF to OneDrive</button>
-      <button class="btn deskonly" id="btnEmail">Create Outlook draft</button><button class="btn primary" id="btnSend">Email PO to vendor…</button><button class="btn" id="btnSendInt" title="Email this PO to hello@highwaydigital.com.au">Email PO internal…</button>
+      <button class="btn primary" id="btnSend">Email PO to vendor…</button><button class="btn" id="btnSendInt" title="Email this PO to hello@highwaydigital.com.au">Email PO internal…</button>
       <span style="flex:1"></span>
       <button class="btn" id="btnSent">Mark sent</button>
       <button class="btn good" id="btnReceive">Receive into stock</button>
@@ -1064,7 +1064,7 @@ $("#btnOneDrive").onclick=async()=>{
   }catch(e){toast(e instanceof Error?"Couldn't save: "+esc(e.message):esc(mcpErr(e,MODE==="portal"?"OneDrive":"Microsoft 365")),6000)}
   btn.disabled=false;btn.textContent="Save PDF to OneDrive";
 };
-$("#btnEmail").onclick=async()=>{
+if($("#btnEmail"))$("#btnEmail").onclick=async()=>{   /* button removed 22 Nov 2026; handler kept unused */
   if(!validate())return;const v=vById(cur.vendorId)||{};if(!mcp){toast("Connectors aren't available in this view");return}
   const t=totals();
   const rows=cur.lines.map(l=>`<tr><td>${Number(l.qty)||0}</td><td>${esc(l.code)}</td><td>${esc(l.desc)}</td><td>${Number(l.price)?money(l.price):"TBC"}</td><td>${Number(l.price)?money(lineTotal(l)):""}</td></tr>`).join("");
