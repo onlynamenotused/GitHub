@@ -4,8 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Highway Warehousing</title>
+<script>if(/\/warehousing\b/.test(location.pathname))document.documentElement.classList.add("inportal");</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..800&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..800&family=League+Spartan:wght@500;600;700&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -13,21 +14,34 @@
 <style>
 /* Service Desk dark palette on every tab. Exported PDFs, spreadsheets and emails are built separately and stay white. */
 :root{
-  --bg:#0f1519;--panel:#172026;--ink:#e4ebef;--muted:#93a4ae;--line:#2c3a42;--soft:#1e2a31;--field-line:#3a4a53;--hover:#1c272e;
-  --head:#172026;--head-ink:#e4ebef;--head-muted:#93a4ae;
-  --accent:#4cb7d4;--accent-hover:#6cc6de;--accent-ink:#06222b;--accent-soft:#16343e;--accent-soft-ink:#bfe6f1;
+  /* dark: matches the Service Desk's dark theme and the portal (black and gold) */
+  --bg:#0b0b0c;--panel:#151517;--ink:#f2f2f2;--muted:#a9a9a9;--line:#2e2e32;--soft:#1e1e21;--field-line:#3a3a3f;--hover:#1b1b1e;
+  --head:#000;--head-ink:#f2f2f2;--head-muted:#9a9a9a;--gold:#e8b923;--gold-hover:#f2c94c;
+  --accent:#e8b923;--accent-hover:#f2c94c;--accent-ink:#111;--accent-soft:#2f270c;--accent-soft-ink:#f6dc8a;
   --good:#4ade80;--good-soft:#143022;--warn:#facc15;--warn-soft:#352c10;--warn-ink:#fde68a;--bad:#fb923c;--bad-soft:#3b2216;--bad-line:#6b3a22;
-  --chip-on:#e4ebef;--chip-on-ink:#0f1519;--shadow:rgba(0,0,0,.5);--scrim:rgba(0,0,0,.55);--toast:#e4ebef;--toast-ink:#0f1519;--toast-link:#0b6e8a;--r:8px;color-scheme:dark}
+  --chip-on:#f2f2f2;--chip-on-ink:#0b0b0c;--shadow:rgba(0,0,0,.5);--scrim:rgba(0,0,0,.55);--toast:#f2f2f2;--toast-ink:#0b0b0c;--toast-link:#8a6508;--r:8px;color-scheme:dark}
+/* light: matches the Service Desk's light theme (the portal copy stays dark, like the rest of the portal) */
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]):not(.inportal){
+  --bg:#f5f4f0;--panel:#fff;--ink:#151515;--muted:#5f5d56;--line:#dad8cf;--soft:#ecebe5;--field-line:#c9c6bb;--hover:#f0eee7;
+  --accent:#8a6508;--accent-hover:#6f5106;--accent-ink:#fff;--accent-soft:#f5ecd1;--accent-soft-ink:#5c4304;
+  --good:#15803d;--good-soft:#ddf2e3;--warn:#a16207;--warn-soft:#fbf1d6;--warn-ink:#713f12;--bad:#c2410c;--bad-soft:#fde9dd;--bad-line:#f2b89a;
+  --chip-on:#151515;--chip-on-ink:#fff;--shadow:rgba(16,16,16,.18);--scrim:rgba(0,0,0,.45);--toast:#151515;--toast-ink:#fff;--toast-link:#e8b923;color-scheme:light}}
+:root[data-theme="light"]:not(.inportal){
+  --bg:#f5f4f0;--panel:#fff;--ink:#151515;--muted:#5f5d56;--line:#dad8cf;--soft:#ecebe5;--field-line:#c9c6bb;--hover:#f0eee7;
+  --accent:#8a6508;--accent-hover:#6f5106;--accent-ink:#fff;--accent-soft:#f5ecd1;--accent-soft-ink:#5c4304;
+  --good:#15803d;--good-soft:#ddf2e3;--warn:#a16207;--warn-soft:#fbf1d6;--warn-ink:#713f12;--bad:#c2410c;--bad-soft:#fde9dd;--bad-line:#f2b89a;
+  --chip-on:#151515;--chip-on-ink:#fff;--shadow:rgba(16,16,16,.18);--scrim:rgba(0,0,0,.45);--toast:#151515;--toast-ink:#fff;--toast-link:#e8b923;color-scheme:light}
 *{box-sizing:border-box}
 a{color:var(--accent)}
 body{margin:0;font-family:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:14px;color:var(--ink);background:var(--bg)}
-header{background:var(--head);color:var(--head-ink);border-bottom:1px solid var(--line);padding:0 20px;display:flex;align-items:center;gap:24px;flex-wrap:wrap;position:sticky;top:0;z-index:20}
-.brand{font:700 18px/1.1 "Archivo","Arial Narrow",Arial,sans-serif;font-stretch:85%;letter-spacing:.01em;padding:14px 0}
-.brand small{font-weight:400;opacity:.7;margin-left:8px;letter-spacing:0}
+header{background:var(--head);color:var(--head-ink);border-bottom:1px solid #262626;color-scheme:dark;padding:0 20px;display:flex;align-items:center;gap:24px;flex-wrap:wrap;position:sticky;top:0;z-index:20}
+.brand{font:700 19px/1.1 "League Spartan","Archivo",Arial,sans-serif;letter-spacing:.04em;padding:14px 0;color:var(--gold)}
+.brand small{font:500 12px "Instrument Sans",system-ui,sans-serif;text-transform:uppercase;letter-spacing:.12em;color:var(--head-ink);margin-left:10px}
 nav{display:flex;gap:2px}
 nav button{background:none;border:0;color:var(--head-muted);padding:16px 14px;font:inherit;font-weight:500;cursor:pointer;border-bottom:3px solid transparent}
-nav button.on{color:var(--head-ink);border-bottom-color:var(--accent)}
-nav .badge{background:var(--accent);color:var(--accent-ink);border-radius:10px;padding:1px 7px;font-size:11px;margin-left:6px;font-weight:700}
+nav button.on{color:var(--gold);border-bottom-color:var(--gold)}
+nav button:hover{color:#fff}
+nav .badge{background:var(--gold);color:#111;border-radius:10px;padding:1px 7px;font-size:11px;margin-left:6px;font-weight:700}
 .status{margin-left:auto;font-size:12px;opacity:.75}
 main{max-width:1280px;margin:0 auto;padding:20px}
 .view{display:none}.view.on{display:block}
@@ -40,8 +54,8 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent-soft);bor
 textarea{resize:vertical;min-height:70px}
 .btn{font:inherit;font-weight:500;border:1px solid var(--field-line);background:var(--panel);color:var(--ink);border-radius:6px;padding:7px 12px;cursor:pointer;white-space:nowrap}
 .btn:hover{background:var(--soft)}
-.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
-.btn.primary:hover{background:var(--accent-hover)}
+.btn.primary{background:var(--gold);border-color:var(--gold);color:#111}
+.btn.primary:hover{background:var(--gold-hover);border-color:var(--gold-hover)}
 .btn.good{background:var(--good);border-color:var(--good);color:var(--panel)}
 .btn.sentv{background:#7c3aed;border-color:#7c3aed;color:#fff}.btn.sentv:hover{background:#6d28d9;border-color:#6d28d9}
 .btn.danger{color:var(--bad);border-color:var(--bad-line)}
