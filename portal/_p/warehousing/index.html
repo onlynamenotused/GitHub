@@ -997,8 +997,8 @@ $("#btnReceive").onclick=async()=>{
 function fileName(){const n=String(cur.number).trim();return"Purchase Order "+(/^\d+$/.test(n)?n.padStart(7,"0"):n)+".pdf"}
 function buildPDF(){
   if(!window.jspdf){toast("PDF library didn't load — check your connection and reload");return null}
-  const {jsPDF}=window.jspdf;const d=new jsPDF({unit:"mm",format:"a4"});const W=210,M=15;
-  if(logoData){const lw=78;d.addImage(logoData,"PNG",M,11,lw,lw*logoRatio)}else{d.setFont("helvetica","bold");d.setFontSize(20);d.setTextColor(22,32,44);d.text("HIGHWAYDIGITAL",M,22)}
+  const {jsPDF}=window.jspdf;const d=new jsPDF({unit:"mm",format:"a4",compress:true});const W=210,M=15;
+  if(logoData){const lw=78;d.addImage(logoData,"PNG",M,11,lw,lw*logoRatio,"hdlogo","FAST")}else{d.setFont("helvetica","bold");d.setFontSize(20);d.setTextColor(22,32,44);d.text("HIGHWAYDIGITAL",M,22)}
   d.setFont("helvetica","bold");d.setFontSize(22);d.setTextColor(22,32,44);d.text(isW()?"Warranty Claim PO":"Purchase Order",W-M,22,{align:"right"});
   d.setFont("helvetica","normal");d.setFontSize(10);d.setTextColor(60,70,80);
   d.text("Date:",W-M-48,31);d.text(auDate(cur.date),W-M,31,{align:"right"});
@@ -1163,7 +1163,7 @@ async function invoiceHistory(){
     return{date:inv.create_date,num:inv.invoice_number,billTo,po:inv.po_number||"",issue,done:done.replace(/\s+/g," "),parts,folder:link}});
 }
 function historyPDF(list){
-  const {jsPDF}=window.jspdf;const d=new jsPDF({unit:"mm",format:"a4"});const W=210,M=15,w=cur.warranty||{};
+  const {jsPDF}=window.jspdf;const d=new jsPDF({unit:"mm",format:"a4",compress:true});const W=210,M=15,w=cur.warranty||{};
   d.setFont("helvetica","bold");d.setFontSize(16);d.setTextColor(22,32,44);d.text("Service history",M,20);
   d.setFont("helvetica","normal");d.setFontSize(10);d.setTextColor(60,70,80);
   d.text([w.model,w.serial?"S/N "+w.serial:"",w.endUser].filter(Boolean).join(" · "),M,27);
@@ -1232,11 +1232,13 @@ function saluteHtml(html,to){const hit=[].concat(to||[]).map(x=>MAIL_SALUTE[Stri
 async function bridgeMail(d){
   if(MODE==="portal")return whTool(Object.assign({op:"mail_send"},d));
   // The Supabase connector limits one call's size, so attachments go up in pieces first, then one small call sends.
-  const batch="po"+Date.now().toString(36)+Math.random().toString(36).slice(2,7),CH=120000;
-  const atts=d.attachments||[];
+  const batch="po"+Date.now().toString(36)+Math.random().toString(36).slice(2,7),CH=200000;
+  const atts=d.attachments||[],total=atts.reduce((n,a)=>n+Math.max(1,Math.ceil(String(a.b64||"").length/CH)),0);let done=0;
+  const tick=()=>{done++;if(d.onProgress)d.onProgress(`Uploading attachments… ${Math.round(done/total*100)}%`)};
   for(let i=0;i<atts.length;i++){const a=atts[i],b64=String(a.b64||"");
-    await sb(`insert into fbw.mail_att(batch,seq,name,content_type,b64) values(${sqlStr(batch)},${i},${sqlStr(a.name)},${sqlStr(a.contentType||"application/octet-stream")},${sqlStr(b64.slice(0,CH))}) returning seq;`);
-    for(let o=CH;o<b64.length;o+=CH)await sb(`update fbw.mail_att set b64=b64||${sqlStr(b64.slice(o,o+CH))} where batch=${sqlStr(batch)} and seq=${i} returning seq;`)}
+    await sb(`insert into fbw.mail_att(batch,seq,name,content_type,b64) values(${sqlStr(batch)},${i},${sqlStr(a.name)},${sqlStr(a.contentType||"application/octet-stream")},${sqlStr(b64.slice(0,CH))}) returning seq;`);tick();
+    for(let o=CH;o<b64.length;o+=CH){await sb(`update fbw.mail_att set b64=b64||${sqlStr(b64.slice(o,o+CH))} where batch=${sqlStr(batch)} and seq=${i} returning seq;`);tick()}}
+  if(d.onProgress)d.onProgress("Sending…");delete d.onProgress;
   const rest=Object.assign({ref:"warehousing-po"},d,{batch});delete rest.attachments;
   const r=await sb(`select fbw.mail_send_staged(${sqlStr(JSON.stringify(rest))}::jsonb)::text as r;`);
   if(!r||r.ok===false)throw new Error((r&&(r.error||r.detail))||"The email wasn't sent");return r;
@@ -1289,7 +1291,7 @@ async function emailPO(internal){
       const d=buildPDF();if(!d)throw new Error("PDF library didn't load");
       const att=[{name:fileName(),contentType:"application/pdf",b64:d.output("datauristring").split(",")[1]}];
       if(isW()&&wForm()==="mimaki")att.push({name:wFileName(),contentType:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",b64:await blobB64(await mimakiXlsx())});
-      const r=await bridgeMail({to,cc,subject:m.querySelector("#em_sub").value,html:saluteHtml(poEmailHtml(v,t,rows),to),attachments:att});
+      const r=await bridgeMail({to,cc,subject:m.querySelector("#em_sub").value,html:saluteHtml(poEmailHtml(v,t,rows),to),attachments:att,onProgress:x=>{m.querySelector("#em_msg").textContent=x}});
       cur.sent=Object.assign({},cur.sent||{},internal?{internalAt:new Date().toISOString()}:{vendorAt:new Date().toISOString(),vendorTo:to.join(", ")});if(!internal&&cur.status==="draft")cur.status="sent";await savePO(true);closeModal();
       toast(`PO ${esc(cur.number)} emailed to ${esc((r.sentTo||to).join(", "))}`,6000);
     }catch(e){go.disabled=false;m.querySelector("#em_msg").textContent=/needs_mail_send/.test(e.message||"")?"Microsoft needs reconnecting in the Service Desk before email can be sent.":"Couldn't send: "+(e.message||e.code)}
