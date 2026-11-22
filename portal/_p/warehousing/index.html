@@ -1016,7 +1016,7 @@ function buildPDF(){
    const c=k==="overnight"?[192,57,43]:k==="economy"?[39,110,67]:[22,32,44];const w=d.getTextWidth(lab)+6;d.setDrawColor(...c);d.setTextColor(...c);d.setLineWidth(0.5);d.rect(M,y-4.2,w,6.4);d.text(lab,M+3,y);d.setTextColor(22,32,44);d.setLineWidth(0.2);y+=8}
   if(cur.notes){d.setFont("helvetica","italic");d.setFontSize(9.5);d.text(d.splitTextToSize(cur.notes,W-2*M),M,y);y+=7}
   if(isW()){const w=cur.warranty||{};d.setFillColor(154,91,0);d.rect(M,y-1,W-2*M,6,"F");d.setTextColor(255,255,255);d.setFont("helvetica","bold");d.setFontSize(9);d.text("WARRANTY CLAIM: parts to be supplied under the manufacturer's warranty",M+2,y+3.2);d.setTextColor(22,32,44);y+=10;
-    const kv=[["Machine",[w.model,w.serial?"S/N "+w.serial:"",w.firmware?"Firmware "+w.firmware:""].filter(Boolean).join(" · ")],["End user",w.endUser],["Issue occurred",w.issueDate?auDate(w.issueDate):""],["Installed",w.installDate?auDate(w.installDate):""],["Ink",[w.ink,w.inkLot?"lot "+w.inkLot:""].filter(Boolean).join(", ")],["Machine status",w.machineStatus],["Problem",w.problem],["Troubleshooting",w.troubleshoot],["Cause",w.cause],["Comments",w.comments]].filter(x=>x[1]);
+    const kv=[["Machine",[w.model,w.serial?"S/N "+w.serial:"",w.firmware?"Firmware "+w.firmware:""].filter(Boolean).join(" · ")],["End user",w.endUser],["Issue occurred",w.issueDate?auDate(w.issueDate):""],["Installed",w.installDate?auDate(w.installDate):""],["Ink",wInk(w)],["Machine status",w.machineStatus],["Problem",w.problem],["Troubleshooting",w.troubleshoot],["Cause",w.cause],["Comments",w.comments]].filter(x=>x[1]);
     d.setFontSize(9.5);kv.forEach(([k,v])=>{d.setFont("helvetica","bold");d.text(k+":",M,y);d.setFont("helvetica","normal");const t=d.splitTextToSize(String(v),W-2*M-34);d.text(t,M+34,y);y+=4.6*t.length+0.6});y+=2}
   const body=cur.lines.map(l=>[String(Number(l.qty)||0),l.code||"",(l.desc||"")+(isW()&&l.supply?(l.supply==="stock"?"\n(replenishes our stock)":"\n(for this job)"):""),Number(l.price)?money(l.price):(isW()?"Warranty":""),Number(l.disc)?l.disc+"%":"",Number(l.price)?money(lineTotal(l)):""]);
   d.autoTable({startY:y+2,head:[["Qty","Item #","Description","Unit Price","Discount","Line Total"]],body,margin:{left:M,right:M},theme:"grid",
@@ -1069,7 +1069,7 @@ $("#btnEmail").onclick=async()=>{
 function poSubject(){const w=cur.warranty||{};return(isW()?"Warranty claim PO "+cur.number+(w.model?" - "+w.model:"")+(w.serial?" S/N "+w.serial:""):"Purchase Order "+cur.number)+" - Highway Digital"+(cur.delivery==="overnight"?" - URGENT (overnight)":"")}
 function poEmailHtml(v,t,rows){
   const w=cur.warranty||{},wm=isW()&&wForm()==="mimaki";
-  const wInfo=isW()?`<table>${[["Machine",[w.model,w.serial?"S/N "+w.serial:"",w.firmware?"firmware "+w.firmware:""].filter(Boolean).join(" · ")],["End user",w.endUser],["Issue occurred",w.issueDate?auDate(w.issueDate):""],["Installed",w.installDate?auDate(w.installDate):""],["Ink",[w.ink,w.inkLot?"lot "+w.inkLot:""].filter(Boolean).join(", ")],["Machine status",w.machineStatus],["Problem",w.problem],["Troubleshooting",w.troubleshoot],["Cause",w.cause],["Comments",w.comments]].filter(x=>x[1]).map(x=>`<tr><td><b>${esc(x[0])}</b></td><td>${esc(x[1])}</td></tr>`).join("")}</table>`:"";
+  const wInfo=isW()?`<table>${[["Machine",[w.model,w.serial?"S/N "+w.serial:"",w.firmware?"firmware "+w.firmware:""].filter(Boolean).join(" · ")],["End user",w.endUser],["Issue occurred",w.issueDate?auDate(w.issueDate):""],["Installed",w.installDate?auDate(w.installDate):""],["Ink",wInk(w)],["Machine status",w.machineStatus],["Problem",w.problem],["Troubleshooting",w.troubleshoot],["Cause",w.cause],["Comments",w.comments]].filter(x=>x[1]).map(x=>`<tr><td><b>${esc(x[0])}</b></td><td>${esc(x[1])}</td></tr>`).join("")}</table>`:"";
   const sig=(poSig&&poSig.html)?poSig.html:`<p>Thank you,<br>Sean Hannan | Proprietor<br>Highway Digital<br>1300 880 815 · hello@highwaydigital.com.au</p>`;
   if(isW())return`<p>Hi ${esc(v.attention||"team")},</p><p>Please find warranty claim PO <b>${esc(cur.number)}</b> attached as a PDF${wm?", together with the completed Mimaki warranty form":""}. Details below.<br><b>Delivery: ${esc(delLabel(cur.delivery))}</b></p>${wInfo}<p><b>Parts required</b></p>
    <table><tr><th>Qty</th><th>Item #</th><th>Description</th></tr>${cur.lines.map(l=>`<tr><td>${Number(l.qty)||0}</td><td>${esc(l.code)}</td><td>${esc(l.desc)}</td></tr>`).join("")}</table>
@@ -1346,7 +1346,10 @@ const W_STATUS=["Running (parts replaced)","Running (temporary fix)","Running (i
 const W_KEYS=[["endUser","End user (customer)"],["dealer","Dealer (purchased from)"],["model","Machine model"],["serial","Serial number"],["firmware","Firmware version"],["ink","Ink type"],["inkLot","Ink lot no."],["issueDate","Date issue occurred","date"],["installDate","Installation date","date"],["machineStatus","Machine status","status"],["problem","Problem","area"],["troubleshoot","Troubleshooting done","area"],["cause","Cause","area"],["comments","Comments for the maker","area"]];
 const isW=()=>cur&&cur.type==="warranty";
 const isMimakiVendor=()=>{const v=vById(cur.vendorId)||{};return /mimaki/i.test((v.brand||"")+" "+(v.name||""))};
-function wBlank(){return{endUser:"",dealer:"Highway Digital",model:"",serial:"",firmware:"",ink:"",inkLot:"",issueDate:"",installDate:"",machineStatus:"",problem:"",troubleshoot:"",cause:"",comments:"",form:"",ticket:""}}
+function wBlank(){return{endUser:"",dealer:"Highway Digital",brand:"",model:"",serial:"",firmware:"",ink:"",inkLot:"",issueDate:"",installDate:"",machineStatus:"",problem:"",troubleshoot:"",cause:"",comments:"",form:"",ticket:""}}
+/* Laser engravers (Epilog) use no ink: no ink type / ink lot on their warranty claims. */
+function wNoInk(w){w=w||cur.warranty||{};const v=(cur&&vById(cur.vendorId))||{};return !!w.noInk||/epilog/i.test([w.brand,w.model,v.brand,v.name].join(" "))}
+function wInk(w){return wNoInk(w)?"":[w.ink,w.inkLot?"lot "+w.inkLot:""].filter(Boolean).join(", ")}
 function wForm(){const w=cur.warranty||{};return w.form||(isMimakiVendor()?"mimaki":"standard")}
 function renderWarranty(){
   const on=isW();$("#poType").value=on?"warranty":"normal";$("#wPanel").style.display=on?"block":"none";$("#wFormWrap").style.display=on?"block":"none";
@@ -1354,11 +1357,11 @@ function renderWarranty(){
   if(!on)return;
   if(!cur.warranty)cur.warranty=wBlank();
   const w=cur.warranty;$("#wForm").value=wForm();
-  $("#wFields").innerHTML=W_KEYS.map(([k,l,ty])=>{const v=esc(w[k]||"");
+  const noInk=wNoInk(w);$("#wFields").innerHTML=W_KEYS.filter(([k])=>!(noInk&&(k==="ink"||k==="inkLot"))).map(([k,l,ty])=>{const v=esc(w[k]||"");
     if(ty==="area")return`<div style="grid-column:1/-1"><label>${l}</label><textarea data-w="${k}" rows="2">${v}</textarea></div>`;
     if(ty==="status")return`<div><label>${l}</label><select data-w="${k}"><option value="">Choose…</option>${W_STATUS.map(s=>`<option ${w[k]===s?"selected":""}>${esc(s)}</option>`).join("")}</select></div>`;
     return`<div><label>${l}</label><input data-w="${k}" ${ty==="date"?'type="date"':""} value="${v}"></div>`}).join("");
-  $$("#wFields [data-w]").forEach(el=>el.oninput=el.onchange=()=>{cur.warranty[el.dataset.w]=el.value;try{localStorage.setItem("hd-po-draft",JSON.stringify(cur))}catch(e){}});
+  $$("#wFields [data-w]").forEach(el=>el.oninput=el.onchange=e=>{cur.warranty[el.dataset.w]=el.value;try{localStorage.setItem("hd-po-draft",JSON.stringify(cur))}catch(_){}if(e.type==="change"&&el.dataset.w==="model"&&wNoInk()!==noInk)renderWarranty()});
 }
 /* Machine register (public.machines, kept in step with the Service Desk's asset register) for the warranty form. */
 let wMachines=null,wMachBusy=null;
@@ -1381,12 +1384,12 @@ async function loadMachines(){
 }
 function machFill(m,replace){
   const w=cur.warranty||(cur.warranty=wBlank());
-  const ink=[m.inkType||m.ink_type,m.ink_set].filter(Boolean);
+  const laser=/epilog/i.test([m.brand,m.model].join(" ")),ink=laser?[]:[m.inkType||m.ink_type,m.ink_set].filter(Boolean);
   const vals={endUser:[m.customer,m.location].filter(Boolean).join(", "),model:[m.brand&&!/mimaki/i.test(m.brand)?m.brand:"",m.model].filter(Boolean).join(" "),serial:m.serial||"",
     installDate:String(m.install_date||"").slice(0,10),ink:ink.length>1?`${ink[0]} (${ink[1]})`:(ink[0]||""),firmware:m.firmware||m.at_firmware||"",dealer:m.purchased_from||""};
   if(vals.dealer&&(replace||!w.dealer||w.dealer==="Highway Digital")){w.dealer=vals.dealer;delete vals.dealer}
   let n=0;Object.entries(vals).forEach(([k,v])=>{if(v&&(replace||!String(w[k]||"").trim())){w[k]=v;n++}});
-  w.machineId=m.id;
+  w.machineId=m.id;w.brand=m.brand||w.brand||"";if(laser){w.ink="";w.inkLot=""}
   if(!cur.notes||/^Warranty claim$/.test(cur.notes)){cur.notes=`Warranty claim · Customer: ${m.customer||""}`;$("#poNotes").value=cur.notes}
   try{localStorage.setItem("hd-po-draft",JSON.stringify(cur))}catch(e){}
   renderWarranty();
@@ -1460,7 +1463,7 @@ function openReq(r){
   const tk=String(p.ticket||r.ticket||"").trim()||("Request "+r.id);
   let num=tk,n=1;while(pos.some(x=>String(x.number).toLowerCase()===num.toLowerCase())){n++;num=tk+"-"+n}
   cur.number=num;
-  cur.warranty=Object.assign(wBlank(),p.dealer?{dealer:p.dealer}:{},{endUser:p.endUser||p.customer||"",model:p.model||"",serial:p.serial||"",firmware:p.firmware||"",ink:p.ink||"",inkLot:p.inkLot||"",issueDate:p.issueDate||"",installDate:p.installDate||"",machineStatus:p.machineStatus||"",problem:p.problem||"",troubleshoot:p.troubleshoot||"",cause:p.cause||"",comments:p.comments||"",ticket:p.ticket||r.ticket||""});
+  cur.warranty=Object.assign(wBlank(),p.dealer?{dealer:p.dealer}:{},{brand:p.brand||"",noInk:!!p.noInk,endUser:p.endUser||p.customer||"",model:p.model||"",serial:p.serial||"",firmware:p.firmware||"",ink:p.ink||"",inkLot:p.inkLot||"",issueDate:p.issueDate||"",installDate:p.installDate||"",machineStatus:p.machineStatus||"",problem:p.problem||"",troubleshoot:p.troubleshoot||"",cause:p.cause||"",comments:p.comments||"",ticket:p.ticket||r.ticket||""});
   cur.notes=`Warranty claim · Customer: ${p.customer||""} · Job ${p.ticket||r.ticket||""}`;
   cur.ref={kind:"ticket",reqId:r.id,number:p.ticket||r.ticket||"",client:p.customer||"",po:""};
   cur.lines=(p.parts||[]).map(x=>({code:x.code||"",desc:x.desc||"",qty:Number(x.qty)||1,price:0,disc:0,supply:x.supply||"order",billable:!!x.billable}));
@@ -1502,7 +1505,7 @@ async function mimakiXlsx(){
   date("C5",cur.date||today());str("C7",w.dealer||"Highway Digital");str("C8",w.endUser);
   str("B11",[w.comments,`Highway Digital PO ${cur.number}${w.ticket?" · job "+w.ticket:""}`,lines.some(l=>l.supply==="stock")?"Parts marked replenish were fitted from our stock.":""].filter(Boolean).join("\n"));
   lines.forEach((l,i)=>{const r=18+i;
-    date("B"+r,w.issueDate);date("C"+r,w.installDate);str("D"+r,w.model);str("E"+r,w.serial);str("F"+r,w.firmware);str("G"+r,w.ink);str("H"+r,w.inkLot);
+    date("B"+r,w.issueDate);date("C"+r,w.installDate);str("D"+r,w.model);str("E"+r,w.serial);str("F"+r,w.firmware);if(!wNoInk(w)){str("G"+r,w.ink);str("H"+r,w.inkLot)}
     str("I"+r,w.problem);str("J"+r,w.troubleshoot);str("K"+r,w.cause);str("L"+r,w.machineStatus);str("M"+r,String(l.code).trim());num("N"+r,Number(l.qty)||1)});
   zip.file(path,new XMLSerializer().serializeToString(doc));
   if(zip.file("xl/calcChain.xml"))zip.remove("xl/calcChain.xml");
