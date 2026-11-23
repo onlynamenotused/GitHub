@@ -104,7 +104,10 @@
   .brand{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:600}
   .studio select,.studio input[type=number],.studio input[type=text]{width:100%;min-width:0;padding:7px 8px;border:1px solid var(--line);border-radius:8px;background:rgba(255,255,255,.06);color:var(--ink);font:inherit;font-size:13px}
   .studio select option{background:#111}
-  .stempty{color:var(--muted);font-size:14px;margin:4px 0}
+  .stempty{display:flex;gap:12px;align-items:center;margin:8px 0;padding:14px 16px;border:2px dashed var(--accent);border-radius:var(--radius);
+    background:color-mix(in srgb,var(--accent) 8%,var(--card));color:var(--ink);font-size:16px;font-weight:600;line-height:1.4}
+  .stempty .sti{flex:none;display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:var(--accent);color:var(--accent-ink);font-size:18px;font-weight:700}
+  .stempty[hidden]{display:none}
   .stgrid{display:grid;grid-template-columns:minmax(0,360px) minmax(0,1fr);gap:16px;align-items:start}
   @media (max-width:860px){.stgrid{grid-template-columns:minmax(0,1fr)}}
   .stctl{display:flex;flex-direction:column;gap:10px;min-width:0}
@@ -284,7 +287,7 @@
         </select>
       </label>
     </div>
-    <p class="stempty" id="stEmpty">Convert an image above first; the studio opens once the vector result is ready.</p>
+    <p class="stempty" id="stEmpty" role="note"><span class="sti" aria-hidden="true">↑</span><span>Convert an image above first; the studio opens once the vector result is ready.</span></p>
 
     <div class="stgrid" id="stBody" hidden>
       <div class="stctl">
