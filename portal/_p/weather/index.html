@@ -116,7 +116,8 @@ select.field{max-width:260px}
 
   <section class="card" style="margin-top:14px">
     <h2>Live from space</h2>
-    <p class="muted small" style="margin:0 0 10px">The Space Shuttle retired in 2011, so here's the next best thing: NASA's live stream (usually the International Space Station's cameras), and where the ISS is right now.</p>
+    <p class="muted small" style="margin:0 0 10px">The Space Shuttle retired in 2011, so here's the next best thing: live 4K cameras on the International Space Station, and where the ISS is right now. The picture goes dark while the station is on Earth's night side.</p>
+    <div class="satbar"><button class="btn on" type="button" data-feed="sen">ISS 4K cameras (Sen, 24/7)</button><button class="btn" type="button" data-feed="nasa">NASA live (when NASA is broadcasting)</button></div>
     <div class="video"><iframe id="issVideo" title="NASA live stream" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen loading="lazy"></iframe></div>
     <div id="issmap"></div>
     <p class="note" id="issTxt">Finding the ISS…</p>
@@ -449,7 +450,9 @@ $("satSlide").oninput = () => { SAT.play = false; $("satPlay").textContent = "�
 setInterval(() => { if (!document.hidden) buildSat(); }, 15 * 60000);   // new frames every 10 minutes
 
 // ---------- ISS ----------
-$("issVideo").src = "https://www.youtube.com/embed/live_stream?channel=UCLA_DiR1FfKNvjuUpBHmylQ&autoplay=1&mute=1";
+const FEEDS = { sen: "https://www.youtube.com/embed/fO9e9jnhYK8?autoplay=1&mute=1", nasa: "https://www.youtube.com/embed/live_stream?channel=UCLA_DiR1FfKNvjuUpBHmylQ&autoplay=1&mute=1" };
+$("issVideo").src = FEEDS.sen;
+document.querySelectorAll("[data-feed]").forEach((b) => b.onclick = () => { document.querySelectorAll("[data-feed]").forEach((x) => x.classList.toggle("on", x === b)); $("issVideo").src = FEEDS[b.dataset.feed]; });
 const iss = L.map("issmap", { zoomControl: false, attributionControl: true, worldCopyJump: true, minZoom: 1 }).setView([-25, 135], 1);
 L.tileLayer("https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/BlueMarble_ShadedRelief_Bathymetry/default/GoogleMapsCompatible_Level8/{z}/{y}/{x}.jpeg", { maxNativeZoom: 8, attribution: 'Blue Marble · NASA GIBS' }).addTo(iss);
 const issDot = L.marker([0, 0], { icon: L.divIcon({ html: '<span style="font-size:26px;display:inline-block;transform:translate(-50%,-50%)">🛰️</span>', className: "", iconSize: null }) }).addTo(iss);
