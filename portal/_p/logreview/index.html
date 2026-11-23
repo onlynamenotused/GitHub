@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mimaki Log Review – Beta version 0.1</title>
+<title>Log Analysis – Beta version 0.1</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -89,7 +89,7 @@ html.pdfmode .pdfBtn{display:none!important}
 </head>
 <body>
 <header>
-  <h1>Mimaki Log Review <span>· Highway Digital</span> <span class="ver" title="Beta version 0.1">Beta version 0.1</span></h1>
+  <h1>Log Analysis <span>· Highway Digital</span> <span class="ver" title="Beta version 0.1">Beta version 0.1</span></h1>
   <nav id="nav">
     <button data-v="fleet" class="on">Fleet</button>
     <button data-v="machine">Machine</button>
@@ -533,7 +533,7 @@ document.addEventListener("click",async e=>{const b=e.target.closest(".pdfBtn");
  if(!window.html2canvas||!window.jspdf){note("The PDF tools didn't load. Reload the page and try again.",true);return}
  if(!DL){note("Downloads aren't available in this view. Open the tool on claude.ai and try again.",true);return}
  const r=scope==="machine"?(S.reviews.find(x=>x._id===$("#mReview").value)||{serial:$("#mSerial").value}):(S.current||{});
- const stamp=new Date().toISOString().slice(0,10);const fname=`Mimaki Log Review ${r.serial||"unknown"} ${stamp}.pdf`.replace(/[\\/:*?"<>|]/g,"");
+ const stamp=new Date().toISOString().slice(0,10);const fname=`Log Analysis ${r.serial||"unknown"} ${stamp}.pdf`.replace(/[\\/:*?"<>|]/g,"");
  const label=b.textContent;b.disabled=true;b.textContent="Building PDF…";
  const head=document.createElement("div");head.className="card";head.style.cssText="padding:10px 14px";
  head.innerHTML=`<b style="font-size:16px">Mimaki Log &amp; Parameter Review</b><div class="small">${esc(r.serial||"")} ${esc(r.model||"")} · ${esc((r.meta&&r.meta.customer)||"")} · exported ${stamp} · Highway Digital · ${esc(APP_VERSION)}</div>`;

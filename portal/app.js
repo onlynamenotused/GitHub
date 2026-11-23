@@ -434,7 +434,7 @@ function renderBilling() {
   if (isSupervisor() && !state.staff) parts.push(vendorInvoicesCard());   // vendor / supervisor: invoices billed to them
   if (state.warReturns && (state.staff || isSupervisor())) parts.push(warrantyReturnsCard());   // faulty parts due back to the maker
   if (state.logReview && isSupervisor() && !state.staff) parts.push(el("div", { class: "card" },
-    el("div", { class: "bhead" }, el("h2", {}, "Mimaki Log Review"), el("a", { class: "btn small primary", href: "/logreview/" }, "Open Log Review")),
+    el("div", { class: "bhead" }, el("h2", {}, "Log Analysis"), el("a", { class: "btn small primary", href: "/logreview/" }, "Open Log Analysis")),
     el("p", { class: "muted small" }, "Daily maintenance compliance, possible service visits and parameter changes, read from the log and parameter files saved at each visit, for the machines in your dashboard. You can also analyse a log or parameter file yourself; nothing you analyse is saved.")));
   if (!isVendorOnly()) parts.push(
     el("div", { class: "card" },
@@ -1829,12 +1829,12 @@ async function renderSupervisorsAdmin(host) {
             const { error } = await sb.from("supervisor_access").update({ warranty_returns: on }).eq("supervisor_id", sup.id).eq("email", u.email);
             if (error) { e.target.checked = !on; return flash(note, "Not changed", false); }
             u.warranty_returns = on; flash(note, "Warranty returns " + (on ? "shown to " : "hidden from ") + u.email, true); } }), " Warranty returns"),
-        el("label", { class: "small", title: "Give this login the Mimaki Log Review (maintenance compliance, service visits and parameter changes from machine logs) for the machines they can see." },
+        el("label", { class: "small", title: "Give this login Log Analysis (maintenance compliance, service visits and parameter changes from machine logs) for the machines they can see." },
           el("input", { type: "checkbox", checked: !!u.log_review, onchange: async (e) => {
             const on = e.target.checked;
             const { error } = await sb.from("supervisor_access").update({ log_review: on }).eq("supervisor_id", sup.id).eq("email", u.email);
             if (error) { e.target.checked = !on; return flash(note, "Not changed", false); }
-            u.log_review = on; flash(note, "Mimaki Log Review " + (on ? "on for " : "off for ") + u.email, true); } }), " Log Review"),
+            u.log_review = on; flash(note, "Log Analysis " + (on ? "on for " : "off for ") + u.email, true); } }), " Log Analysis"),
         el("button", { class: "btn ghost small", type: "button", onclick: async () => { await sb.from("supervisor_access").delete().eq("supervisor_id", sup.id).eq("email", u.email); renderSupervisorsAdmin(host); } }, "Remove")))),
       addLogins,
       ...(inv ? [] : [el("h3", {}, "Customers (" + custs.length + ")"),

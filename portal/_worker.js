@@ -4,7 +4,7 @@
 // shared portal menu (nav.js + nav.css) added at the top, with their old cross-links removed.
 const SB_URL = "https://sfuuzcgwbbhdjqzrchvv.supabase.co";
 const SB_KEY = "sb_publishable_uu0N60ZMVjJ1kl14FW1NBA_v-cm_U3_"; // publishable key: safe, RLS protects data
-const V = "43";
+const V = "44";
 const GATED = {
   kb: { page: "/_p/kb/", flag: "kb", name: "Knowledge Base" },
   catalogue: { page: "/_p/catalogue/", flag: "cat", name: "Parts Catalogue" },
@@ -12,7 +12,7 @@ const GATED = {
   flute: { page: "/_p/flute/", flag: "flute", name: "Flute Practice player" },   // staff, customers with flute_access (off by default)
   warehousing: { page: "/_p/warehousing/", flag: "intranet", name: "Warehousing" }, // purchase orders, parts & stock: hello@ only
   radio: { page: "/_p/radio/", flag: "radio", name: "Radio" },   // free internet radio: staff, and customers / vendors with radio_access (on by default)
-  logreview: { page: "/_p/logreview/", flag: "logreview", name: "Mimaki Log Review" }   // staff, and vendor logins ticked for it (off by default)
+  logreview: { page: "/_p/logreview/", flag: "logreview", name: "Log Analysis" }   // staff, and vendor logins ticked for it (off by default)
 };
 // Files the Warehousing page loads next to itself (served only to the same signed-in hello@ account).
 const WH_FILES = new Set(["catalog-mimaki.json", "warranty-mimaki.json", "logo-bw.png"]);
