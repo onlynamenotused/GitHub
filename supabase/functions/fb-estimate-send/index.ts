@@ -1,4 +1,5 @@
-// Highway Service Desk: email one FreshBooks estimate (PDF attached) when staff choose "Email to customer".
+// Highway Service Desk: email one FreshBooks estimate (PDF attached) when staff choose "Email to customer" (op estimate_send),
+// and set the discount % on a just-created draft invoice/estimate (op doc_discount).
 // Reached only through fbw.call() (op estimate_send), which holds the bridge key. Shares the FreshBooks
 // connection (fbw.conn) with the "freshbooks" bridge function and refreshes it the same way.
 // Deployed with verify_jwt=false (the x-hsd-key check below is the auth).
@@ -50,16 +51,38 @@ async function sendEstimate(d: any) {
   return { ok: true, id: String(id), number: String(x.estimate_number ?? ""), status: x.v3_status || x.ui_status || null, sentTo: to };
 }
 
+/* Discount % on a FreshBooks draft invoice or estimate (FreshBooks applies it to the subtotal, before tax).
+   Called right after the service desk creates the draft; never sends anything. */
+async function docDiscount(d: any) {
+  const kind = d.kind === "invoice" ? "invoice" : d.kind === "estimate" ? "estimate" : "";
+  const id = parseInt(d.id, 10); if (!kind || !id) throw new Error("No draft to discount");
+  const pct = Math.round(Math.min(100, Math.max(0, +d.pct || 0)) * 100) / 100;
+  const c = await token();
+  const path = kind === "invoice" ? "invoices/invoices" : "estimates/estimates";
+  const r = await fetch(`${FB_API}/accounting/account/${c.account_id}/${path}/${id}`, {
+    method: "PUT", headers: { "content-type": "application/json", "Api-Version": "alpha", authorization: "Bearer " + c.access_token },
+    body: JSON.stringify({ [kind]: { discount_value: String(pct) } }),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    const errs = j?.response?.errors || j?.errors;
+    throw new Error(`FreshBooks ${r.status}: ` + (Array.isArray(errs) ? errs.map((e: any) => e.message || e.errno).join("; ") : (j.message || r.statusText)));
+  }
+  const x = j?.response?.result?.[kind] || {};
+  await sql`insert into fbw.log(op,ref,ok,fb_id,fb_number,total,detail) values ('doc_discount',${d.ref || null},true,${String(id)},${String(x.invoice_number ?? x.estimate_number ?? "")},${x.amount?.amount ?? null},${sql.json({ kind, pct })})`;
+  return { ok: true, id: String(id), pct, total: x.amount?.amount ?? null };
+}
+
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ ok: false, error: "POST only" }, 405);
   const [k] = await sql`select v from fbw.settings where k='bridge_key'`;
   if (!k || req.headers.get("x-hsd-key") !== k.v) return json({ ok: false, error: "forbidden" }, 403);
   const b = await req.json().catch(() => ({}));
-  if (b.op !== "estimate_send") return json({ ok: false, error: "unknown op" }, 400);
-  try { return json(await sendEstimate(b)); }
+  if (b.op !== "estimate_send" && b.op !== "doc_discount") return json({ ok: false, error: "unknown op" }, 400);
+  try { return json(b.op === "doc_discount" ? await docDiscount(b) : await sendEstimate(b)); }
   catch (e) {
     const msg = (e as Error).message || String(e);
-    await sql`insert into fbw.log(op,ref,ok,detail) values ('estimate_send',${b.ref || null},false,${sql.json({ error: msg })})`.catch(() => {});
+    await sql`insert into fbw.log(op,ref,ok,detail) values (${b.op},${b.ref || null},false,${sql.json({ error: msg })})`.catch(() => {});
     return json({ ok: false, error: msg });
   }
 });
