@@ -238,6 +238,7 @@ function renderMachines() {
   renderBilling();
   $("#machineHint").hidden = false;
   if (state.staff) $("#machineHint").textContent = "Tap a machine to see its details, service history and files.";
+  else if (isVendorOnly()) $("#machineHint").replaceChildren(el("b", {}, "Tap a machine"), " to see its details and service history. Press ", el("b", {}, "Book"), " to book a service or log a job for it.");
   box.replaceChildren(...list.map((m) => {
     const s = pmStatus(m);
     return el("button", { class: "mcard", onclick: () => (location.hash = "#machine/" + encodeURIComponent(m.id)) },
