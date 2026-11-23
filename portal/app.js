@@ -1297,10 +1297,10 @@ function drawReports() {
   v.replaceChildren(
     el("div", { class: "head" }, el("h1", {}, "Reports"), el("span", { class: "muted small" }, state.staff ? "Whole service desk" : isSupervisor() ? supName() : state.clients.map((c) => c.name).join(", "))),
     el("p", { class: "muted small" }, state.staff
-      ? "Every customer, machine and job in the service desk, with invoices from FreshBooks. Every table downloads as a CSV. Amounts are ex GST."
+      ? "Every customer, machine and job in the service desk, with invoices from FreshBooks. Every table downloads as Excel, CSV or PDF. Amounts are ex GST."
       : isSupervisor()
-        ? "Jobs billed to " + supName() + " (Bill to " + supName() + "), for any customer: invoices from our accounts and open service desk jobs, with the machines they were on. Every table downloads as a CSV. Amounts are ex GST."
-        : "Your machines, their service history and usage, from our service desk and invoices. Every table downloads as a CSV. Amounts are ex GST."),
+        ? "Jobs billed to " + supName() + " (Bill to " + supName() + "), for any customer: invoices from our accounts and open service desk jobs, with the machines they were on. Every table downloads as Excel, CSV or PDF. Amounts are ex GST."
+        : "Your machines, their service history and usage, from our service desk and invoices. Every table downloads as Excel, CSV or PDF. Amounts are ex GST."),
     ...[filters, f.tab === "desk" ? null : kpis, tabBar, body].filter(Boolean));
 }
 function jobsReport(jobs) {
