@@ -386,6 +386,7 @@ async function renderMachine(id) {
       ),
       el("div", { class: "card" }, el("h2", {}, "Manuals, drivers & software"), relRes)
     ),
+    machineHistoryCard(m),
     filesCard(m),
     el("div", { id: "mExtras" }),
     ...(state.intranet ? [el("div", { class: "card", style: "margin-top:14px" }, el("h2", {}, "Intranet Knowledge for this machine"), relKb)] : [])
@@ -403,6 +404,44 @@ async function renderMachine(id) {
   } catch (e) { relKb.replaceChildren(el("p", { class: "msg err" }, "Couldn't load articles.")); }
 }
 
+/* Machine page: open and recent service desk tickets for this machine, and its FreshBooks invoices.
+   What each login sees is limited by the database (customers: theirs; vendors: billed to them; staff: all). */
+const T_STATUS = { new: ["New", "soon"], scheduled: ["Scheduled", "soon"], "in-progress": ["In progress", "soon"], waiting: ["Waiting", "soon"], quote: ["Quote", "soon"], completed: ["Completed", "ok"], invoiced: ["Invoiced", "ok"] };
+function machineHistoryCard(m) {
+  const tBox = el("div", { class: "stack" }, el("p", { class: "muted small" }, "Loading…"));
+  const iBox = el("div", {}, el("p", { class: "muted small" }, "Loading…"));
+  (async () => {
+    const [t, r] = await Promise.all([
+      sb.from("tickets").select("num,type,subtype,status,summary,created,sched_date,sched_time").eq("machine_id", m.id).eq("sample", false).order("num", { ascending: false }).limit(25),
+      sb.from("service_records").select("id,number,issued,status,kind,po,total_ex,lines").eq("machine_id", m.id).neq("status", "draft").order("issued", { ascending: false }).limit(25)]);
+    if (t.error) tBox.replaceChildren(el("p", { class: "msg err" }, "Couldn't load tickets."));
+    else {
+      const done = (x) => ["completed", "invoiced"].includes(x.status);
+      const list = [...t.data.filter((x) => !done(x)), ...t.data.filter(done).slice(0, 8)];
+      tBox.replaceChildren(...(list.length ? list.map((x) => { const [lb, cl] = T_STATUS[x.status] || [x.status, "none"];
+        return el("div", { class: "bkitem" + (done(x) ? "" : " open") },
+          el("b", {}, "Job " + x.num + " · " + fmtDate(x.created)),
+          el("div", { class: "muted small" }, String(x.summary || "").replace(/^[^/]*\/\s*/, "")),
+          el("span", { class: "pill " + cl }, lb + (x.sched_date && !done(x) ? " · booked " + fmtDate(x.sched_date) + (x.sched_time ? " " + String(x.sched_time).slice(0, 5) : "") : ""))); })
+        : [el("p", { class: "muted small" }, "No service desk tickets for this machine.")]));
+    }
+    if (r.error) iBox.replaceChildren(el("p", { class: "msg err" }, "Couldn't load invoices."));
+    else iBox.replaceChildren(r.data.length ? el("div", { class: "tscroll" }, el("table", { class: "tbl rtbl" },
+      el("thead", {}, el("tr", {}, ...["Date", "Invoice", "Work", "Status", "Ex GST"].map((h) => el("th", { class: h === "Ex GST" ? "num" : null }, h)))),
+      el("tbody", {}, ...r.data.map((x) => { const lab = (x.lines || []).find((l) => /labou?r|day rate|hourly/i.test(l.code || ""));
+        const work = x.po || (lab ? String(lab.desc || "").split("\n").map((s) => s.trim()).filter((s) => s && !/^(date|model|job|serial|end user|install)/i.test(s))[0] : "") || ({ service: "Service", install: "Installation", parts: "Parts" }[x.kind] || "");
+        const parts = (x.lines || []).filter(isPart).map((l) => (Number(l.qty) || 1) + "× " + l.code).slice(0, 4).join(", ");
+        return el("tr", {}, el("td", { "data-l": "Date" }, fmtDate(x.issued)), el("td", { class: "mono", "data-l": "Invoice" }, x.number),
+          el("td", { "data-l": "Work" }, work || "—", parts ? el("div", { class: "muted small" }, parts) : null),
+          el("td", { "data-l": "Status" }, el("span", { class: "pill " + (x.status === "paid" ? "ok" : "soon") }, x.status || "")),
+          el("td", { class: "num", "data-l": "Ex GST" }, money(x.total_ex))); }))))
+      : el("p", { class: "muted small" }, "No FreshBooks invoices matched to this machine yet."));
+  })();
+  return el("div", { class: "card", style: "margin-top:14px" },
+    el("h2", {}, "Tickets"), tBox,
+    el("h2", { style: "margin-top:16px" }, "FreshBooks invoices"), iBox,
+    el("p", { class: "muted small" }, "Invoices are matched to a machine by its serial number or model on the invoice; some older invoices only show under the customer."));
+}
 function mailtoFor(m) {
   const subj = `Service request: ${machineName(m)}${m.serial ? " SN " + m.serial : ""}`;
   const body = `Machine: ${machineName(m)}\nSerial: ${m.serial || ""}\nLocation: ${m.location || ""}\n\nIssue:\n`;
