@@ -74,7 +74,7 @@ async function signOut() { await sb.auth.signOut(); setAccessCookie(null); histo
 const navHost = () => $("#hd-nav");
 function drawNav(active) {
   window.HDNav?.render(navHost(), state.user
-    ? { signedIn: true, email: state.user.email, staff: state.staff, intranet: state.intranet, kb: state.kbAccess || isSupervisor(), cat: state.catAccess, vector: state.vectorAccess, flute: state.fluteAccess, appsOnly: state.appsOnly, supervisor: isSupervisor() || (state.staff && (state.supervisors || []).length > 0), active }
+    ? { signedIn: true, email: state.user.email, staff: state.staff, intranet: state.intranet, kb: state.kbAccess || isSupervisor(), cat: state.catAccess, vector: state.vectorAccess, flute: state.fluteAccess, appsOnly: state.appsOnly, supervisor: isSupervisor(), reports: !!state.reportsAccess, active }
     : { signedIn: false });
 }
 
@@ -103,7 +103,7 @@ sb.auth.onAuthStateChange((evt, session) => {
 // ---------- data ----------
 async function loadCore() {
   const [c, m, k, s, g, it, ...rest] = await Promise.all([
-    sb.from("clients").select("id,name,kb_access,vector_access,flute_access,apps_only,catalogue_access,catalogue_brands").order("name"),
+    sb.from("clients").select("id,name,kb_access,vector_access,flute_access,apps_only,reports_access,catalogue_access,catalogue_brands").order("name"),
     sb.from("machines").select("*").eq("status", "active").order("brand").order("model"),
     sb.rpc("has_kb_access"),
     sb.rpc("is_staff"),
@@ -115,9 +115,11 @@ async function loadCore() {
     sb.from("supervisors").select("id,name,bill_to,scope"),
     sb.rpc("has_vector_access"),
     sb.rpc("has_flute_access"),
-    sb.rpc("is_apps_only")
+    sb.rpc("is_apps_only"),
+    sb.rpc("has_reports_access")
   ]);
-  const [mf, inv, est, sv, va, fa, ao] = rest;
+  const [mf, inv, est, sv, va, fa, ao, ra] = rest;
+  state.reportsAccess = ra?.data === true;
   state.vectorAccess = va?.data === true;
   state.fluteAccess = fa?.data === true;
   state.appsOnly = ao?.data === true;
@@ -387,10 +389,10 @@ async function renderCustomers() {
     showTab(k0 === "vendors" ? "vendors" : "list");
   }
   if (!state.access) {
-    body.replaceChildren(el("tr", {}, el("td", { colspan: "9", class: "muted" }, "Loading…")));
+    body.replaceChildren(el("tr", {}, el("td", { colspan: "10", class: "muted" }, "Loading…")));
     const [{ data, error }, vx] = await Promise.all([sb.from("portal_access").select("client_id,email"), sb.rpc("vector_export_counts")]);
     state.vexp = (vx && vx.data) || {};
-    if (error) { body.replaceChildren(el("tr", {}, el("td", { colspan: "9", class: "msg err" }, "Couldn't load customers."))); return; }
+    if (error) { body.replaceChildren(el("tr", {}, el("td", { colspan: "10", class: "msg err" }, "Couldn't load customers."))); return; }
     state.access = data;
   }
   const q = norm($("#custSearch").value);
@@ -425,10 +427,11 @@ async function renderCustomers() {
       tick("vector_access", "Vector Converter"),
       tick("flute_access", "Flute Practice"),
       tick("apps_only", "Apps only"),
+      tick("reports_access", "Reports"),
       el("td", { class: "num", title: vexpTitle(c.id) }, String(((state.vexp || {})[c.id] || {}).n || 0)),
       el("td", {}, catPicker(c, "clients", c.name))));
     if (open) {
-      const cell = el("td", { colspan: "9", class: "panelcell" }, el("p", { class: "muted small" }, "Loading…"));
+      const cell = el("td", { colspan: "10", class: "panelcell" }, el("p", { class: "muted small" }, "Loading…"));
       rows.push(el("tr", { class: "panelrow" }, cell));
       renderManage(c, cell);
     }
@@ -589,7 +592,7 @@ $("#addCustForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const name = $("#newCustName").value.trim(); if (!name) return;
   const msg = $("#addCustMsg");
-  const { data, error } = await sb.from("clients").insert({ name }).select("id,name,kb_access,vector_access,flute_access,apps_only,catalogue_access,catalogue_brands").single();
+  const { data, error } = await sb.from("clients").insert({ name }).select("id,name,kb_access,vector_access,flute_access,apps_only,reports_access,catalogue_access,catalogue_brands").single();
   if (error) return flash(msg, "Customer not added", false);
   state.clients.push(data); state.clients.sort((x, y) => x.name.localeCompare(y.name));
   $("#newCustName").value = ""; $("#custSearch").value = name; state.openClient = data.id;
@@ -1060,16 +1063,17 @@ async function loadReportData(force) {
   rep.loading = (async () => {
     const [sr, tj, pj] = await Promise.all([
       sb.from("service_records").select("id,client_id,machine_id,number,issued,status,kind,po,notes,total_ex,total_inc,lines").order("issued", { ascending: false }),
-      sb.rpc("supervisor_jobs"),
+      sb.rpc("report_jobs"),
       sb.from("portal_jobs").select("id,client_id,machine_id,kind,description,error_code,status,ticket_num,created_at").order("created_at", { ascending: false })
     ]);
     if (sr.error) throw sr.error;
+    if (tj.error) throw tj.error;
     const jobs = [];
     // Invoiced history (FreshBooks)
     for (const r of sr.data || []) {
       const lines = (r.lines || []).filter((l) => !/^(reports?|delivery)$/i.test(l.code || "") || Number(l.amount));
       const labour = lines.find((l) => /labou?r|day rate|hourly/i.test(l.code || ""));
-      jobs.push({ key: "inv-" + r.id, ref: "Invoice " + r.number, date: r.issued, client_id: r.client_id, machine_id: r.machine_id, kind: r.kind,
+      jobs.push({ key: "inv-" + r.id, ref: "Invoice " + r.number, number: r.number, date: r.issued, client_id: r.client_id, machine_id: r.machine_id, kind: r.kind,
         title: r.po || (labour ? String(labour.desc || "").split("\n")[0] : "") || KIND_NAMES[r.kind], notes: r.notes || "",
         detail: labour ? labour.desc : "", lines, amount: Number(r.total_ex) || 0, status: r.status, src: "invoice" });
     }
@@ -1080,13 +1084,14 @@ async function loadReportData(force) {
       jobs.push({ key: "t-" + t.num, ref: "Job " + t.num, date: t.created, client_id: t.client_id, machine_id: t.machine_id,
         kind: t.subtype === "installation" ? "install" : t.subtype === "pm" ? "service" : t.type === "incident" ? "fault" : "other",
         title: t.summary || "", notes: [t.description, t.error_code && "Error " + t.error_code].filter(Boolean).join(" · "), detail: t.notes || "",
-        lines, amount: lines.reduce((s, l) => s + l.amount, 0), status: t.status, src: "ticket", error: t.error_code || "" });
+        lines, amount: lines.reduce((s, l) => s + l.amount, 0), status: t.status, src: "ticket", error: t.error_code || "",
+        num: t.num, type: t.type, subtype: t.subtype, created: t.created, completed: t.completed || "", bill_to: t.bill_to || "Customer", channel: t.channel || "", warranty: !!t.warranty, customer: t.customer || "" });
     }
     for (const j of pj.data || []) if (j.status === "pending")
       jobs.push({ key: "p-" + j.id, ref: "Logged in portal", date: String(j.created_at).slice(0, 10), client_id: j.client_id, machine_id: j.machine_id,
         kind: j.kind, title: String(j.description || "").split("\n")[0], notes: j.description || "", detail: "", lines: [], amount: 0, status: "waiting", src: "portal", error: j.error_code || "" });
     jobs.sort((a, b) => String(b.date).localeCompare(String(a.date)));
-    rep.data = { jobs, invoicedCount: invoiced.size };
+    rep.data = { jobs, invoicedCount: invoiced.size, tickets: tj.data || [] };
     return rep.data;
   })();
   try { return await rep.loading; } finally { rep.loading = null; }
@@ -1112,8 +1117,9 @@ const monthLbl = (k) => { const [y, m] = k.split("-"); return new Date(+y, +m - 
 
 async function renderReports() {
   const v = $("#view-reports");
-  if (!isSupervisor() && !state.staff) { v.replaceChildren(el("div", { class: "card empty" }, "Fleet reports are for vendor supervisor logins.")); return; }
-  v.replaceChildren(el("div", { class: "head" }, el("h1", {}, "Fleet reports")), el("div", { class: "card center" }, el("span", { class: "spin" }), " Loading service history…"));
+  if (!state.reportsAccess) { v.replaceChildren(el("div", { class: "card empty" }, "Reports aren't turned on for your account. Contact hello@highwaydigital.com.au if you'd like them.")); return; }
+  if (state.staff && rep.f.tab === "jobs" && !rep.staffTabSet) { rep.staffTabSet = true; rep.f.tab = "desk"; }
+  v.replaceChildren(el("div", { class: "head" }, el("h1", {}, "Reports")), el("div", { class: "card center" }, el("span", { class: "spin" }), " Loading service history…"));
   try { await loadReportData(); } catch (e) { v.replaceChildren(el("div", { class: "card msg err" }, "Couldn't load the reports: " + (e.message || e))); return; }
   drawReports();
 }
@@ -1142,14 +1148,17 @@ function drawReports() {
         [money(spend), "Billed ex GST"], [fleet.length, "Machines"], [overdue, "PM overdue"]]
       .map(([n, l]) => el("div", { class: "stat" }, el("div", { class: "n" }, n), el("div", { class: "l" }, l))));
 
-  const tabs = [["jobs", "Job details"], ["parts", "Parts used"], ["trends", "Trends"], ["machines", "Machine stats"]];
+  const tabs = [...(state.staff ? [["desk", "Service desk overview"]] : []), ["assets", "Assets"], ["machines", "Usage by machine"], ["jobs", "Service history"], ["parts", "Parts used"], ["trends", "Trends"]];
   const tabBar = el("div", { class: "rtabs", role: "tablist" }, ...tabs.map(([k, l]) => el("button", { type: "button", role: "tab", class: "chipbtn", "aria-selected": String(f.tab === k), onclick: () => { f.tab = k; drawReports(); } }, l)));
-  const body = f.tab === "parts" ? partsReport(jobs) : f.tab === "trends" ? trendsReport(jobs) : f.tab === "machines" ? machineReport(jobs, fleet) : jobsReport(jobs);
+  const body = f.tab === "parts" ? partsReport(jobs) : f.tab === "trends" ? trendsReport(jobs) : f.tab === "machines" ? machineReport(jobs, fleet)
+    : f.tab === "assets" ? assetsReport(fleet, jobs) : f.tab === "desk" && state.staff ? deskReport(jobs, fleet) : jobsReport(jobs);
   v.replaceChildren(
-    el("div", { class: "head" }, el("h1", {}, "Fleet reports"), el("span", { class: "muted small" }, supName() || "All supervised fleets")),
-    el("p", { class: "muted small" }, isVendorOnly()
-      ? "Every job Highway Digital has invoiced to " + supName() + ", for any customer, plus open service desk jobs billed to " + supName() + ". Amounts are ex GST."
-      : "Service history for the customers whose support is contracted to Highway Digital through " + (supName() || "a vendor") + ": invoiced jobs from our accounts, plus open jobs from the service desk. Amounts are ex GST."),
+    el("div", { class: "head" }, el("h1", {}, "Reports"), el("span", { class: "muted small" }, state.staff ? "Whole service desk" : isSupervisor() ? supName() : state.clients.map((c) => c.name).join(", "))),
+    el("p", { class: "muted small" }, state.staff
+      ? "Every customer, machine and job in the service desk, with invoices from FreshBooks. Every table downloads as a CSV. Amounts are ex GST."
+      : isSupervisor()
+        ? "Jobs billed to " + supName() + " (Bill to " + supName() + "), for any customer: invoices from our accounts and open service desk jobs, with the machines they were on. Every table downloads as a CSV. Amounts are ex GST."
+        : "Your machines, their service history and usage, from our service desk and invoices. Every table downloads as a CSV. Amounts are ex GST."),
     filters, kpis, tabBar, body);
 }
 function jobsReport(jobs) {
@@ -1165,8 +1174,8 @@ function jobsReport(jobs) {
     return [tr, det];
   }).flat();
   return el("div", { class: "card" },
-    el("div", { class: "bhead" }, el("h2", {}, "Job details (" + jobs.length + ")"),
-      el("button", { class: "btn small", type: "button", onclick: () => csvDownload("Fleet job details.csv", [["Date", "Ref", "Customer", "Machine", "Type", "Job", "Notes", "Parts", "Amount ex GST"],
+    el("div", { class: "bhead" }, el("h2", {}, "Service history (" + jobs.length + ")"),
+      el("button", { class: "btn small", type: "button", onclick: () => csvDownload("Service history.csv", [["Date", "Ref", "Customer", "Machine", "Type", "Job", "Notes", "Parts", "Amount ex GST"],
         ...jobs.map((j) => [j.date, j.ref, cName(j.client_id), mLabel(j.machine_id), KIND_NAMES[j.kind] || j.kind, j.title, j.notes, j.lines.filter(isPart).map((l) => l.qty + "x " + l.code).join("; "), j.amount.toFixed(2)])]) }, "Download CSV")),
     jobs.length ? el("div", { class: "tscroll" }, el("table", { class: "tbl rtbl" }, el("thead", {}, el("tr", {}, ...["Date", "Ref", "Customer", "Machine", "Type", "Job", "Amount"].map((h) => el("th", { class: h === "Amount" ? "num" : null }, h)))), el("tbody", {}, ...rows)))
       : el("p", { class: "muted small" }, "No jobs match these filters."),
@@ -1184,7 +1193,7 @@ function partsReport(jobs) {
   const list = [...by.values()].sort((a, b) => b.spend - a.spend || b.qty - a.qty);
   return el("div", { class: "card" },
     el("div", { class: "bhead" }, el("h2", {}, "Parts used (" + list.length + " part numbers)"),
-      el("button", { class: "btn small", type: "button", onclick: () => csvDownload("Fleet parts used.csv", [["Part", "Description", "Qty", "Times supplied", "Spend ex GST", "Last supplied", "Customers", "Machines"],
+      el("button", { class: "btn small", type: "button", onclick: () => csvDownload("Parts used.csv", [["Part", "Description", "Qty", "Times supplied", "Spend ex GST", "Last supplied", "Customers", "Machines"],
         ...list.map((p) => [p.code, p.desc, p.qty, p.orders, p.spend.toFixed(2), p.last, [...p.customers].join("; "), [...p.machines].join("; ")])]) }, "Download CSV")),
     list.length ? el("div", { class: "tscroll" }, el("table", { class: "tbl rtbl" },
       el("thead", {}, el("tr", {}, ...["Part", "Description", "Qty", "Times", "Spend", "Last supplied", "Customers"].map((h) => el("th", { class: ["Qty", "Times", "Spend"].includes(h) ? "num" : null }, h)))),
@@ -1221,6 +1230,67 @@ function trendsReport(jobs) {
         el("tbody", {}, ...[...byCust.entries()].sort((a, b) => b[1].s - a[1].s).map(([c, x]) => el("tr", {}, el("td", {}, c), el("td", { class: "num" }, x.n), el("td", { class: "num" }, money(x.s))))))),
     topCodes.length ? el("div", { class: "card" }, el("h2", {}, "Recurring error codes"), el("ul", { class: "links" }, ...topCodes.map(([c, n]) => el("li", {}, el("span", { class: "kind" }, n + "×"), c)))) : null);
 }
+/* Asset register: every machine in view with its details, warranty, service plan and job count. */
+function assetsReport(fleet, jobs) {
+  const today = localIso();
+  const rows = fleet.slice().sort((a, b) => cName(a.client_id).localeCompare(cName(b.client_id)) || machineName(a).localeCompare(machineName(b))).map((m) => {
+    const js = jobs.filter((j) => j.machine_id === m.id);
+    const war = m.warranty_end ? (m.warranty_end >= today ? "In warranty to " + fmtDate(m.warranty_end) : "Ended " + fmtDate(m.warranty_end)) : "";
+    return { m, n: js.length, last: js.map((j) => j.date).sort().pop() || m.last_visit || "", war, pm: pmStatus(m) };
+  });
+  const cols = ["Customer", "Brand", "Model", "Serial", "Category", "Location", "Installed", "Warranty", "Firmware", "Ink", "PM every", "Next PM", "PM status", "Jobs", "Last job"];
+  const val = (r) => [cName(r.m.client_id), r.m.brand || "", r.m.model || "", r.m.serial || "", r.m.category || "", r.m.location || r.m.site || "", r.m.install_date || "", r.war,
+    r.m.firmware || "", [r.m.ink_type, r.m.ink_set].filter(Boolean).join(" "), r.m.pm_interval_months ? r.m.pm_interval_months + " months" : "", r.m.pm_next_due || "", r.pm.label, r.n, r.last];
+  return el("div", { class: "card" },
+    el("div", { class: "bhead" }, el("h2", {}, "Assets (" + rows.length + ")"),
+      el("button", { class: "btn small", type: "button", onclick: () => csvDownload("Assets.csv", [cols, ...rows.map(val)]) }, "Download CSV")),
+    rows.length ? el("div", { class: "tscroll" }, el("table", { class: "tbl rtbl" },
+      el("thead", {}, el("tr", {}, ...["Machine", "Customer", "Location", "Installed", "Warranty", "Service plan", "Jobs", "Last job"].map((h) => el("th", { class: h === "Jobs" ? "num" : null }, h)))),
+      el("tbody", {}, ...rows.map((r) => el("tr", { class: "rrow", tabindex: 0, onclick: () => (location.hash = "#machine/" + encodeURIComponent(r.m.id)) },
+        el("td", { "data-l": "Machine" }, el("b", {}, machineName(r.m)), el("br"), el("span", { class: "muted small" }, [r.m.serial && "SN " + r.m.serial, r.m.firmware && "FW " + r.m.firmware].filter(Boolean).join(" · "))),
+        el("td", { "data-l": "Customer" }, cName(r.m.client_id)), el("td", { "data-l": "Location" }, r.m.location || r.m.site || "—"),
+        el("td", { "data-l": "Installed" }, r.m.install_date ? fmtDate(r.m.install_date) : "—"), el("td", { "data-l": "Warranty" }, r.war || "—"),
+        el("td", { "data-l": "Service plan" }, el("span", { class: "pill " + r.pm.cls }, r.pm.label + (r.m.pm_next_due ? " · " + fmtDate(r.m.pm_next_due) : ""))),
+        el("td", { class: "num", "data-l": "Jobs" }, r.n), el("td", { "data-l": "Last job" }, r.last ? fmtDate(r.last) : "—"))))))
+      : el("p", { class: "muted small" }, "No machines match these filters."));
+}
+/* Staff only: the whole service desk at a glance. */
+function deskReport(jobs, fleet) {
+  const T = jobs.filter((j) => j.src === "ticket"), INV = jobs.filter((j) => j.src === "invoice");
+  const open = T.filter((j) => !["completed", "invoiced", "closed", "cancelled"].includes(j.status));
+  const days = (a, b) => Math.round((new Date(b) - new Date(a)) / 86400000);
+  const today = localIso();
+  const done = T.filter((j) => j.completed && j.created).map((j) => days(j.created, String(j.completed).slice(0, 10))).filter((d) => d >= 0);
+  const avg = done.length ? Math.round(done.reduce((s, d) => s + d, 0) / done.length) : null;
+  const age = (j) => days(j.created || j.date, today);
+  const count = (arr, fn) => { const m = new Map(); for (const x of arr) { const k = fn(x) || "—"; m.set(k, (m.get(k) || 0) + 1); } return [...m.entries()].sort((a, b) => b[1] - a[1]); };
+  const sum = (arr, fn) => { const m = new Map(); for (const x of arr) { const k = fn(x) || "—"; const v = m.get(k) || { n: 0, s: 0 }; v.n++; v.s += x.amount; m.set(k, v); } return [...m.entries()].sort((a, b) => b[1].s - a[1].s); };
+  const STN = { new: "New", scheduled: "Scheduled", "in-progress": "In progress", waiting: "Waiting on parts / customer", quote: "Quote", completed: "Completed", invoiced: "Invoiced" };
+  const TYN = (j) => j.subtype === "installation" ? "Installation" : j.subtype === "pm" ? "PM service" : ({ incident: "Incident", request: "Request", problem: "Problem" }[j.type] || j.type);
+  const mini = (title, rows, csvName, head) => el("div", { class: "card" },
+    el("div", { class: "bhead" }, el("h2", {}, title), csvName ? el("button", { class: "btn small", type: "button", onclick: () => csvDownload(csvName, [head, ...rows.map((r) => r.map((c) => (c && c.textContent != null ? c.textContent : c)))]) }, "Download CSV") : null),
+    rows.length ? el("div", { class: "tscroll" }, el("table", { class: "tbl rtbl" }, el("thead", {}, el("tr", {}, ...head.map((h, i) => el("th", { class: i ? "num" : null }, h)))),
+      el("tbody", {}, ...rows.map((r) => el("tr", {}, ...r.map((c, i) => el("td", { class: i ? "num" : null }, c))))))) : el("p", { class: "muted small" }, "Nothing in this period."));
+  const fleetDue = fleet.filter((m) => ["over", "soon"].includes(pmStatus(m).cls)).sort((a, b) => String(a.pm_next_due || "").localeCompare(String(b.pm_next_due || "")));
+  const warSoon = fleet.filter((m) => m.warranty_end && m.warranty_end >= today && days(today, m.warranty_end) <= 90).sort((a, b) => a.warranty_end.localeCompare(b.warranty_end));
+  const kp = [[T.length, "Tickets"], [open.length, "Open now"], [open.filter((j) => age(j) > 30).length, "Open over 30 days"], [avg == null ? "—" : avg + " days", "Average time to complete"],
+    [INV.length, "Invoices"], [money(INV.reduce((s, j) => s + j.amount, 0)), "Invoiced ex GST"], [fleet.length, "Machines"], [fleetDue.length, "PM due or overdue"]];
+  return el("div", { class: "stack" },
+    el("div", { class: "stats" }, ...kp.map(([n, l]) => el("div", { class: "stat" }, el("div", { class: "n" }, n), el("div", { class: "l" }, l)))),
+    el("div", { class: "rgrid" },
+      mini("Tickets by status", count(T, (j) => STN[j.status] || j.status).map(([k, n]) => [k, n]), "Tickets by status.csv", ["Status", "Tickets"]),
+      mini("Tickets by type", count(T, TYN).map(([k, n]) => [k, n]), "Tickets by type.csv", ["Type", "Tickets"]),
+      mini("Billed to", sum(T, (j) => j.bill_to).map(([k, v]) => [k, v.n, money(v.s)]), "Tickets by bill to.csv", ["Bill to", "Tickets", "Lines ex GST"]),
+      mini("How jobs came in", count(T, (j) => ({ phone: "Phone", sms: "Text", email: "Email", godaddy: "GoDaddy booking", portal: "Portal" }[j.channel] || j.channel || "Service desk")).map(([k, n]) => [k, n]), "Tickets by channel.csv", ["Came in by", "Tickets"])),
+    mini("Open tickets, oldest first (" + open.length + ")", open.slice().sort((a, b) => age(b) - age(a)).map((j) => [j.ref + " · " + (j.customer || cName(j.client_id)), STN[j.status] || j.status, age(j) + " days", j.bill_to]),
+      "Open tickets.csv", ["Ticket", "Status", "Age", "Bill to"]),
+    mini("Top customers by invoiced ex GST", sum(INV, (j) => cName(j.client_id)).slice(0, 25).map(([k, v]) => [k, v.n, money(v.s)]), "Invoiced by customer.csv", ["Customer", "Invoices", "Invoiced ex GST"]),
+    mini("Jobs by brand", count(jobs.filter((j) => j.machine_id), (j) => (mOf(j.machine_id) || {}).brand).map(([k, n]) => [k, n]), "Jobs by brand.csv", ["Brand", "Jobs"]),
+    mini("PM due or overdue (" + fleetDue.length + ")", fleetDue.map((m) => [cName(m.client_id) + " · " + machineName(m) + (m.serial ? " · " + m.serial : ""), pmStatus(m).label, m.pm_next_due ? fmtDate(m.pm_next_due) : "—"]),
+      "PM due.csv", ["Machine", "PM status", "Due"]),
+    mini("Warranty ending in the next 90 days (" + warSoon.length + ")", warSoon.map((m) => [cName(m.client_id) + " · " + machineName(m) + (m.serial ? " · " + m.serial : ""), fmtDate(m.warranty_end)]),
+      "Warranty ending.csv", ["Machine", "Warranty ends"]));
+}
 function machineReport(jobs, fleet) {
   const files = state.files || [];
   const rows = fleet.map((m) => {
@@ -1235,8 +1305,8 @@ function machineReport(jobs, fleet) {
   }).sort((a, b) => b.spend - a.spend);
   const unmatched = jobs.filter((j) => !j.machine_id).length;
   return el("div", { class: "card" },
-    el("div", { class: "bhead" }, el("h2", {}, "Machine stats (" + rows.length + ")"),
-      el("button", { class: "btn small", type: "button", onclick: () => csvDownload("Fleet machine stats.csv", [["Customer", "Machine", "Serial", "Installed", "Jobs", "Service visits", "Avg days between visits", "Parts fitted", "Billed ex GST", "Last job", "Next PM due", "PM status", "Firmware", "Parameter/log files", "Latest log"],
+    el("div", { class: "bhead" }, el("h2", {}, "Usage by machine (" + rows.length + ")"),
+      el("button", { class: "btn small", type: "button", onclick: () => csvDownload("Usage by machine.csv", [["Customer", "Machine", "Serial", "Installed", "Jobs", "Service visits", "Avg days between visits", "Parts fitted", "Billed ex GST", "Last job", "Next PM due", "PM status", "Firmware", "Parameter/log files", "Latest log"],
         ...rows.map((r) => [cName(r.m.client_id), machineName(r.m), r.m.serial || "", r.m.install_date || "", r.n, r.visits, r.gap ?? "", r.parts, r.spend.toFixed(2), r.last, r.m.pm_next_due || "", r.pm.label, r.fw, r.files, r.lastLog])]) }, "Download CSV")),
     el("div", { class: "tscroll" }, el("table", { class: "tbl rtbl" },
       el("thead", {}, el("tr", {}, ...["Machine", "Customer", "Jobs", "Visits", "Avg gap", "Parts", "Billed", "Last job", "Service", "Firmware / logs"].map((h) => el("th", { class: ["Jobs", "Visits", "Avg gap", "Parts", "Billed"].includes(h) ? "num" : null }, h)))),
@@ -1283,6 +1353,10 @@ async function renderSupervisorsAdmin(host) {
     return el("div", { class: "card", style: "margin-top:12px" + (sup.enabled === false ? ";opacity:.75" : "") },
       el("div", { class: "bhead" }, el("h3", {}, sup.name), el("span", { class: "muted small" }, "Bill to: " + (sup.bill_to || "—") + (sup.last_sync ? " · history updated " + new Date(sup.last_sync).toLocaleString("en-AU") : ""))),
       el("label", { class: "small", style: "display:flex;gap:8px;align-items:center;margin:4px 0 8px" }, onBox, el("b", {}, "Portal access"), el("span", { class: "muted" }, sup.enabled === false ? "off: these logins see nothing" : "on")),
+      el("label", { class: "small", style: "display:flex;gap:8px;align-items:center;margin:0 0 8px" }, el("input", { type: "checkbox", checked: sup.reports_access !== false, onchange: async (e) => {
+        const on = e.target.checked; const { error } = await sb.from("supervisors").update({ reports_access: on }).eq("id", sup.id);
+        if (error) { e.target.checked = !on; return flash(note, "Not changed", false); } flash(note, "Reports " + (on ? "on" : "off") + " for " + sup.name, true); } }),
+        el("b", {}, "Reports"), el("span", { class: "muted" }, "assets, usage and service history for jobs billed to " + (sup.bill_to || sup.name) + ", exportable as CSV")),
       inv
         ? el("p", { class: "muted small" }, "Vendor logins see every job invoiced to " + (sup.bill_to || sup.name) + ", for any customer: invoices from FreshBooks and service desk jobs with Bill to " + (sup.bill_to || sup.name) + ". They see only those jobs' customers and machines, and get Fleet reports. Adding a login sends nothing.")
         : el("p", { class: "muted small" }, "Supervisor logins see every machine, job and service record for these customers, can log jobs and add machines for them, and get Fleet reports. Adding a login sends nothing."),

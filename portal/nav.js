@@ -11,7 +11,7 @@
     if (f.cat) out.push(["catalogue", "/catalogue/", "Parts Catalogue"]);
     if (f.vector) out.push(["vector", "/vector/", "Vector Converter"]);
     if (f.flute) out.push(["flute", "/flute/", "Flute Practice"]);
-    if (f.supervisor) out.push(["reports", "/#reports", "Fleet reports"]);
+    if (f.reports) out.push(["reports", "/#reports", "Reports"]);
     if (!(f.appsOnly && !f.staff)) out.push(["contact", "/#contact", "Contact & booking"]);
     if (f.staff) out.push(["customers", "/#customers", "Customers (staff)"]);
     if (f.staff) out.push(["service-kits", "/#service-kits", "Service kits (staff)"]);
