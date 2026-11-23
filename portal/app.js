@@ -1465,15 +1465,57 @@ function machineReport(jobs, fleet) {
       (unmatched ? unmatched + " job" + (unmatched > 1 ? "s" : "") + " in this period couldn't be tied to a specific machine and count only in the customer totals." : "")));
 }
 
+// Vendor logins: pick one or more addresses from the vendor's Outlook contacts (vendor_contacts), or type them, then add them all.
+function loginPicker(sup, logins, contacts, note, done) {
+  const have = new Set(logins.map((u) => u.email.toLowerCase()));
+  const avail = contacts.filter((x) => !have.has(x.email.toLowerCase()));
+  const staged = new Map();
+  const chips = el("div", { class: "chips", style: "display:flex;flex-wrap:wrap;gap:6px;margin:6px 0" });
+  const addBtn = el("button", { class: "btn small", type: "button", disabled: true }, "Add logins");
+  const draw = () => {
+    chips.replaceChildren(...[...staged].map(([e, n]) => el("span", { class: "pill", style: "display:inline-flex;gap:6px;align-items:center" }, n ? n + " <" + e + ">" : e,
+      el("button", { class: "btn ghost small", type: "button", title: "Remove", onclick: () => { staged.delete(e); draw(); } }, "×"))));
+    addBtn.disabled = !staged.size; addBtn.textContent = staged.size > 1 ? "Add " + staged.size + " logins" : "Add login";
+    [...pick.options].forEach((o) => { if (o.value) o.disabled = staged.has(o.value); });
+  };
+  const stage = (raw) => {
+    let bad = [];
+    raw.split(/[\s,;]+/).map((x) => x.trim().toLowerCase().replace(/^<|>$/g, "")).filter(Boolean).forEach((e) => {
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) return bad.push(e);
+      if (have.has(e)) return;
+      staged.set(e, contacts.find((x) => x.email.toLowerCase() === e)?.name || "");
+    });
+    if (bad.length) flash(note, "Not an email address: " + bad.join(", "), false);
+    draw();
+  };
+  const pick = el("select", { class: "field", style: "max-width:340px", onchange: () => { if (pick.value) stage(pick.value); pick.value = ""; } },
+    el("option", { value: "" }, avail.length ? "Pick from " + sup.name + " Outlook contacts (" + avail.length + ")…" : "No more Outlook contacts on file"),
+    ...avail.map((x) => el("option", { value: x.email }, (x.name ? x.name + " — " : "") + x.email)));
+  const dlId = "vc-" + sup.id;
+  const typed = el("input", { class: "field", type: "text", list: dlId, placeholder: "or type addresses, separated by commas", style: "max-width:340px",
+    onkeydown: (e) => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); stage(typed.value); typed.value = ""; } },
+    onchange: () => { if (/[@].+\./.test(typed.value)) { stage(typed.value); typed.value = ""; } } });
+  const dl = el("datalist", { id: dlId }, ...avail.map((x) => el("option", { value: x.email }, x.name || "")));
+  addBtn.onclick = async () => {
+    addBtn.disabled = true;
+    const rows = [...staged].map(([email, n]) => ({ supervisor_id: sup.id, email, full_name: n || null }));
+    const { error } = await sb.from("supervisor_access").upsert(rows, { onConflict: "supervisor_id,email", ignoreDuplicates: true });
+    if (error) { addBtn.disabled = false; return flash(note, "Logins not added: " + error.message, false); }
+    const fresh = rows.filter((r) => !contacts.some((x) => x.email.toLowerCase() === r.email));
+    if (fresh.length) await sb.from("vendor_contacts").upsert(fresh.map((r) => ({ supervisor_id: sup.id, email: r.email, name: null, source: "manual" })), { onConflict: "supervisor_id,email", ignoreDuplicates: true });
+    done();
+  };
+  return el("div", {}, el("div", { style: "display:flex;flex-wrap:wrap;gap:8px" }, pick, typed, dl), chips, addBtn);
+}
+
 // ---------- staff: manage vendor supervisors ----------
 async function renderSupervisorsAdmin(host) {
-  const [s, a, c] = await Promise.all([
-    sb.from("supervisors").select("*").order("name"), sb.from("supervisor_access").select("*").order("email"), sb.from("supervisor_clients").select("*")]);
+  const [s, a, c, vcs] = await Promise.all([
+    sb.from("supervisors").select("*").order("name"), sb.from("supervisor_access").select("*").order("email"), sb.from("supervisor_clients").select("*"), sb.from("vendor_contacts").select("*").order("name")]);
   if (s.error) { host.replaceChildren(el("p", { class: "msg err" }, "Couldn't load vendor supervisors.")); return; }
   const note = el("span", { class: "saved" });
   const cards = s.data.map((sup) => {
     const logins = a.data.filter((x) => x.supervisor_id === sup.id), custs = c.data.filter((x) => x.supervisor_id === sup.id);
-    const em = el("input", { class: "field", type: "email", placeholder: "name@vendor.com" }), fn = el("input", { class: "field", placeholder: "Full name" });
     const pick = el("select", { class: "field" }, el("option", { value: "" }, "Add a customer…"), ...state.clients.filter((x) => !custs.some((y) => y.client_id === x.id)).map((x) => el("option", { value: x.id }, x.name)));
     const sync = el("button", { class: "btn small", type: "button", onclick: async () => {
       sync.disabled = true; sync.textContent = "Reading FreshBooks…";
@@ -1496,12 +1538,7 @@ async function renderSupervisorsAdmin(host) {
       if (error) { e.target.checked = !e.target.checked; return flash(note, "Not saved", false); }
       flash(note, kbSel.size ? "Knowledge Base shows " + KBB.filter(([x]) => kbSel.has(x)).map(([, y]) => y).join(", ") : "Knowledge Base shows every brand", true);
     } }), " " + l)));
-    const dom = el("input", { class: "field", value: (sup.login_domains || []).join(", "), placeholder: "e.g. mimaki.com", style: "max-width:260px" });
-    const domForm = el("form", { class: "inline", onsubmit: async (e) => { e.preventDefault();
-      const list = [...new Set(dom.value.split(/[\s,;]+/).map((x) => x.trim().toLowerCase().replace(/^@/, "")).filter((x) => /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(x)))];
-      const { error } = await sb.from("supervisors").update({ login_domains: list }).eq("id", sup.id);
-      flash(note, error ? "Not saved" : list.length ? "Anyone at " + list.map((d) => "@" + d).join(", ") + " can sign in as " + sup.name : "Only the logins below can sign in", !error);
-    } }, dom, el("button", { class: "btn small", type: "submit" }, "Save domains"));
+    const addLogins = loginPicker(sup, logins, (vcs.data || []).filter((x) => x.supervisor_id === sup.id), note, () => renderSupervisorsAdmin(host));
     return el("div", { class: "card", style: "margin-top:12px" + (sup.enabled === false ? ";opacity:.75" : "") },
       el("div", { class: "bhead" }, el("h3", {}, sup.name), el("span", { class: "muted small" }, "Bill to: " + (sup.bill_to || "—") + (sup.last_sync ? " · history updated " + new Date(sup.last_sync).toLocaleString("en-AU") : ""))),
       el("label", { class: "small", style: "display:flex;gap:8px;align-items:center;margin:4px 0 8px" }, onBox, el("b", {}, "Portal access"), el("span", { class: "muted" }, sup.enabled === false ? "off: these logins see nothing" : "on")),
@@ -1518,12 +1555,10 @@ async function renderSupervisorsAdmin(host) {
       el("p", { class: "muted small" }, "Brands every " + sup.name + " login can see in the Parts Catalogue. Untick them all to remove access."),
       catPicker(sup, "supervisors", sup.name),
       el("h3", {}, "Logins"),
-      el("p", { class: "muted small" }, "Email domains that can sign in as " + sup.name + " (anyone with an address there):"), domForm,
+      el("p", { class: "muted small" }, "Only the addresses listed here can sign in as " + sup.name + ". Pick them from " + sup.name + "'s Outlook contacts or type them in; add several at once."),
       el("ul", { class: "links" }, ...logins.map((u) => el("li", {}, u.email + (u.full_name ? " (" + u.full_name + ")" : ""), " ",
         el("button", { class: "btn ghost small", type: "button", onclick: async () => { await sb.from("supervisor_access").delete().eq("supervisor_id", sup.id).eq("email", u.email); renderSupervisorsAdmin(host); } }, "Remove")))),
-      el("form", { class: "inline", onsubmit: async (e) => { e.preventDefault(); if (!em.value.trim()) return;
-        const { error } = await sb.from("supervisor_access").insert({ supervisor_id: sup.id, email: em.value.trim().toLowerCase(), full_name: fn.value.trim() || null });
-        if (error) return flash(note, "Login not added", false); renderSupervisorsAdmin(host); } }, em, fn, el("button", { class: "btn small", type: "submit" }, "Add login")),
+      addLogins,
       ...(inv ? [] : [el("h3", {}, "Customers (" + custs.length + ")"),
       el("ul", { class: "links" }, ...custs.map((x) => el("li", {}, cName(x.client_id), x.match_terms?.length ? el("span", { class: "muted small" }, "  matched on invoices by: " + x.match_terms.join(", ")) : "", " ",
         el("button", { class: "btn ghost small", type: "button", onclick: async () => { await sb.from("supervisor_clients").delete().eq("supervisor_id", sup.id).eq("client_id", x.client_id); renderSupervisorsAdmin(host); } }, "Remove")))),
