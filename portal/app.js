@@ -112,7 +112,7 @@ async function loadCore() {
     sb.from("machine_files").select("id,kind,name,machine_id,param_date,modified,size,fw").order("param_date", { ascending: false }),
     sb.from("fb_invoices").select("*").order("issued", { ascending: false }).limit(60),
     sb.from("fb_estimates").select("*").order("issued", { ascending: false }).limit(60),
-    sb.from("supervisors").select("id,name,bill_to"),
+    sb.from("supervisors").select("id,name,bill_to,scope"),
     sb.rpc("has_vector_access"),
     sb.rpc("has_flute_access"),
     sb.rpc("is_apps_only")
@@ -176,7 +176,7 @@ function renderMachines() {
   const q = norm($("#machineSearch").value);
   const list = state.machines.filter((m) =>
     !q || [m.brand, m.model, m.serial, m.site, m.location, m.sub_category].some((v) => norm(v).includes(q)));
-  $("#clientTitle").textContent = state.staff ? "Customer Assets" : isSupervisor() ? supName() + " fleet" : state.clients.length === 1 ? state.clients[0].name : "My machines";
+  $("#clientTitle").textContent = state.staff ? "Customer Assets" : isSupervisor() ? supName() + (isVendorOnly() ? " jobs" : " fleet") : state.clients.length === 1 ? state.clients[0].name : "My machines";
 
   const counts = { over: 0, soon: 0, ok: 0 };
   for (const m of state.machines) { const s = pmStatus(m).cls; if (s in counts) counts[s]++; }
@@ -211,7 +211,7 @@ function renderMachines() {
       el("span", { class: "pill " + s.cls }, s.label + (m.pm_next_due ? " · " + fmtDate(m.pm_next_due) : "")),
       m.added_via === "portal" && m.desk_seen === false ? el("span", { class: "muted small" }, "Added by you · we'll check the details") : null,
       filesFor(m).length ? el("span", { class: "muted small" }, "📄 " + filesFor(m).length + " parameter/log file" + (filesFor(m).length > 1 ? "s" : "")) : null,
-      state.staff ? null : el("span", { class: "mbook", role: "link", title: "Book a service or log a job for this machine",
+      state.staff || isVendorOnly() ? null : el("span", { class: "mbook", role: "link", title: "Book a service or log a job for this machine",
         onclick: (e) => { e.stopPropagation(); location.hash = "#book/" + encodeURIComponent(m.id); } }, "Book"),
       isCustomer() && !isSupervisor() ? el("span", { class: "mquote", role: "button", tabindex: 0, title: kitFor(m) ? "Get a quote for this machine's service and PM parts, emailed to you now" : "Get a quote for a service visit, emailed to you now",
         onclick: (e) => { e.stopPropagation(); openServiceQuote(m.id); },
@@ -795,7 +795,7 @@ const PLATE_MODELS = ["UCJV300-160", "UCJV330-160", "CJV150-160", "CJV150-130", 
 const MACHINE_TYPES = ["Sign printer", "Print & cut", "Flatbed UV printer", "Direct-to-film / textile printer", "Cutter / plotter", "Laser engraver", "Embroidery machine", "CNC router", "Office printer / copier", "Other"];
 const compact = (s) => String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 const JOB_KINDS = [["fault", "Fault or repair"], ["service", "Scheduled service"], ["install", "Installation"], ["consumables", "Consumables order"], ["other", "Something else"]];
-const isCustomer = () => !state.staff && state.clients.length > 0;
+const isCustomer = () => !state.staff && state.clients.length > 0 && !isVendorOnly();
 
 function knownModels() {
   return [...new Set([...PLATE_MODELS, ...state.machines.map((m) => m.model).filter(Boolean)])];
@@ -1037,6 +1037,8 @@ async function machineExtras(m, host) {
 // ---------- vendor supervisors (e.g. Avery Dennison): fleet view and fleet reports ----------
 const isSupervisor = () => !state.staff && (state.supervisors || []).length > 0;
 const supName = () => (state.supervisors || []).map((s) => s.name).join(", ");
+// A vendor login (scope "invoiced") sees only the jobs invoiced to it; a supervisor (scope "fleet") sees whole customer fleets.
+const isVendorOnly = () => isSupervisor() && state.supervisors.every((s) => s.scope === "invoiced");
 const money = (n) => "$" + (Number(n) || 0).toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const KIND_NAMES = { service: "Service visit", install: "Installation", parts: "Parts order", consumables: "Consumables order", fault: "Fault or repair", other: "Other" };
 const rep = { data: null, loading: null, f: { from: "", to: "", client: "", machine: "", q: "", tab: "jobs" } };
@@ -1134,7 +1136,9 @@ function drawReports() {
   const body = f.tab === "parts" ? partsReport(jobs) : f.tab === "trends" ? trendsReport(jobs) : f.tab === "machines" ? machineReport(jobs, fleet) : jobsReport(jobs);
   v.replaceChildren(
     el("div", { class: "head" }, el("h1", {}, "Fleet reports"), el("span", { class: "muted small" }, supName() || "All supervised fleets")),
-    el("p", { class: "muted small" }, "Service history for the customers whose support is contracted to Highway Digital through " + (supName() || "a vendor") + ": invoiced jobs from our accounts, plus open jobs from the service desk. Amounts are ex GST."),
+    el("p", { class: "muted small" }, isVendorOnly()
+      ? "Every job Highway Digital has invoiced to " + supName() + ", for any customer, plus open service desk jobs billed to " + supName() + ". Amounts are ex GST."
+      : "Service history for the customers whose support is contracted to Highway Digital through " + (supName() || "a vendor") + ": invoiced jobs from our accounts, plus open jobs from the service desk. Amounts are ex GST."),
     filters, kpis, tabBar, body);
 }
 function jobsReport(jobs) {
@@ -1252,28 +1256,45 @@ async function renderSupervisorsAdmin(host) {
       sync.disabled = false; sync.textContent = "Update service history from FreshBooks";
       flash(note, error ? "Sync failed: " + error.message : data?.ok ? data.invoices + " invoices read" : "Sync failed: " + (data?.error || ""), !error && data?.ok);
     } }, "Update service history from FreshBooks");
-    return el("div", { class: "card", style: "margin-top:12px" },
+    const inv = sup.scope === "invoiced";
+    const onBox = el("input", { type: "checkbox", checked: sup.enabled !== false, onchange: async () => {
+      const { error } = await sb.from("supervisors").update({ enabled: onBox.checked }).eq("id", sup.id);
+      if (error) { onBox.checked = !onBox.checked; return flash(note, "Not changed", false); }
+      flash(note, onBox.checked ? sup.name + " portal access is on" : sup.name + " portal access is off", true);
+      if (onBox.checked && inv && !sup.last_sync) sync.click();
+    } });
+    const dom = el("input", { class: "field", value: (sup.login_domains || []).join(", "), placeholder: "e.g. mimaki.com", style: "max-width:260px" });
+    const domForm = el("form", { class: "inline", onsubmit: async (e) => { e.preventDefault();
+      const list = [...new Set(dom.value.split(/[\s,;]+/).map((x) => x.trim().toLowerCase().replace(/^@/, "")).filter((x) => /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(x)))];
+      const { error } = await sb.from("supervisors").update({ login_domains: list }).eq("id", sup.id);
+      flash(note, error ? "Not saved" : list.length ? "Anyone at " + list.map((d) => "@" + d).join(", ") + " can sign in as " + sup.name : "Only the logins below can sign in", !error);
+    } }, dom, el("button", { class: "btn small", type: "submit" }, "Save domains"));
+    return el("div", { class: "card", style: "margin-top:12px" + (sup.enabled === false ? ";opacity:.75" : "") },
       el("div", { class: "bhead" }, el("h3", {}, sup.name), el("span", { class: "muted small" }, "Bill to: " + (sup.bill_to || "—") + (sup.last_sync ? " · history updated " + new Date(sup.last_sync).toLocaleString("en-AU") : ""))),
-      el("p", { class: "muted small" }, "Supervisor logins see every machine, job and service record for these customers, can log jobs and add machines for them, and get Fleet reports. Adding a login sends nothing."),
+      el("label", { class: "small", style: "display:flex;gap:8px;align-items:center;margin:4px 0 8px" }, onBox, el("b", {}, "Portal access"), el("span", { class: "muted" }, sup.enabled === false ? "off: these logins see nothing" : "on")),
+      inv
+        ? el("p", { class: "muted small" }, "Vendor logins see every job invoiced to " + (sup.bill_to || sup.name) + ", for any customer: invoices from FreshBooks and service desk jobs with Bill to " + (sup.bill_to || sup.name) + ". They see only those jobs' customers and machines, and get Fleet reports. Adding a login sends nothing.")
+        : el("p", { class: "muted small" }, "Supervisor logins see every machine, job and service record for these customers, can log jobs and add machines for them, and get Fleet reports. Adding a login sends nothing."),
       el("h3", {}, "Parts Catalogue access"),
       el("p", { class: "muted small" }, "Brands every " + sup.name + " login can see in the Parts Catalogue. Untick them all to remove access."),
       catPicker(sup, "supervisors", sup.name),
       el("h3", {}, "Logins"),
+      el("p", { class: "muted small" }, "Email domains that can sign in as " + sup.name + " (anyone with an address there):"), domForm,
       el("ul", { class: "links" }, ...logins.map((u) => el("li", {}, u.email + (u.full_name ? " (" + u.full_name + ")" : ""), " ",
         el("button", { class: "btn ghost small", type: "button", onclick: async () => { await sb.from("supervisor_access").delete().eq("supervisor_id", sup.id).eq("email", u.email); renderSupervisorsAdmin(host); } }, "Remove")))),
       el("form", { class: "inline", onsubmit: async (e) => { e.preventDefault(); if (!em.value.trim()) return;
         const { error } = await sb.from("supervisor_access").insert({ supervisor_id: sup.id, email: em.value.trim().toLowerCase(), full_name: fn.value.trim() || null });
         if (error) return flash(note, "Login not added", false); renderSupervisorsAdmin(host); } }, em, fn, el("button", { class: "btn small", type: "submit" }, "Add login")),
-      el("h3", {}, "Customers (" + custs.length + ")"),
+      ...(inv ? [] : [el("h3", {}, "Customers (" + custs.length + ")"),
       el("ul", { class: "links" }, ...custs.map((x) => el("li", {}, cName(x.client_id), x.match_terms?.length ? el("span", { class: "muted small" }, "  matched on invoices by: " + x.match_terms.join(", ")) : "", " ",
         el("button", { class: "btn ghost small", type: "button", onclick: async () => { await sb.from("supervisor_clients").delete().eq("supervisor_id", sup.id).eq("client_id", x.client_id); renderSupervisorsAdmin(host); } }, "Remove")))),
       el("form", { class: "inline", onsubmit: async (e) => { e.preventDefault(); if (!pick.value) return;
         const cl = state.clients.find((x) => String(x.id) === pick.value);
         const { error } = await sb.from("supervisor_clients").insert({ supervisor_id: sup.id, client_id: Number(pick.value), match_terms: [norm(cl?.name || "")] });
-        if (error) return flash(note, "Customer not added", false); renderSupervisorsAdmin(host); } }, pick, el("button", { class: "btn small", type: "submit" }, "Add customer")),
+        if (error) return flash(note, "Customer not added", false); renderSupervisorsAdmin(host); } }, pick, el("button", { class: "btn small", type: "submit" }, "Add customer"))]),
       el("p", {}, sync, " ", note));
   });
-  host.replaceChildren(el("h2", { style: "margin-top:24px" }, "Vendor supervisors"), ...cards);
+  host.replaceChildren(el("h2", { style: "margin-top:24px" }, "Vendors and supervisors"), ...cards);
 }
 
 // ---------- all jobs for the account: open jobs on My machines, and exports ----------
@@ -1365,7 +1386,7 @@ async function exportTable(fmt, base, title, head, rows) {
   await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js", () => window.jspdf);
   await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js", () => window.jspdf && window.jspdf.jsPDF.API.autoTable);
   const doc = new window.jspdf.jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-  const who = state.staff ? "Customer Assets" : isSupervisor() ? supName() + " fleet" : state.clients.map((c) => c.name).join(", ");
+  const who = state.staff ? "Customer Assets" : isSupervisor() ? supName() + (isVendorOnly() ? " jobs" : " fleet") : state.clients.map((c) => c.name).join(", ");
   doc.setFont("helvetica", "bold"); doc.setFontSize(15); doc.text("Highway Digital · " + title, 12, 14);
   doc.setFont("helvetica", "normal"); doc.setFontSize(9.5); doc.setTextColor(90);
   doc.text(`${who}  ·  ${rows.length} rows  ·  exported ${new Date().toLocaleString("en-AU")}  ·  portal.highwaydigital.com.au`, 12, 20);
