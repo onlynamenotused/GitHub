@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Radio · Highway Service Desk</title><meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE: friendly workshop radio, something on while you work
+   PICTURE: the record sleeve of what's playing, big, beside a list of stations */
+:root{--bg:#f4f2ec;--card:#ffffff;--ink:#17171a;--soft:#5e5f66;--line:#dfdcd3;--sunk:#efece4;--accent:#c99a12;--accent-ink:#17171a;--on:#d7261e;--shadow:0 10px 30px rgba(20,18,10,.12)}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#111214;--card:#1b1c20;--ink:#f1efe8;--soft:#a3a3ab;--line:#2d2e34;--sunk:#24252a;--accent:#e8b923;--accent-ink:#141414;--on:#ff4a3d;--shadow:0 10px 30px rgba(0,0,0,.45);color-scheme:dark}}
+:root[data-theme=dark]{--bg:#111214;--card:#1b1c20;--ink:#f1efe8;--soft:#a3a3ab;--line:#2d2e34;--sunk:#24252a;--accent:#e8b923;--accent-ink:#141414;--on:#ff4a3d;--shadow:0 10px 30px rgba(0,0,0,.45);color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 Inter,system-ui,sans-serif}
+main{max-width:1180px;margin:0 auto;padding:18px max(16px,env(safe-area-inset-right,0px)) 60px max(16px,env(safe-area-inset-left,0px))}
+h1,h2,h3{font-family:"League Spartan",Inter,sans-serif;margin:0;line-height:1.1;text-wrap:balance}
+h1{font-size:clamp(30px,5vw,42px)}h2{font-size:22px}
+.sub{color:var(--soft);margin:4px 0 18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:var(--shadow)}
+button{font:inherit;color:inherit}
+.player{display:grid;grid-template-columns:minmax(180px,280px) 1fr;gap:22px;align-items:center}
+.sleeve{position:relative;aspect-ratio:1;border-radius:12px;overflow:hidden;background:var(--sunk);box-shadow:0 14px 34px rgba(0,0,0,.28)}
+.sleeve>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.vinyl{position:absolute;inset:0;display:grid;place-items:center}
+.vinyl svg{width:86%;height:86%}
+.spin .vinyl svg{animation:rot 4s linear infinite}@keyframes rot{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin .vinyl svg{animation:none}}
+.onair{display:inline-flex;align-items:center;gap:6px;font:700 11px/1 Inter,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:var(--soft)}
+.onair i{width:9px;height:9px;border-radius:50%;background:var(--line)}
+.onair.live{color:var(--on)}.onair.live i{background:var(--on);box-shadow:0 0 0 4px color-mix(in srgb,var(--on) 25%,transparent)}
+.song{font:700 clamp(24px,4vw,38px)/1.1 "League Spartan",sans-serif;margin:10px 0 4px;overflow-wrap:anywhere}
+.artist{font-size:18px;font-weight:600}
+.album{color:var(--soft);margin-top:2px}
+.station{display:flex;align-items:center;gap:10px;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+.logo{flex:none;width:40px;height:40px;border-radius:8px;background:var(--sunk);display:grid;place-items:center;overflow:hidden;font:700 14px "League Spartan",sans-serif;color:var(--soft)}
+.logo img{width:100%;height:100%;object-fit:contain;background:#fff}
+.ctrls{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:16px}
+.play{width:58px;height:58px;border-radius:50%;border:0;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;cursor:pointer;box-shadow:0 6px 16px color-mix(in srgb,var(--accent) 45%,transparent)}
+.play:disabled{opacity:.45;cursor:default}
+.play svg{width:26px;height:26px}
+.vol{display:flex;align-items:center;gap:8px;color:var(--soft)}
+.vol input{width:140px;accent-color:var(--accent)}
+.ghost{border:1px solid var(--line);background:transparent;border-radius:999px;padding:8px 14px;cursor:pointer;font-weight:600}
+.ghost:hover{border-color:var(--accent)}
+.ghost.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.msg{color:var(--soft);font-size:13px;min-height:18px;margin-top:8px}
+.msg.err{color:var(--on)}
+.hist{display:flex;gap:14px;overflow-x:auto;padding:4px 2px 10px;scroll-snap-type:x mandatory}
+.hcard{flex:none;width:150px;scroll-snap-align:start}
+.hcard .cv{aspect-ratio:1;border-radius:10px;overflow:hidden;background:var(--sunk);box-shadow:0 6px 16px rgba(0,0,0,.18);display:grid;place-items:center;color:var(--soft);font:700 28px "League Spartan",sans-serif}
+.hcard .cv img{width:100%;height:100%;object-fit:cover}
+.hcard b{margin-top:8px;font-size:14px;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.hcard span{display:block;color:var(--soft);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.section{margin-top:22px}
+.shead{display:flex;flex-wrap:wrap;gap:10px;align-items:baseline;justify-content:space-between;margin-bottom:12px}
+.tools{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.field{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:10px 12px;font:inherit}
+.tools .q{flex:1 1 240px}
+.tabs,.genres{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.st{display:flex;gap:12px;align-items:center;text-align:left;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:12px;cursor:pointer;width:100%}
+.st:hover,.st:focus-visible{border-color:var(--accent);outline:none}
+.st.playing{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.st .logo{width:48px;height:48px}
+.st .t{flex:1}
+.st b{display:block;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.st small{display:block;color:var(--soft);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fav{flex:none;border:0;background:none;cursor:pointer;font-size:20px;line-height:1;color:var(--soft);padding:4px}
+.fav.on{color:var(--accent)}
+.empty{color:var(--soft);padding:20px 0}
+.foot{color:var(--soft);font-size:12.5px;margin-top:26px}
+@media (max-width:640px){.player{grid-template-columns:1fr}.sleeve{max-width:300px;width:100%;margin:0 auto}}
+</style>
+</head>
+<body>
+<main>
+  <h1>Radio</h1>
+  <p class="sub">Free stations from around the world. When a station shares what it's playing, you'll see the song and its album cover.</p>
+
+  <section class="card player" aria-label="Now playing">
+    <div class="sleeve" id="sleeve"><div class="vinyl" id="vinyl"></div><img id="cover" alt="" hidden></div>
+    <div>
+      <span class="onair" id="onair"><i></i><span id="onairTxt">Pick a station</span></span>
+      <div class="song" id="song">Nothing playing yet</div>
+      <div class="artist" id="artist"></div>
+      <div class="album" id="album"></div>
+      <div class="station" id="stationRow" hidden><div class="logo" id="stLogo"></div><div><b id="stName"></b><div class="album" id="stMeta"></div></div></div>
+      <div class="ctrls">
+        <button class="play" id="play" type="button" aria-label="Play" disabled></button>
+        <label class="vol"><span aria-hidden="true">🔈</span><input id="vol" type="range" min="0" max="1" step="0.01" value="0.8" aria-label="Volume"><span aria-hidden="true">🔊</span></label>
+        <button class="ghost" id="favNow" type="button" hidden>☆ Favourite</button>
+      </div>
+      <div class="msg" id="msg" role="status"></div>
+    </div>
+  </section>
+
+  <section class="section" id="histSec" hidden>
+    <div class="shead"><h2>Recently played</h2><button class="ghost" id="clearHist" type="button">Clear</button></div>
+    <div class="hist" id="hist"></div>
+  </section>
+
+  <section class="section">
+    <div class="shead"><h2>Stations</h2><span class="album" id="count"></span></div>
+    <form class="tools" id="searchForm">
+      <input class="field q" id="q" type="search" placeholder="Search stations, e.g. Triple J, jazz, BBC" aria-label="Search stations">
+      <select class="field" id="country" aria-label="Country"><option value="">Any country</option></select>
+      <button class="ghost" type="submit">Search</button>
+    </form>
+    <div class="tabs" id="tabs"></div>
+    <div class="genres" id="genres"></div>
+    <div class="grid" id="grid"><p class="empty">Loading stations…</p></div>
+  </section>
+  <p class="foot">Station list from Radio Browser, a free community directory. Album covers from Apple Music. Some stations don't share song details, so you'll see their logo instead.</p>
+</main>
+<audio id="audio" preload="none"></audio>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const store = { get(k, d) { try { const v = localStorage.getItem("hdradio." + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+                  set(k, v) { try { localStorage.setItem("hdradio." + k, JSON.stringify(v)); } catch (e) {} } };
+  const audio = $("audio");
+  const S = { cur: null, now: null, poll: 0, list: [], tab: store.get("tab", "au"), genre: "", favs: store.get("favs", []), hist: store.get("hist", []), loading: false };
+  const ICON = { play: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>', pause: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>',
+    load: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="8" stroke-dasharray="30 60"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="1s" repeatCount="indefinite"/></circle></svg>' };
+  const vinyl = (label) => `<svg viewBox="0 0 200 200" aria-hidden="true"><circle cx="100" cy="100" r="98" fill="#141416"/>${[88, 76, 64, 52].map((r) => `<circle cx="100" cy="100" r="${r}" fill="none" stroke="#2a2a2e" stroke-width="1.2"/>`).join("")}<circle cx="100" cy="100" r="36" fill="#e8b923"/><text x="100" y="93" text-anchor="middle" font-family="League Spartan,sans-serif" font-weight="700" font-size="16" fill="#141414">${esc(String(label || "FM").slice(0, 6))}</text><circle cx="100" cy="100" r="3.5" fill="#141416"/></svg>`;
+  const initials = (n) => String(n || "?").replace(/[^A-Za-z0-9 ]/g, "").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "FM";
+  const https = (u) => /^https:\/\//i.test(String(u || ""));
+  const logoEl = (st) => { const d = document.createElement("div"); d.className = "logo"; d.textContent = initials(st.name);
+    if (https(st.favicon)) { const i = new Image(); i.alt = ""; i.loading = "lazy"; i.referrerPolicy = "no-referrer"; i.onload = () => d.replaceChildren(i); i.src = st.favicon; } return d; };
+  const flag = (cc) => cc && cc.length === 2 ? String.fromCodePoint(...[...cc.toUpperCase()].map((c) => 127397 + c.charCodeAt(0))) : "";
+  const metaLine = (st) => [flag(st.countrycode) + " " + (st.country || ""), st.codec && st.codec + (st.bitrate ? " " + st.bitrate + "k" : ""), (st.tags || "").split(",").slice(0, 2).join(", ")].filter((x) => String(x || "").trim()).join(" · ");
+
+  async function api(path, params) {
+    const r = await fetch("/radio/api/stations?" + new URLSearchParams({ path, ...params }), { credentials: "same-origin" });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "The station list didn't load.");
+    return r.json();
+  }
+  const playable = (s) => https(s.url_resolved) && !s.hls && !/\.m3u8(\?|$)/i.test(s.url_resolved);
+
+  // ---------- browse ----------
+  const TABS = [["au", "Australia"], ["top", "Most popular"], ["favs", "Favourites"], ["search", "Search results"]];
+  const GENRES = ["pop", "rock", "news", "jazz", "classical", "dance", "country", "chillout", "80s", "hip hop", "talk", "sport"];
+  function btn(label, on, fn) { const b = document.createElement("button"); b.type = "button"; b.className = "ghost" + (on ? " on" : ""); b.textContent = label; b.onclick = fn; return b; }
+  function drawTabs() {
+    $("tabs").replaceChildren(...TABS.filter(([k]) => k !== "search" || S.tab === "search")
+      .map(([k, l]) => btn(l + (k === "favs" && S.favs.length ? " (" + S.favs.length + ")" : ""), S.tab === k, () => { S.genre = ""; load(k); })));
+    $("genres").replaceChildren(...GENRES.map((g) => btn(g[0].toUpperCase() + g.slice(1), S.genre === g, () => { S.genre = S.genre === g ? "" : g; load(S.genre ? "genre" : "au"); })));
+  }
+  async function load(tab) {
+    S.tab = tab; if (tab !== "search" && tab !== "genre") store.set("tab", tab); drawTabs();
+    $("grid").innerHTML = '<p class="empty">Loading stations…</p>';
+    const base = { is_https: "true", order: "clickcount", reverse: "true", limit: "80" };
+    const cc = $("country").value, ccq = cc ? { countrycode: cc } : {};
+    try {
+      let list;
+      if (tab === "favs") list = S.favs;
+      else if (tab === "au") list = await api("stations/search", { ...base, countrycode: "AU" });
+      else if (tab === "top") list = await api("stations/search", { ...base, ...ccq });
+      else if (tab === "genre") list = await api("stations/search", { ...base, tag: S.genre, ...ccq });
+      else list = await api("stations/search", { ...base, name: $("q").value.trim(), ...ccq });
+      const seen = new Set();
+      S.list = (Array.isArray(list) ? list : []).filter(playable).filter((s) => { const k = String(s.name || "").trim().toLowerCase() + "|" + s.countrycode; if (seen.has(k)) return false; seen.add(k); return true; });
+      drawGrid();
+    } catch (e) { $("grid").innerHTML = '<p class="empty">' + esc(e.message) + "</p>"; $("count").textContent = ""; }
+  }
+  function drawGrid() {
+    $("count").textContent = S.list.length ? S.list.length + " stations" : "";
+    if (!S.list.length) { $("grid").innerHTML = '<p class="empty">' + (S.tab === "favs" ? "No favourites yet. Tap ☆ on any station to keep it here." : "No stations found. Try another search or country.") + "</p>"; return; }
+    $("grid").replaceChildren(...S.list.map((st) => {
+      const b = document.createElement("div"); b.className = "st" + (S.cur && S.cur.stationuuid === st.stationuuid ? " playing" : ""); b.tabIndex = 0; b.setAttribute("role", "button");
+      b.setAttribute("aria-label", "Play " + st.name);
+      const t = document.createElement("div"); t.className = "t"; t.innerHTML = "<b>" + esc(String(st.name).trim()) + "</b><small>" + esc(metaLine(st)) + "</small>";
+      const on = isFav(st), f = document.createElement("button"); f.type = "button"; f.className = "fav" + (on ? " on" : ""); f.textContent = on ? "★" : "☆";
+      f.setAttribute("aria-label", (on ? "Remove from" : "Add to") + " favourites");
+      f.onclick = (e) => { e.stopPropagation(); toggleFav(st); };
+      b.append(logoEl(st), t, f);
+      b.onclick = () => play(st); b.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); play(st); } };
+      return b; }));
+  }
+  const isFav = (st) => S.favs.some((x) => x.stationuuid === st.stationuuid);
+  function toggleFav(st) {
+    S.favs = isFav(st) ? S.favs.filter((x) => x.stationuuid !== st.stationuuid)
+      : [...S.favs, { stationuuid: st.stationuuid, name: st.name, url_resolved: st.url_resolved, favicon: st.favicon, country: st.country, countrycode: st.countrycode, codec: st.codec, bitrate: st.bitrate, tags: st.tags, hls: st.hls }];
+    store.set("favs", S.favs); if (S.tab === "favs") S.list = S.favs.slice(); drawTabs(); drawGrid(); drawFavNow();
+  }
+  function drawFavNow() { const b = $("favNow"); if (!S.cur) { b.hidden = true; return; } b.hidden = false; const on = isFav(S.cur); b.textContent = on ? "★ Favourite" : "☆ Favourite"; b.classList.toggle("on", on); }
+  $("favNow").onclick = () => S.cur && toggleFav(S.cur);
+
+  // ---------- player ----------
+  function setPlayIcon() {
+    const b = $("play"), st = !S.cur ? "play" : S.loading ? "load" : audio.paused ? "play" : "pause";
+    b.innerHTML = ICON[st]; b.disabled = !S.cur; b.setAttribute("aria-label", st === "pause" ? "Pause" : st === "load" ? "Loading" : "Play");
+    const live = !!S.cur && !audio.paused && !S.loading;
+    $("onair").classList.toggle("live", live); $("onairTxt").textContent = !S.cur ? "Pick a station" : S.loading ? "Tuning in…" : live ? "On air" : "Paused";
+    $("sleeve").classList.toggle("spin", live);
+  }
+  function play(st) {
+    S.cur = st; S.now = null; S.loading = true; $("msg").textContent = ""; $("msg").classList.remove("err");
+    audio.src = st.url_resolved; audio.volume = +$("vol").value;
+    audio.play().catch((e) => { if (e && e.name === "AbortError") return; fail(); });
+    showStation(); showNow(null); drawGrid(); drawFavNow();
+    clearInterval(S.poll); setTimeout(pollNow, 1500); S.poll = setInterval(pollNow, 20000);
+  }
+  function fail() { if (!S.cur) return; $("msg").textContent = "This station isn't broadcasting right now. Try another one."; $("msg").classList.add("err"); S.loading = false; setPlayIcon(); }
+  audio.addEventListener("playing", () => { S.loading = false; setPlayIcon(); });
+  audio.addEventListener("waiting", () => { S.loading = true; setPlayIcon(); });
+  audio.addEventListener("pause", setPlayIcon);
+  audio.addEventListener("error", fail);
+  $("play").onclick = () => { if (!S.cur) return; if (audio.paused) { S.loading = true; setPlayIcon(); audio.src = S.cur.url_resolved; audio.play().catch(fail); pollNow(); } else { audio.pause(); } };
+  $("vol").value = store.get("vol", 0.8); audio.volume = +$("vol").value;
+  $("vol").oninput = () => { audio.volume = +$("vol").value; store.set("vol", +$("vol").value); };
+
+  function showStation() {
+    const st = S.cur; $("stationRow").hidden = !st; if (!st) return;
+    $("stLogo").replaceWith(Object.assign(logoEl(st), { id: "stLogo" }));
+    $("stName").textContent = String(st.name).trim(); $("stMeta").textContent = metaLine(st);
+  }
+  function showNow(n) {
+    const st = S.cur, cover = $("cover");
+    $("song").textContent = n && n.song ? n.song : st ? String(st.name).trim() : "Nothing playing yet";
+    $("artist").textContent = n && n.artist ? n.artist : st && !(n && n.title) ? "Song details aren't shared by this station" : "";
+    $("album").textContent = n && n.album ? n.album + (n.year ? " · " + n.year : "") : "";
+    $("vinyl").innerHTML = vinyl(st ? initials(st.name) : "FM");
+    if (n && n.art) {
+      cover.onload = () => { if (S.now === n) { cover.hidden = false; } };
+      cover.onerror = () => { cover.hidden = true; };
+      cover.alt = "Album cover: " + (n.album || n.song || ""); cover.src = n.art;
+    } else {
+      cover.hidden = true;
+      if (st && https(st.favicon)) { const i = new Image(); i.referrerPolicy = "no-referrer";
+        i.onload = () => { if (S.cur === st && !(S.now && S.now.art)) { cover.alt = "Station logo"; cover.src = st.favicon; cover.style.objectFit = "contain"; cover.style.background = "#fff"; cover.hidden = false; } };
+        i.src = st.favicon; }
+    }
+    if (n && n.art) { cover.style.objectFit = "cover"; cover.style.background = ""; }
+    setPlayIcon();
+    if ("mediaSession" in navigator && st) {
+      try { navigator.mediaSession.metadata = new MediaMetadata({ title: (n && n.song) || String(st.name).trim(), artist: (n && n.artist) || String(st.name).trim(), album: (n && n.album) || "",
+        artwork: n && n.art ? [{ src: n.art, sizes: "600x600", type: "image/jpeg" }] : https(st.favicon) ? [{ src: st.favicon }] : [] }); } catch (e) {}
+    }
+  }
+  async function pollNow() {
+    const st = S.cur; if (!st || (audio.paused && !S.loading)) return;
+    try {
+      const r = await fetch("/radio/api/now?u=" + encodeURIComponent(st.url_resolved), { credentials: "same-origin" });
+      const n = await r.json(); if (S.cur !== st || !n || !n.ok) return;
+      if (!S.now || S.now.title !== n.title) { S.now = n; showNow(n); if (n.title) addHist(n, st); }
+    } catch (e) { /* keep what's shown */ }
+  }
+  function addHist(n, st) {
+    if (S.hist[0] && S.hist[0].title === n.title) return;
+    S.hist = [{ title: n.title, song: n.song, artist: n.artist, art: n.art, album: n.album, station: String(st.name).trim(), at: Date.now() }, ...S.hist].slice(0, 30);
+    store.set("hist", S.hist); drawHist();
+  }
+  function drawHist() {
+    $("histSec").hidden = !S.hist.length;
+    $("hist").replaceChildren(...S.hist.map((h) => { const d = document.createElement("div"); d.className = "hcard";
+      const t = new Date(h.at).toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit" });
+      d.innerHTML = '<div class="cv">' + (h.art ? '<img src="' + esc(h.art.replace("600x600bb", "300x300bb")) + '" alt="Album cover: ' + esc(h.album || h.song) + '" loading="lazy">' : "♪") + "</div><b>" + esc(h.song || h.title) + "</b><span>" + esc(h.artist || "") + "</span><span>" + esc(h.station + " · " + t) + "</span>";
+      return d; }));
+  }
+  $("clearHist").onclick = () => { S.hist = []; store.set("hist", []); drawHist(); };
+
+  // ---------- start ----------
+  $("searchForm").onsubmit = (e) => { e.preventDefault(); S.genre = ""; load($("q").value.trim() ? "search" : "top"); };
+  $("country").onchange = () => load(S.tab === "genre" ? "genre" : S.tab === "search" ? "search" : "top");
+  api("countries", { order: "stationcount", reverse: "true" }).then((cs) => {
+    const sel = $("country");
+    cs.filter((c) => c.iso_3166_1 && c.stationcount > 20).sort((a, b) => a.name.localeCompare(b.name))
+      .forEach((c) => { const o = document.createElement("option"); o.value = c.iso_3166_1; o.textContent = flag(c.iso_3166_1) + " " + c.name; sel.append(o); });
+  }).catch(() => {});
+  $("vinyl").innerHTML = vinyl("FM"); setPlayIcon(); drawHist(); load(S.tab === "search" || S.tab === "genre" ? "au" : S.tab);
+})();
+</script>
+</body>
+</html>

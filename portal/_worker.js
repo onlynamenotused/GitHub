@@ -4,13 +4,14 @@
 // shared portal menu (nav.js + nav.css) added at the top, with their old cross-links removed.
 const SB_URL = "https://sfuuzcgwbbhdjqzrchvv.supabase.co";
 const SB_KEY = "sb_publishable_uu0N60ZMVjJ1kl14FW1NBA_v-cm_U3_"; // publishable key: safe, RLS protects data
-const V = "40";
+const V = "41";
 const GATED = {
   kb: { page: "/_p/kb/", flag: "kb", name: "Knowledge Base" },
   catalogue: { page: "/_p/catalogue/", flag: "cat", name: "Parts Catalogue" },
   vector: { page: "/_p/vector/", flag: "vector", name: "Vector Converter" },  // staff, supervisors, customers with vector_access
   flute: { page: "/_p/flute/", flag: "flute", name: "Flute Practice player" },   // staff, customers with flute_access (off by default)
-  warehousing: { page: "/_p/warehousing/", flag: "intranet", name: "Warehousing" } // purchase orders, parts & stock: hello@ only
+  warehousing: { page: "/_p/warehousing/", flag: "intranet", name: "Warehousing" }, // purchase orders, parts & stock: hello@ only
+  radio: { page: "/_p/radio/", flag: null, name: "Radio" }   // free internet radio: every signed-in login
 };
 // Files the Warehousing page loads next to itself (served only to the same signed-in hello@ account).
 const WH_FILES = new Set(["catalog-mimaki.json", "warranty-mimaki.json", "logo-bw.png"]);
@@ -107,6 +108,9 @@ async function apiRoute(req, env, url, p) {
       : await rpc("flute_revoke", { p_id: Number(b.id) || 0 }, token);
     return jres(r.ok ? r.j || { ok: true } : { ok: false, error: (r.j && (r.j.message || r.j.error)) || "Couldn't save that." });
   }
+  // Radio: station directory (Radio Browser, a free community list) and "now playing" for one stream.
+  if (p === "/radio/api/stations") return radioStations(url);
+  if (p === "/radio/api/now") return radioNow(url);
   if (p === "/vector/log" && req.method === "POST") {
     const b = await req.json().catch(() => ({}));
     await rpc("log_vector_export", { p_kind: String(b.kind || "file").slice(0, 40) }, token);
@@ -157,6 +161,65 @@ async function apiRoute(req, env, url, p) {
   }
   return null;
 }
+// ---------- Radio ----------
+const RB_HOSTS = ["de1.api.radio-browser.info", "nl1.api.radio-browser.info", "at1.api.radio-browser.info", "de2.api.radio-browser.info", "fi1.api.radio-browser.info"];
+const RB_ALLOWED = new Set(["stations/search", "stations/topclick", "stations/topvote", "stations/byuuid", "countries", "tags"]);
+async function radioStations(url) {
+  const path = url.searchParams.get("path") || "stations/search";
+  if (!RB_ALLOWED.has(path)) return jres({ ok: false, error: "Not allowed" }, 400);
+  const q = new URLSearchParams(url.searchParams); q.delete("path");
+  if (path.startsWith("stations")) { if (!q.has("hidebroken")) q.set("hidebroken", "true"); if (!q.has("limit")) q.set("limit", "60"); }
+  for (const host of RB_HOSTS) {
+    try {
+      const r = await fetch(`https://${host}/json/${path}${path === "stations/topclick" || path === "stations/topvote" ? "/" + (q.get("limit") || "60") : ""}?${q}`,
+        { headers: { "User-Agent": "HighwayServiceDesk/1.0 (portal.highwaydigital.com.au)" }, cf: { cacheTtl: 600, cacheEverything: true } });
+      if (!r.ok) continue;
+      return new Response(await r.text(), { headers: { "content-type": "application/json", "Cache-Control": "private, max-age=300" } });
+    } catch (e) { /* next mirror */ }
+  }
+  return jres({ ok: false, error: "The station directory didn't answer. Try again shortly." }, 502);
+}
+// Reads the stream's ICY "StreamTitle" (artist - song) from the first metadata block, then looks up the album cover on iTunes.
+async function radioNow(url) {
+  const u = url.searchParams.get("u") || "";
+  let su; try { su = new URL(u); } catch (e) { return jres({ ok: false }, 400); }
+  if (!/^https?:$/.test(su.protocol)) return jres({ ok: false }, 400);
+  let title = "";
+  const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), 7000);
+  try {
+    const r = await fetch(su.toString(), { headers: { "Icy-MetaData": "1", "User-Agent": "HighwayServiceDesk/1.0" }, signal: ctl.signal });
+    const mi = parseInt(r.headers.get("icy-metaint") || "0", 10);
+    if (r.ok && r.body && mi > 0 && mi < 200000) {
+      const rd = r.body.getReader(); let got = 0, need = mi + 1 + 4080, buf = new Uint8Array(need), len = -1;
+      while (got < need) {
+        const { value, done } = await rd.read(); if (done) break;
+        const n = Math.min(value.length, need - got); buf.set(value.subarray(0, n), got); got += n;
+        if (len < 0 && got > mi) { len = buf[mi] * 16; need = mi + 1 + len; if (!len) break; }
+      }
+      rd.cancel().catch(() => {});
+      if (len > 0 && got >= mi + 1 + len) {
+        const meta = new TextDecoder("utf-8").decode(buf.subarray(mi + 1, mi + 1 + len)).replace(/\0+$/, "");
+        const m = meta.match(/StreamTitle='([\s\S]*?)';/); title = m ? m[1].trim() : "";
+      }
+    } else if (r.body) r.body.cancel().catch(() => {});
+  } catch (e) { /* no metadata */ } finally { clearTimeout(timer); }
+  let artist = "", song = title;
+  const sp = title.split(/\s+[-–—]\s+/);
+  if (sp.length >= 2) { artist = sp[0].trim(); song = sp.slice(1).join(" - ").trim(); }
+  let art = "", album = "", year = "";
+  if (title && !/^(unknown|advert|commercial|station id)/i.test(title)) {
+    try {
+      const term = (artist ? artist + " " : "") + song.replace(/\(.*?\)|\[.*?\]/g, "");
+      const r = await fetch("https://itunes.apple.com/search?" + new URLSearchParams({ term: term.slice(0, 120), media: "music", entity: "song", limit: "1", country: "AU" }),
+        { cf: { cacheTtl: 86400, cacheEverything: true } });
+      const j = await r.json().catch(() => ({}));
+      const x = j.results && j.results[0];
+      if (x) { art = String(x.artworkUrl100 || "").replace(/100x100bb/, "600x600bb"); album = x.collectionName || ""; year = String(x.releaseDate || "").slice(0, 4);
+        if (!artist) artist = x.artistName || ""; }
+    } catch (e) { /* no cover */ }
+  }
+  return jres({ ok: true, title, artist, song, art, album, year });
+}
 function quoteBlock(f) {
   const q = JSON.stringify({ customer: !!f.customer, email: f.email || "" });
   return `<script>window.HDQ=${q.replace(/</g, "\\u003c")};</script><link rel="stylesheet" href="/quote.css?v=${V}"><script src="/quote.js?v=${V}" defer></script>`;
@@ -166,13 +229,13 @@ export default {
   async fetch(req, env) {
     const url = new URL(req.url);
     const p = url.pathname;
-    if (p === "/_src/catalogue" || p === "/vector/log" || p.startsWith("/flute/api/") || p.startsWith("/catalogue/quote") || p.startsWith("/service/")) {
+    if (p === "/_src/catalogue" || p === "/vector/log" || p.startsWith("/flute/api/") || p.startsWith("/radio/api/") || p.startsWith("/catalogue/quote") || p.startsWith("/service/")) {
       const r = await apiRoute(req, env, url, p);
       if (r) return r;
     }
     if (p.startsWith("/_p/")) return new Response("Not found", { status: 404 });
     if (/^\/po(\/|$)/.test(p)) return Response.redirect(url.origin + "/warehousing/", 302);
-    const key = /^\/kb(\/|$)/.test(p) ? "kb" : /^\/catalogue(\/|$)/.test(p) ? "catalogue" : /^\/vector(\/|$)/.test(p) ? "vector" : /^\/flute(\/|$)/.test(p) ? "flute" : /^\/warehousing(\/|$)/.test(p) ? "warehousing" : null;
+    const key = /^\/kb(\/|$)/.test(p) ? "kb" : /^\/catalogue(\/|$)/.test(p) ? "catalogue" : /^\/vector(\/|$)/.test(p) ? "vector" : /^\/flute(\/|$)/.test(p) ? "flute" : /^\/warehousing(\/|$)/.test(p) ? "warehousing" : /^\/radio(\/|$)/.test(p) ? "radio" : null;
     if (!key) return env.ASSETS.fetch(req);
     const whFile = key === "warehousing" ? p.slice("/warehousing/".length) : "";
     if (whFile && WH_FILES.has(whFile)) {
@@ -216,7 +279,8 @@ export default {
     const h = new Headers(out.headers);
     h.set("Cache-Control", "private, no-store");
     h.set("X-Robots-Tag", "noindex");
-    if (key === "flute") h.set("Permissions-Policy", "microphone=(self)");   // the player listens to the customer playing
+    if (key === "flute") h.set("Permissions-Policy", "microphone=(self)");
+    if (key === "radio") h.set("Permissions-Policy", "autoplay=(self)");   // the player listens to the customer playing
     h.delete("Content-Length");
     return new Response(out.body, { status: page.status, headers: h });
   }
