@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Weather · Highway Service Desk</title><meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+/* VOICE: a field tech's weather desk: where am I working tomorrow, can I get there, what's the sea doing
+   PICTURE: the whole of Australia and New Zealand behind the page, every city wearing its temperature */
+:root{--ink:#eef2f6;--soft:#a9b4c0;--line:rgba(255,255,255,.14);--panel:rgba(12,16,22,.78);--sunk:rgba(255,255,255,.06);--accent:#e8b923;--sea:#38bdf8;--hot:#f97316;--cold:#60a5fa;--ok:#4ade80;color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:#06090d;color:var(--ink);font:15px/1.5 Inter,system-ui,sans-serif}
+#bgmap{position:fixed;inset:0;z-index:0;background:#06090d}
+#hd-nav{position:relative;z-index:5}
+#bgmap .leaflet-tile-pane{filter:saturate(.8) brightness(.95)}
+.veil{position:fixed;inset:0;z-index:1;pointer-events:none;background:linear-gradient(90deg,rgba(6,9,13,.15),rgba(6,9,13,.05) 40%,rgba(6,9,13,.15))}
+main{position:relative;z-index:2;max-width:1240px;margin:0 auto;padding:18px max(16px,env(safe-area-inset-right,0px)) 80px max(16px,env(safe-area-inset-left,0px));pointer-events:none}
+main>*{pointer-events:auto}
+.spacer{height:min(34vh,320px);pointer-events:none}
+h1,h2,h3{font-family:"League Spartan",Inter,sans-serif;margin:0;line-height:1.1;text-wrap:balance}
+h1{font-size:clamp(28px,4.5vw,40px)}h2{font-size:21px;margin-bottom:10px}h3{font-size:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 12px 30px rgba(0,0,0,.35)}
+.muted{color:var(--soft)}.small{font-size:13px}.mono{font-family:"JetBrains Mono",monospace;font-size:.9em}
+.top{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+.pick{display:flex;flex-wrap:wrap;gap:8px;align-items:center;position:relative}
+.field{border:1px solid var(--line);background:rgba(0,0,0,.45);color:var(--ink);border-radius:10px;padding:10px 12px;font:inherit}
+select.field{max-width:260px}
+.search{position:relative}.search input{width:240px;border:2px solid var(--accent)}
+.sugg{position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:30;background:#0d1218;border:1px solid var(--line);border-radius:10px;overflow:hidden;box-shadow:0 12px 30px rgba(0,0,0,.5)}
+.sugg button{all:unset;box-sizing:border-box;display:block;width:100%;padding:8px 12px;cursor:pointer}.sugg button:hover,.sugg button:focus{background:var(--sunk);color:var(--accent)}
+.btn{border:1px solid var(--line);background:rgba(0,0,0,.45);color:var(--ink);border-radius:999px;padding:8px 14px;font:600 14px Inter,sans-serif;cursor:pointer}
+.btn:hover{border-color:var(--accent)}.btn.on{background:var(--accent);color:#141414;border-color:var(--accent)}
+.grid{display:grid;gap:14px;margin-top:14px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(min(100%,520px),1fr))}
+.now{display:grid;grid-template-columns:auto 1fr;gap:18px;align-items:center}
+.big{font:700 clamp(56px,9vw,92px)/1 "League Spartan",sans-serif;letter-spacing:-.02em}
+.ico{font-size:56px;line-height:1}
+.facts{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-top:12px}
+.fact{background:var(--sunk);border-radius:10px;padding:8px 10px}.fact b{display:block;font-size:17px}.fact span{font-size:12px;color:var(--soft)}
+.days{display:grid;grid-template-columns:repeat(7,minmax(92px,1fr));gap:8px;overflow-x:auto;padding-bottom:4px}
+.day{background:var(--sunk);border-radius:12px;padding:10px;text-align:center}
+.day .d{font-weight:600}.day .i{font-size:28px;margin:4px 0}.day .t b{color:var(--hot)}.day .t span{color:var(--cold)}
+.chart{width:100%;height:auto;display:block}
+.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
+.tbl th{font:600 11px Inter,sans-serif;text-transform:uppercase;letter-spacing:.06em;color:var(--soft);text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl td{padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+.tscroll{overflow-x:auto}
+.arrow{display:inline-block;width:16px;text-align:center}
+.tides{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.tday{background:var(--sunk);border-radius:10px;padding:8px 10px}.tday b{display:block;margin-bottom:4px}
+.hi{color:var(--sea);font-weight:600}.lo{color:var(--soft)}
+.moon{display:grid;grid-template-columns:auto 1fr;gap:18px;align-items:center}
+.moons{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:6px;margin-top:12px}
+.moons div{background:var(--sunk);border-radius:8px;padding:6px 10px;font-size:13.5px}
+#sat{height:min(62vh,560px);border-radius:12px;overflow:hidden;border:1px solid var(--line);background:#000}
+.satbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+.satbar input[type=range]{flex:1 1 200px;accent-color:var(--accent)}
+.video{position:relative;aspect-ratio:16/9;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:#000}
+.video iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+#issmap{height:260px;border-radius:12px;overflow:hidden;border:1px solid var(--line);margin-top:10px}
+.tchip{background:rgba(8,12,18,.85);border:1px solid rgba(255,255,255,.25);border-radius:999px;padding:2px 8px;font:700 12px Inter,sans-serif;color:#fff;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.4);cursor:pointer;transform:translate(-50%,-50%);display:inline-block}
+.tchip.sel{background:var(--accent);color:#141414;border-color:var(--accent)}
+.tchip small{font-weight:500;opacity:.8;margin-left:4px}
+.leaflet-div-icon{background:none;border:0}
+.leaflet-container{font:inherit}
+.note{font-size:12.5px;color:var(--soft);margin-top:8px}
+.err{color:#fca5a5}
+.loading{color:var(--soft);padding:10px 0}
+@media (max-width:640px){.now{grid-template-columns:1fr}.search input{width:100%}.pick{width:100%}.spacer{height:24vh}}
+</style>
+</head>
+<body>
+<div id="bgmap" aria-hidden="true"></div><div class="veil"></div>
+<main>
+  <div class="card top">
+    <div><h1>Weather</h1><div class="muted small">Australia and New Zealand · forecasts, tides, swell, wind, moon and satellite</div></div>
+    <div class="pick">
+      <select class="field" id="citySel" aria-label="Choose a city"></select>
+      <div class="search"><input class="field" id="q" type="search" placeholder="🔍 Any town in AU or NZ" aria-label="Search any town in Australia or New Zealand" autocomplete="off"><div class="sugg" id="sugg" hidden></div></div>
+      <button class="btn" id="locBtn" type="button" title="Use where I am now">📍 Near me</button>
+    </div>
+  </div>
+  <div class="spacer"></div>
+
+  <section class="card" id="nowCard"><p class="loading">Loading the forecast…</p></section>
+
+  <section class="card" style="margin-top:14px"><h2>7-day forecast</h2><div class="days" id="days"></div></section>
+
+  <div class="grid g2">
+    <section class="card"><h2>Next 48 hours</h2><div id="hours"></div></section>
+    <section class="card"><h2>Wind</h2><div id="wind"></div></section>
+  </div>
+
+  <div class="grid g2">
+    <section class="card"><h2>Tides</h2><div id="tides"></div></section>
+    <section class="card"><h2>Swell and waves</h2><div id="swell"></div></section>
+  </div>
+
+  <section class="card" style="margin-top:14px"><h2>Moon</h2><div id="moon"></div></section>
+
+  <section class="card" style="margin-top:14px">
+    <h2>Satellite</h2>
+    <div class="satbar">
+      <button class="btn on" type="button" data-band="ir">Infrared (day and night)</button>
+      <button class="btn" type="button" data-band="vis">Visible (daylight)</button>
+      <button class="btn" type="button" id="satPlay">❚❚ Pause</button>
+      <input type="range" id="satSlide" min="0" max="0" value="0" aria-label="Satellite frame">
+      <span class="mono small" id="satTime">—</span>
+    </div>
+    <div id="sat"></div>
+    <p class="note">Himawari-9 geostationary satellite (Japan Meteorological Agency, via NASA GIBS), the last 3 hours in 10–20 minute steps. Infrared shows cloud-top temperature, so it works at night: the whiter the cloud, the colder and higher it is.</p>
+  </section>
+
+  <section class="card" style="margin-top:14px">
+    <h2>Live from space</h2>
+    <p class="muted small" style="margin:0 0 10px">The Space Shuttle retired in 2011, so here's the next best thing: NASA's live stream (usually the International Space Station's cameras), and where the ISS is right now.</p>
+    <div class="video"><iframe id="issVideo" title="NASA live stream" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen loading="lazy"></iframe></div>
+    <div id="issmap"></div>
+    <p class="note" id="issTxt">Finding the ISS…</p>
+  </section>
+
+  <p class="note">Forecasts, tides and swell from Open-Meteo (Bureau of Meteorology, MetService and ECMWF models). Tides are modelled for the nearest open-sea point: a guide only, not for navigation. Moon times are calculated.</p>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+(() => {
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const store = { get(k, d) { try { const v = localStorage.getItem("hdwx." + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem("hdwx." + k, JSON.stringify(v)); } catch (e) {} } };
+
+// ---------- cities ----------
+const C = (n, r, lat, lon, cc = "AU") => ({ name: n, region: r, lat, lon, cc });
+const CITIES = [
+  C("Perth","WA",-31.95,115.86),C("Fremantle","WA",-32.05,115.75),C("Mandurah","WA",-32.53,115.72),C("Bunbury","WA",-33.33,115.64),C("Busselton","WA",-33.65,115.35),C("Margaret River","WA",-33.95,115.07),
+  C("Albany","WA",-35.02,117.88),C("Esperance","WA",-33.86,121.89),C("Geraldton","WA",-28.77,114.61),C("Kalgoorlie","WA",-30.75,121.47),C("Carnarvon","WA",-24.88,113.66),C("Exmouth","WA",-21.93,114.13),
+  C("Karratha","WA",-20.74,116.85),C("Port Hedland","WA",-20.31,118.6),C("Broome","WA",-17.96,122.24),C("Kununurra","WA",-15.77,128.74),
+  C("Darwin","NT",-12.46,130.84),C("Katherine","NT",-14.47,132.26),C("Alice Springs","NT",-23.7,133.88),C("Uluru","NT",-25.24,130.99),
+  C("Adelaide","SA",-34.93,138.6),C("Mount Gambier","SA",-37.83,140.78),C("Port Lincoln","SA",-34.73,135.86),C("Whyalla","SA",-33.03,137.58),C("Port Augusta","SA",-32.49,137.77),
+  C("Melbourne","VIC",-37.81,144.96),C("Geelong","VIC",-38.15,144.36),C("Ballarat","VIC",-37.56,143.85),C("Bendigo","VIC",-36.76,144.28),C("Warrnambool","VIC",-38.38,142.48),C("Mildura","VIC",-34.19,142.16),C("Shepparton","VIC",-36.38,145.4),C("Traralgon","VIC",-38.2,146.54),
+  C("Hobart","TAS",-42.88,147.33),C("Launceston","TAS",-41.43,147.14),C("Devonport","TAS",-41.18,146.35),C("Burnie","TAS",-41.05,145.9),
+  C("Canberra","ACT",-35.28,149.13),
+  C("Sydney","NSW",-33.87,151.21),C("Newcastle","NSW",-32.93,151.78),C("Wollongong","NSW",-34.42,150.89),C("Central Coast","NSW",-33.43,151.34),C("Port Macquarie","NSW",-31.43,152.91),C("Coffs Harbour","NSW",-30.3,153.11),
+  C("Byron Bay","NSW",-28.64,153.61),C("Wagga Wagga","NSW",-35.11,147.37),C("Albury","NSW",-36.08,146.92),C("Dubbo","NSW",-32.25,148.6),C("Orange","NSW",-33.28,149.1),C("Tamworth","NSW",-31.09,150.93),C("Broken Hill","NSW",-31.95,141.47),
+  C("Brisbane","QLD",-27.47,153.03),C("Gold Coast","QLD",-28.02,153.4),C("Sunshine Coast","QLD",-26.65,153.07),C("Toowoomba","QLD",-27.56,151.95),C("Hervey Bay","QLD",-25.29,152.84),C("Bundaberg","QLD",-24.87,152.35),
+  C("Gladstone","QLD",-23.84,151.26),C("Rockhampton","QLD",-23.38,150.51),C("Mackay","QLD",-21.14,149.19),C("Townsville","QLD",-19.26,146.82),C("Cairns","QLD",-16.92,145.77),C("Mount Isa","QLD",-20.73,139.49),
+  C("Auckland","Auckland",-36.85,174.76,"NZ"),C("Whangārei","Northland",-35.73,174.32,"NZ"),C("Hamilton","Waikato",-37.79,175.28,"NZ"),C("Tauranga","Bay of Plenty",-37.69,176.17,"NZ"),C("Rotorua","Bay of Plenty",-38.14,176.25,"NZ"),
+  C("Gisborne","Gisborne",-38.66,178.02,"NZ"),C("Napier","Hawke's Bay",-39.49,176.91,"NZ"),C("New Plymouth","Taranaki",-39.06,174.08,"NZ"),C("Palmerston North","Manawatū",-40.35,175.61,"NZ"),C("Wellington","Wellington",-41.29,174.78,"NZ"),
+  C("Nelson","Nelson",-41.27,173.28,"NZ"),C("Blenheim","Marlborough",-41.51,173.96,"NZ"),C("Christchurch","Canterbury",-43.53,172.64,"NZ"),C("Timaru","Canterbury",-44.4,171.25,"NZ"),C("Queenstown","Otago",-45.03,168.66,"NZ"),
+  C("Dunedin","Otago",-45.87,170.5,"NZ"),C("Invercargill","Southland",-46.41,168.35,"NZ"),C("Greymouth","West Coast",-42.45,171.21,"NZ")
+];
+// Cities shown on the background map (one call for all of them)
+const MAPCITIES = ["Perth","Geraldton","Kalgoorlie","Albany","Esperance","Carnarvon","Karratha","Broome","Kununurra","Darwin","Katherine","Alice Springs","Adelaide","Port Lincoln","Mount Gambier","Melbourne","Mildura","Hobart","Launceston","Canberra","Sydney","Newcastle","Coffs Harbour","Dubbo","Broken Hill","Brisbane","Rockhampton","Mackay","Townsville","Cairns","Mount Isa","Auckland","Tauranga","Gisborne","Wellington","Christchurch","Queenstown","Dunedin","Invercargill","Nelson"]
+  .map((n) => CITIES.find((c) => c.name === n));
+
+// ---------- weather codes ----------
+const WMO = { 0: ["☀️", "Clear"], 1: ["🌤️", "Mostly clear"], 2: ["⛅", "Partly cloudy"], 3: ["☁️", "Cloudy"], 45: ["🌫️", "Fog"], 48: ["🌫️", "Freezing fog"], 51: ["🌦️", "Light drizzle"], 53: ["🌦️", "Drizzle"], 55: ["🌧️", "Heavy drizzle"],
+  56: ["🌧️", "Freezing drizzle"], 57: ["🌧️", "Freezing drizzle"], 61: ["🌦️", "Light rain"], 63: ["🌧️", "Rain"], 65: ["🌧️", "Heavy rain"], 66: ["🌧️", "Freezing rain"], 67: ["🌧️", "Freezing rain"], 71: ["🌨️", "Light snow"], 73: ["🌨️", "Snow"], 75: ["❄️", "Heavy snow"],
+  77: ["🌨️", "Snow grains"], 80: ["🌦️", "Showers"], 81: ["🌧️", "Heavy showers"], 82: ["⛈️", "Violent showers"], 85: ["🌨️", "Snow showers"], 86: ["❄️", "Heavy snow showers"], 95: ["⛈️", "Thunderstorm"], 96: ["⛈️", "Thunderstorm, hail"], 99: ["⛈️", "Severe thunderstorm, hail"] };
+const wx = (c, night) => { const w = WMO[c] || ["·", "—"]; return night && c <= 1 ? ["🌙", w[1]] : w; };
+const DIRS = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
+const compass = (d) => d == null ? "—" : DIRS[Math.round(((d % 360) + 360) % 360 / 22.5) % 16];
+// arrow pointing where the wind/swell is going (from + 180)
+const arrow = (d) => d == null ? "" : `<span class="arrow" style="transform:rotate(${(d + 180) % 360}deg)">↑</span>`;
+const r1 = (x) => x == null ? "—" : (Math.round(x * 10) / 10).toFixed(1);
+const r0 = (x) => x == null ? "—" : Math.round(x);
+const tempCol = (t) => t >= 35 ? "#ef4444" : t >= 28 ? "#f97316" : t >= 22 ? "#facc15" : t >= 15 ? "#4ade80" : t >= 8 ? "#38bdf8" : "#818cf8";
+
+// ---------- background map ----------
+const bg = L.map("bgmap", { zoomControl: false, attributionControl: true, scrollWheelZoom: false, dragging: true, worldCopyJump: false, minZoom: 3, maxZoom: 8 });
+L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", { subdomains: "abcd", attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · © <a href="https://carto.com/">CARTO</a>' }).addTo(bg);
+const fitBg = () => bg.fitBounds([[-47.5, 111], [-9.5, 179.5]], { paddingTopLeft: [0, window.innerHeight * 0.05] });
+fitBg(); addEventListener("resize", () => { clearTimeout(fitBg.t); fitBg.t = setTimeout(fitBg, 200); });
+const chips = new Map();
+async function loadMapTemps() {
+  const q = new URLSearchParams({ latitude: MAPCITIES.map((c) => c.lat).join(","), longitude: MAPCITIES.map((c) => c.lon).join(","), current: "temperature_2m,weather_code,is_day", daily: "temperature_2m_max,temperature_2m_min", forecast_days: "1", timezone: "auto" });
+  try {
+    const r = await fetch("https://api.open-meteo.com/v1/forecast?" + q); const arr = await r.json();
+    (Array.isArray(arr) ? arr : [arr]).forEach((d, i) => {
+      const c = MAPCITIES[i]; if (!d || !d.current) return;
+      const t = Math.round(d.current.temperature_2m), w = wx(d.current.weather_code, !d.current.is_day);
+      const html = `<span class="tchip" style="border-color:${tempCol(t)}">${w[0]} ${t}°<small>${esc(c.name)}</small></span>`;
+      const m = L.marker([c.lat, c.lon], { icon: L.divIcon({ html, className: "", iconSize: null }), title: `${c.name}: ${t}°C, ${w[1]}. Max ${Math.round(d.daily.temperature_2m_max[0])}°, min ${Math.round(d.daily.temperature_2m_min[0])}°` }).addTo(bg);
+      m.on("click", () => choose(c)); chips.set(c.name, m);
+    });
+    markSel();
+  } catch (e) { /* map still shows */ }
+}
+let selMarker = null;
+function markSel() {
+  chips.forEach((m, n) => { const el = m.getElement && m.getElement(); const s = el && el.querySelector(".tchip"); if (s) s.classList.toggle("sel", S.city && n === S.city.name); });
+  if (selMarker) selMarker.remove();
+  if (S.city && !chips.has(S.city.name)) selMarker = L.circleMarker([S.city.lat, S.city.lon], { radius: 8, color: "#e8b923", fillColor: "#e8b923", fillOpacity: .9 }).addTo(bg);
+}
+
+// ---------- city picking ----------
+const S = { city: null, fc: null, marine: null };
+function fillSelect() {
+  const sel = $("citySel"); const groups = {};
+  CITIES.forEach((c, i) => { const g = c.cc === "NZ" ? "New Zealand" : c.region; (groups[g] = groups[g] || []).push([c, i]); });
+  const order = ["WA","NT","SA","VIC","TAS","ACT","NSW","QLD","New Zealand"];
+  sel.innerHTML = order.map((g) => `<optgroup label="${esc(g)}">${(groups[g] || []).map(([c, i]) => `<option value="${i}">${esc(c.name)}</option>`).join("")}</optgroup>`).join("");
+  sel.onchange = () => choose(CITIES[+sel.value]);
+}
+function choose(c) {
+  S.city = c; store.set("city", c);
+  const i = CITIES.findIndex((x) => x.name === c.name && x.cc === c.cc); if (i >= 0) $("citySel").value = String(i);
+  markSel(); loadCity(); satCenter();
+}
+let gTimer = 0;
+$("q").addEventListener("input", () => { clearTimeout(gTimer); const v = $("q").value.trim(); if (v.length < 2) { $("sugg").hidden = true; return; } gTimer = setTimeout(() => geo(v), 280); });
+$("q").addEventListener("keydown", (e) => { if (e.key === "Escape") $("sugg").hidden = true; if (e.key === "Enter") { const b = $("sugg").querySelector("button"); if (b) { e.preventDefault(); b.click(); } } });
+document.addEventListener("click", (e) => { if (!e.target.closest(".search")) $("sugg").hidden = true; });
+async function geo(v) {
+  try {
+    const [a, b] = await Promise.all(["AU", "NZ"].map((cc) => fetch("https://geocoding-api.open-meteo.com/v1/search?" + new URLSearchParams({ name: v, count: "8", countryCode: cc, language: "en" })).then((r) => r.json()).catch(() => ({}))));
+    const res = [...(a.results || []), ...(b.results || [])].sort((x, y) => (y.population || 0) - (x.population || 0)).slice(0, 10);
+    const box = $("sugg");
+    if (!res.length) { box.innerHTML = '<div class="small muted" style="padding:8px 12px">No town found in Australia or New Zealand</div>'; box.hidden = false; return; }
+    box.replaceChildren(...res.map((x) => { const bt = document.createElement("button"); bt.type = "button";
+      bt.innerHTML = `${esc(x.name)} <span class="muted small">${esc([x.admin1, x.country_code === "NZ" ? "NZ" : "AU"].filter(Boolean).join(", "))}</span>`;
+      bt.onclick = () => { box.hidden = true; $("q").value = ""; choose({ name: x.name, region: x.admin1 || "", lat: x.latitude, lon: x.longitude, cc: x.country_code }); }; return bt; }));
+    box.hidden = false;
+  } catch (e) {}
+}
+$("locBtn").onclick = () => {
+  if (!navigator.geolocation) return;
+  $("locBtn").textContent = "📍 Finding you…";
+  navigator.geolocation.getCurrentPosition(async (p) => {
+    $("locBtn").textContent = "📍 Near me";
+    const { latitude: lat, longitude: lon } = p.coords;
+    const near = CITIES.slice().sort((a, b) => Math.hypot(a.lat - lat, a.lon - lon) - Math.hypot(b.lat - lat, b.lon - lon))[0];
+    choose({ name: "Near me" + (near ? " (" + near.name + ")" : ""), region: "", lat, lon, cc: near ? near.cc : "AU" });
+  }, () => { $("locBtn").textContent = "📍 Near me"; }, { timeout: 10000 });
+};
+
+// ---------- forecast ----------
+const fmtDay = (iso, tz) => new Date(iso + "T12:00:00").toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short" });
+const hm = (iso) => { const [d, t] = iso.split("T"); const [h, m] = t.split(":").map(Number); return (h % 12 || 12) + (m ? ":" + String(m).padStart(2, "0") : "") + (h < 12 ? "am" : "pm"); };
+async function loadCity() {
+  const c = S.city; if (!c) return;
+  $("nowCard").innerHTML = `<p class="loading">Loading the forecast for ${esc(c.name)}…</p>`;
+  const q = new URLSearchParams({ latitude: c.lat, longitude: c.lon, timezone: "auto", forecast_days: "7", wind_speed_unit: "kmh",
+    current: "temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,is_day,wind_speed_10m,wind_direction_10m,wind_gusts_10m,precipitation,pressure_msl,cloud_cover",
+    hourly: "temperature_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,is_day",
+    daily: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max,wind_direction_10m_dominant,uv_index_max,sunrise,sunset" });
+  const mq = new URLSearchParams({ latitude: c.lat, longitude: c.lon, timezone: "auto", forecast_days: "7",
+    hourly: "sea_level_height_msl,wave_height,wave_direction,wave_period,swell_wave_height,swell_wave_direction,swell_wave_period,wind_wave_height,wind_wave_period,sea_surface_temperature",
+    current: "wave_height,wave_direction,wave_period,swell_wave_height,swell_wave_direction,swell_wave_period,sea_surface_temperature" });
+  try {
+    const [f, m] = await Promise.all([fetch("https://api.open-meteo.com/v1/forecast?" + q).then((r) => r.json()), fetch("https://marine-api.open-meteo.com/v1/marine?" + mq).then((r) => r.ok ? r.json() : null).catch(() => null)]);
+    if (S.city !== c) return;
+    S.fc = f; S.marine = m;
+    drawNow(); drawDays(); drawHours(); drawWind(); drawTides(); drawSwell();
+  } catch (e) { $("nowCard").innerHTML = `<p class="err">Couldn't load the forecast. Check your connection and try again.</p>`; }
+}
+function drawNow() {
+  const f = S.fc, c = S.city, cu = f.current, d = f.daily, w = wx(cu.weather_code, !cu.is_day);
+  const local = new Date().toLocaleString("en-AU", { timeZone: f.timezone, weekday: "long", hour: "numeric", minute: "2-digit" });
+  $("nowCard").innerHTML = `<div class="now"><div class="ico" aria-hidden="true">${w[0]}</div>
+    <div><h2 style="margin:0">${esc(c.name)}${c.region ? `<span class="muted small" style="font-family:Inter;font-weight:500"> · ${esc(c.region)}${c.cc === "NZ" ? ", NZ" : ""}</span>` : ""}</h2>
+      <div class="muted small">${esc(local)} local time · ${esc(f.timezone_abbreviation || f.timezone)}</div>
+      <div style="display:flex;gap:16px;align-items:baseline;flex-wrap:wrap"><span class="big" style="color:${tempCol(cu.temperature_2m)}">${r0(cu.temperature_2m)}°</span>
+        <span style="font-size:20px">${esc(w[1])}<br><span class="muted small">Feels like ${r0(cu.apparent_temperature)}° · today ${r0(d.temperature_2m_max[0])}° / ${r0(d.temperature_2m_min[0])}°</span></span></div></div></div>
+    <div class="facts">
+      <div class="fact"><b>${arrow(cu.wind_direction_10m)} ${r0(cu.wind_speed_10m)} km/h</b><span>Wind ${compass(cu.wind_direction_10m)}, gusts ${r0(cu.wind_gusts_10m)}</span></div>
+      <div class="fact"><b>${r0(cu.relative_humidity_2m)}%</b><span>Humidity</span></div>
+      <div class="fact"><b>${r0(d.precipitation_probability_max[0])}%</b><span>Rain chance today · ${r1(d.precipitation_sum[0])} mm</span></div>
+      <div class="fact"><b>${r1(d.uv_index_max[0])}</b><span>UV index max</span></div>
+      <div class="fact"><b>${hm(d.sunrise[0])} / ${hm(d.sunset[0])}</b><span>Sunrise / sunset</span></div>
+      <div class="fact"><b>${r0(cu.pressure_msl)} hPa</b><span>Pressure · cloud ${r0(cu.cloud_cover)}%</span></div>
+      ${S.marine && S.marine.current && S.marine.current.sea_surface_temperature != null ? `<div class="fact"><b>${r1(S.marine.current.sea_surface_temperature)}°</b><span>Sea temperature</span></div>` : ""}
+    </div>`;
+}
+function drawDays() {
+  const d = S.fc.daily;
+  $("days").innerHTML = d.time.map((t, i) => { const w = wx(d.weather_code[i]);
+    return `<div class="day"><div class="d">${i ? new Date(t + "T12:00").toLocaleDateString("en-AU", { weekday: "short" }) : "Today"}</div><div class="muted small">${new Date(t + "T12:00").toLocaleDateString("en-AU", { day: "numeric", month: "short" })}</div>
+      <div class="i" title="${esc(w[1])}">${w[0]}</div><div class="t"><b>${r0(d.temperature_2m_max[i])}°</b> <span>${r0(d.temperature_2m_min[i])}°</span></div>
+      <div class="small muted">💧 ${r0(d.precipitation_probability_max[i])}% · ${r1(d.precipitation_sum[i])} mm</div>
+      <div class="small muted">${arrow(d.wind_direction_10m_dominant[i])} ${compass(d.wind_direction_10m_dominant[i])} ${r0(d.wind_speed_10m_max[i])} km/h</div></div>`; }).join("");
+}
+// small SVG line chart
+function lineChart(xs, series, opts = {}) {
+  const W = 640, H = opts.h || 190, P = { l: 34, r: 10, t: 12, b: 26 };
+  const all = series.flatMap((s) => s.v.filter((x) => x != null));
+  let lo = Math.min(...all), hi = Math.max(...all); if (opts.zero) lo = Math.min(0, lo); if (hi - lo < 1) { hi += 1; lo -= 1; }
+  const pad = (hi - lo) * 0.1; lo -= pad; hi += pad;
+  const X = (i) => P.l + (i / (xs.length - 1)) * (W - P.l - P.r), Y = (v) => P.t + (1 - (v - lo) / (hi - lo)) * (H - P.t - P.b);
+  const ticks = [lo + pad, (lo + hi) / 2, hi - pad];
+  const grid = ticks.map((t) => `<line x1="${P.l}" x2="${W - P.r}" y1="${Y(t)}" y2="${Y(t)}" stroke="rgba(255,255,255,.1)"/><text x="${P.l - 4}" y="${Y(t) + 4}" fill="#a9b4c0" font-size="11" text-anchor="end">${opts.fmt ? opts.fmt(t) : Math.round(t)}</text>`).join("");
+  const xl = xs.map((x, i) => (opts.xlab && opts.xlab(x, i)) ? `<text x="${X(i)}" y="${H - 8}" fill="#a9b4c0" font-size="11" text-anchor="middle">${opts.xlab(x, i)}</text><line x1="${X(i)}" x2="${X(i)}" y1="${P.t}" y2="${H - P.b}" stroke="rgba(255,255,255,.06)"/>` : "").join("");
+  const now = opts.nowIdx != null ? `<line x1="${X(opts.nowIdx)}" x2="${X(opts.nowIdx)}" y1="${P.t}" y2="${H - P.b}" stroke="#e8b923" stroke-dasharray="3 3"/>` : "";
+  const lines = series.map((s) => { const pts = s.v.map((v, i) => v == null ? null : `${X(i).toFixed(1)},${Y(v).toFixed(1)}`).filter(Boolean).join(" ");
+    return (s.fill ? `<polygon points="${X(0)},${H - P.b} ${pts} ${X(xs.length - 1)},${H - P.b}" fill="${s.c}" opacity=".15"/>` : "") + `<polyline points="${pts}" fill="none" stroke="${s.c}" stroke-width="${s.w || 2}" ${s.dash ? 'stroke-dasharray="4 3"' : ""} stroke-linejoin="round"/>`; }).join("");
+  const marks = (opts.marks || []).map((m) => `<circle cx="${X(m.i)}" cy="${Y(m.v)}" r="3.5" fill="${m.c}"/><text x="${X(m.i)}" y="${Y(m.v) + (m.up ? -8 : 15)}" fill="${m.c}" font-size="10.5" text-anchor="middle">${m.t}</text>`).join("");
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(opts.label || "chart")}">${grid}${xl}${lines}${now}${marks}</svg>`;
+}
+const nowIndex = (times, tz) => { const n = new Date().toLocaleString("sv-SE", { timeZone: tz }).replace(" ", "T").slice(0, 13); const i = times.findIndex((t) => t.slice(0, 13) === n); return i < 0 ? 0 : i; };
+function drawHours() {
+  const h = S.fc.hourly, i0 = nowIndex(h.time, S.fc.timezone), sl = (a) => a.slice(i0, i0 + 48), xs = sl(h.time);
+  const lab = (x, i) => { const hh = +x.slice(11, 13); return hh === 0 ? new Date(x).toLocaleDateString("en-AU", { weekday: "short" }) : hh % 6 === 0 ? hm(x) : ""; };
+  $("hours").innerHTML = `<div class="small muted">Temperature (°C)</div>` + lineChart(xs, [{ v: sl(h.temperature_2m), c: "#f97316", fill: true }], { xlab: lab, label: "Temperature next 48 hours" }) +
+    `<div class="small muted" style="margin-top:8px">Rain chance (%) and rain (mm)</div>` + lineChart(xs, [{ v: sl(h.precipitation_probability), c: "#38bdf8", fill: true }, { v: sl(h.precipitation).map((x) => x * 10), c: "#a78bfa", dash: true }], { xlab: lab, zero: true, h: 130, label: "Rain next 48 hours" }) +
+    `<p class="note">Dashed purple line is rain in mm × 10.</p>`;
+}
+function drawWind() {
+  const h = S.fc.hourly, i0 = nowIndex(h.time, S.fc.timezone), sl = (a) => a.slice(i0, i0 + 48), xs = sl(h.time), cu = S.fc.current;
+  const lab = (x) => { const hh = +x.slice(11, 13); return hh === 0 ? new Date(x).toLocaleDateString("en-AU", { weekday: "short" }) : hh % 6 === 0 ? hm(x) : ""; };
+  const rose = `<svg viewBox="0 0 120 120" width="120" height="120" aria-label="Wind from ${compass(cu.wind_direction_10m)}"><circle cx="60" cy="60" r="54" fill="none" stroke="rgba(255,255,255,.2)"/>
+    ${["N","E","S","W"].map((d, i) => `<text x="${60 + 44 * Math.sin(i * Math.PI / 2)}" y="${64 - 44 * Math.cos(i * Math.PI / 2)}" fill="#a9b4c0" font-size="12" text-anchor="middle">${d}</text>`).join("")}
+    <g transform="rotate(${cu.wind_direction_10m} 60 60)"><line x1="60" y1="20" x2="60" y2="96" stroke="#e8b923" stroke-width="3"/><polygon points="60,104 52,88 68,88" fill="#e8b923"/></g>
+    <text x="60" y="64" fill="#fff" font-size="15" font-weight="700" text-anchor="middle">${r0(cu.wind_speed_10m)}</text></svg>`;
+  const rows = [];
+  for (let k = i0; k < Math.min(h.time.length, i0 + 24); k += 3) rows.push(`<tr><td>${k === i0 ? "Now" : hm(h.time[k])}</td><td>${arrow(h.wind_direction_10m[k])} ${compass(h.wind_direction_10m[k])}</td><td>${r0(h.wind_speed_10m[k])}</td><td>${r0(h.wind_gusts_10m[k])}</td></tr>`);
+  $("wind").innerHTML = `<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">${rose}<div><div style="font-size:22px;font-weight:700">${r0(cu.wind_speed_10m)} km/h from the ${compass(cu.wind_direction_10m)}</div><div class="muted">Gusts to ${r0(cu.wind_gusts_10m)} km/h · today's max ${r0(S.fc.daily.wind_speed_10m_max[0])} km/h, gusts ${r0(S.fc.daily.wind_gusts_10m_max[0])}</div></div></div>` +
+    lineChart(xs, [{ v: sl(h.wind_gusts_10m), c: "#f472b6", dash: true }, { v: sl(h.wind_speed_10m), c: "#e8b923", fill: true }], { xlab: lab, zero: true, h: 150, label: "Wind next 48 hours" }) +
+    `<p class="note">Gold: average wind · pink dashed: gusts (km/h). Arrows point the way the wind is blowing.</p>
+    <div class="tscroll"><table class="tbl"><thead><tr><th>Time</th><th>From</th><th>km/h</th><th>Gusts</th></tr></thead><tbody>${rows.join("")}</tbody></table></div>`;
+}
+// ---------- tides ----------
+function tideTurns(times, v) {
+  const out = [];
+  for (let i = 1; i < v.length - 1; i++) {
+    const a = v[i - 1], b = v[i], c = v[i + 1]; if (a == null || b == null || c == null) continue;
+    const hi = b >= a && b > c, lo = b <= a && b < c; if (!hi && !lo) continue;
+    const den = a - 2 * b + c, off = den ? (a - c) / (2 * den) : 0, h = b - (a - c) * off / 4;   // parabola through the three hours
+    const t = new Date(new Date(times[i] + ":00").getTime() + off * 3600e3);
+    out.push({ hi, h, t });
+  }
+  return out;
+}
+function drawTides() {
+  const m = S.marine, box = $("tides");
+  const v = m && m.hourly && m.hourly.sea_level_height_msl;
+  if (!v || v.every((x) => x == null)) { box.innerHTML = `<p class="muted">No sea data for ${esc(S.city.name)}: it's inland. Pick a coastal town for tides.</p>`; return; }
+  const times = m.hourly.time, turns = tideTurns(times, v), i0 = nowIndex(times, m.timezone);
+  const xs = times.slice(i0, i0 + 72), vs = v.slice(i0, i0 + 72);
+  const lab = (x) => { const hh = +x.slice(11, 13); return hh === 0 ? new Date(x).toLocaleDateString("en-AU", { weekday: "short" }) : hh === 12 ? "12pm" : ""; };
+  const byDay = {};
+  for (const t of turns) { const k = t.t.toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short" }); (byDay[k] = byDay[k] || []).push(t); }
+  const clock = (d) => d.toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit" });
+  box.innerHTML = lineChart(xs, [{ v: vs, c: "#38bdf8", fill: true }], { xlab: lab, h: 170, fmt: (t) => t.toFixed(1), marks: [], label: "Tide height next 3 days" }) +
+    `<div class="tides" style="margin-top:10px">${Object.entries(byDay).slice(0, 7).map(([d, ts]) => `<div class="tday"><b>${esc(d)}</b>${ts.map((t) => `<div><span class="${t.hi ? "hi" : "lo"}">${t.hi ? "High" : "Low"}</span> ${clock(t.t)} <span class="muted mono">${t.h >= 0 ? "+" : ""}${t.h.toFixed(2)} m</span></div>`).join("")}</div>`).join("")}</div>
+    <p class="note">Heights in metres above or below mean sea level at the nearest open-sea point (${r1(m.latitude)}, ${r1(m.longitude)}). Times are local. Harbour and estuary tides can differ by an hour or more: use the official tide tables for boating.</p>`;
+}
+function drawSwell() {
+  const m = S.marine, box = $("swell");
+  if (!m || !m.hourly || m.hourly.wave_height.every((x) => x == null)) { box.innerHTML = `<p class="muted">No sea data for ${esc(S.city.name)}: it's inland.</p>`; return; }
+  const h = m.hourly, cu = m.current || {}, i0 = nowIndex(h.time, m.timezone);
+  const rows = [];
+  for (let k = i0; k < h.time.length; k += 6) rows.push(`<tr><td>${k === i0 ? "Now" : new Date(h.time[k]).toLocaleDateString("en-AU", { weekday: "short" }) + " " + hm(h.time[k])}</td><td>${r1(h.swell_wave_height[k])} m</td><td>${r0(h.swell_wave_period[k])} s</td><td>${arrow(h.swell_wave_direction[k])} ${compass(h.swell_wave_direction[k])}</td><td>${r1(h.wind_wave_height[k])} m</td><td>${r1(h.wave_height[k])} m</td></tr>`);
+  const xs = h.time.slice(i0, i0 + 168).filter((_, i) => i % 3 === 0), pick = (a) => a.slice(i0, i0 + 168).filter((_, i) => i % 3 === 0);
+  const lab = (x) => +x.slice(11, 13) < 3 ? new Date(x).toLocaleDateString("en-AU", { weekday: "short" }) : "";
+  box.innerHTML = `<div class="facts" style="margin-top:0">
+      <div class="fact"><b>${r1(cu.swell_wave_height)} m</b><span>Swell height</span></div>
+      <div class="fact"><b>${r0(cu.swell_wave_period)} s</b><span>Swell period</span></div>
+      <div class="fact"><b>${arrow(cu.swell_wave_direction)} ${compass(cu.swell_wave_direction)}</b><span>Swell from</span></div>
+      <div class="fact"><b>${r1(cu.wave_height)} m</b><span>Total waves (sea + swell)</span></div></div>` +
+    `<div class="small muted" style="margin-top:10px">Next 7 days (m)</div>` + lineChart(xs, [{ v: pick(h.wave_height), c: "#94a3b8", dash: true }, { v: pick(h.swell_wave_height), c: "#38bdf8", fill: true }], { xlab: lab, zero: true, h: 150, fmt: (t) => t.toFixed(1), label: "Swell next 7 days" }) +
+    `<p class="note">Blue: swell · grey dashed: total wave height.</p><div class="tscroll"><table class="tbl"><thead><tr><th>When</th><th>Swell</th><th>Period</th><th>From</th><th>Wind waves</th><th>Total</th></tr></thead><tbody>${rows.join("")}</tbody></table></div>`;
+}
+
+// ---------- moon (Meeus, chapters 47–49: phases to within a few minutes) ----------
+const RAD = Math.PI / 180;
+function moonPhaseJDE(k) {   // k integer = new moon, k+0.5 = full moon
+  const T = k / 1236.85, E = 1 - 0.002516 * T - 0.0000074 * T * T;
+  let jde = 2451550.09766 + 29.530588861 * k + 0.00015437 * T * T - 0.00000015 * T ** 3 + 0.00000000073 * T ** 4;
+  const M = (2.5534 + 29.1053567 * k - 0.0000014 * T * T) * RAD, Mp = (201.5643 + 385.81693528 * k + 0.0107582 * T * T + 0.00001238 * T ** 3) * RAD,
+    F = (160.7108 + 390.67050284 * k - 0.0016118 * T * T) * RAD, Om = (124.7746 - 1.56375588 * k + 0.0020672 * T * T) * RAD;
+  const full = Math.abs(k % 1) === 0.5, s = Math.sin;
+  jde += full
+    ? -0.40614 * s(Mp) + 0.17302 * E * s(M) + 0.01614 * s(2 * Mp) + 0.01043 * s(2 * F) + 0.00734 * E * s(Mp - M) - 0.00515 * E * s(Mp + M) + 0.00209 * E * E * s(2 * M) - 0.00111 * s(Mp - 2 * F) - 0.00057 * s(Mp + 2 * F) + 0.00056 * E * s(2 * Mp + M) - 0.00042 * s(3 * Mp) + 0.00042 * E * s(M + 2 * F) + 0.00038 * E * s(M - 2 * F) - 0.00024 * E * s(2 * Mp - M) - 0.00017 * s(Om)
+    : -0.40720 * s(Mp) + 0.17241 * E * s(M) + 0.01608 * s(2 * Mp) + 0.01039 * s(2 * F) + 0.00739 * E * s(Mp - M) - 0.00514 * E * s(Mp + M) + 0.00208 * E * E * s(2 * M) - 0.00111 * s(Mp - 2 * F) - 0.00057 * s(Mp + 2 * F) + 0.00056 * E * s(2 * Mp + M) - 0.00042 * s(3 * Mp) + 0.00042 * E * s(M + 2 * F) + 0.00038 * E * s(M - 2 * F) - 0.00024 * E * s(2 * Mp - M) - 0.00017 * s(Om);
+  return jde;
+}
+const jdeToDate = (jde) => new Date((jde - 2440587.5) * 86400000 - 69000);   // TT to UTC (~69 s)
+// Distance to the moon at a date (km), for supermoons (Meeus ch. 47, main terms)
+function moonDistance(d) {
+  const T = ((d.getTime() / 86400000 + 2440587.5) - 2451545) / 36525;
+  const D = (297.8501921 + 445267.1114034 * T) * RAD, M = (357.5291092 + 35999.0502909 * T) * RAD, Mp = (134.9633964 + 477198.8675055 * T) * RAD, F = (93.272095 + 483202.0175233 * T) * RAD, c = Math.cos;
+  return 385000.56 + (-20905355 * c(Mp) - 3699111 * c(2 * D - Mp) - 2955968 * c(2 * D) - 569925 * c(2 * Mp) + 48888 * c(M) - 3149 * c(2 * F) + 246158 * c(2 * D - 2 * Mp) - 152138 * c(2 * D - M - Mp) - 170733 * c(2 * D + Mp) - 204586 * c(2 * D - M) - 129620 * c(M - Mp) + 108743 * c(D) + 104755 * c(M + Mp)) / 1000;
+}
+function drawMoon() {
+  const now = new Date(), tz = (S.fc && S.fc.timezone) || "Australia/Perth";
+  const k0 = Math.floor((now.getFullYear() + (now.getMonth() + now.getDate() / 31) / 12 - 2000) * 12.3685) - 2;
+  const phases = [];
+  for (let k = k0; k < k0 + 16; k++) for (const kk of [k, k + 0.5]) phases.push({ full: kk % 1 !== 0, d: jdeToDate(moonPhaseJDE(kk)) });
+  phases.sort((a, b) => a.d - b.d);
+  const lastNew = phases.filter((p) => !p.full && p.d <= now).pop(), nextNew = phases.find((p) => !p.full && p.d > now);
+  const age = (now - lastNew.d) / 86400000, syn = (nextNew.d - lastNew.d) / 86400000, frac = age / syn;
+  const illum = (1 - Math.cos(2 * Math.PI * frac)) / 2;
+  const name = frac < 0.03 || frac > 0.97 ? "New moon" : frac < 0.22 ? "Waxing crescent" : frac < 0.28 ? "First quarter" : frac < 0.47 ? "Waxing gibbous" : frac < 0.53 ? "Full moon" : frac < 0.72 ? "Waning gibbous" : frac < 0.78 ? "Last quarter" : "Waning crescent";
+  const fulls = phases.filter((p) => p.full && p.d > now).slice(0, 13), nextFull = fulls[0];
+  const fmt = (d) => d.toLocaleString("en-AU", { timeZone: tz, weekday: "short", day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
+  const days = (d) => Math.ceil((d - now) / 86400000);
+  // Southern hemisphere view: the lit side is on the left while waxing, on the right while waning.
+  const R = 54, rx = Math.abs(Math.cos(2 * Math.PI * frac)) * R, wax = frac < 0.5, gib = frac > 0.25 && frac < 0.75;
+  const edge = wax ? `A ${R} ${R} 0 0 0 60 ${60 + R}` : `A ${R} ${R} 0 0 1 60 ${60 + R}`;
+  const term = `A ${rx.toFixed(2)} ${R} 0 0 ${wax ? (gib ? 0 : 1) : (gib ? 1 : 0)} 60 ${60 - R}`;
+  const disc = `<svg viewBox="0 0 120 120" width="140" height="140" role="img" aria-label="${name}, ${Math.round(illum * 100)}% lit">
+    <circle cx="60" cy="60" r="${R}" fill="#1c2430"/><path d="M60 ${60 - R} ${edge} ${term} Z" fill="#f4efd8"/>
+    <circle cx="60" cy="60" r="${R}" fill="none" stroke="rgba(255,255,255,.25)"/></svg>`;
+  const sup = (d) => moonDistance(d) < 362000;
+  $("moon").innerHTML = `<div class="moon">${disc}<div>
+      <div style="font-size:24px;font-weight:700">${name}</div>
+      <div class="muted">${Math.round(illum * 100)}% lit · ${age.toFixed(1)} days old · as seen from the southern hemisphere</div>
+      <div style="margin-top:8px"><b>Next full moon:</b> ${fmt(nextFull.d)} <span class="muted">(${days(nextFull.d) <= 1 ? "within a day" : "in " + days(nextFull.d) + " days"})</span>${sup(nextFull.d) ? ' <span style="color:var(--accent);font-weight:600">· supermoon</span>' : ""}</div>
+      <div><b>Next new moon:</b> ${fmt(nextNew.d)}</div></div></div>
+    <h3 style="margin-top:14px">Full moons for the next year</h3>
+    <div class="moons">${fulls.map((p) => `<div>🌕 ${fmt(p.d)}${sup(p.d) ? ' <span style="color:var(--accent)">· supermoon</span>' : ""}</div>`).join("")}</div>
+    <p class="note">Times in ${esc(tz.replace("_", " "))} time, calculated to within a few minutes. Supermoon: full moon within about 362,000 km of Earth. Full and new moons bring the biggest (spring) tides.</p>`;
+}
+
+// ---------- satellite (Himawari-9 via NASA GIBS) ----------
+const sat = L.map("sat", { zoomControl: true, attributionControl: true, minZoom: 3, maxZoom: 7 });
+L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png", { subdomains: "abcd", attribution: "© OpenStreetMap · © CARTO" }).addTo(sat);
+const labels = L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png", { subdomains: "abcd", pane: "shadowPane" }).addTo(sat);
+const BANDS = { ir: { id: "Himawari_AHI_Band13_Clean_Infrared", lvl: 6, max: 6 }, vis: { id: "Himawari_AHI_Band3_Red_Visible_1km", lvl: 7, max: 7 } };
+const SAT = { band: "ir", frames: [], layers: [], i: 0, play: true, timer: 0, pin: null };
+const iso10 = (ms) => new Date(Math.floor(ms / 600000) * 600000).toISOString().slice(0, 19) + "Z";
+function gibsUrl(b, t) { return `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/${b.id}/default/${t}/GoogleMapsCompatible_Level${b.lvl}/{z}/{y}/{x}.png`; }
+async function buildSat() {
+  clearInterval(SAT.timer); SAT.layers.forEach((l) => l.remove()); SAT.layers = []; SAT.frames = [];
+  $("satTime").textContent = "Loading frames…";
+  const b = BANDS[SAT.band], cands = [];
+  for (let m = 200; m >= 30; m -= 20) cands.push(iso10(Date.now() - m * 60000));
+  // keep the frames GIBS actually has (a test tile over Australia)
+  const ok = await Promise.all(cands.map((t) => fetch(gibsUrl(b, t).replace("{z}/{y}/{x}", "3/4/7")).then((r) => r.ok).catch(() => false)));
+  SAT.frames = cands.filter((_, i) => ok[i]);
+  if (!SAT.frames.length) { $("satTime").textContent = "No recent frames available right now"; return; }
+  SAT.layers = SAT.frames.map((t) => L.tileLayer(gibsUrl(b, t), { maxNativeZoom: b.max, maxZoom: 8, opacity: 0, attribution: "Himawari-9 · JMA · NASA GIBS" }).addTo(sat));
+  labels.bringToFront();
+  $("satSlide").max = String(SAT.frames.length - 1);
+  show(SAT.frames.length - 1);
+  if (SAT.play) SAT.timer = setInterval(() => show((SAT.i + 1) % SAT.frames.length), 700);
+}
+function show(i) {
+  SAT.layers.forEach((l, k) => l.setOpacity(k === i ? 0.85 : 0)); SAT.i = i; $("satSlide").value = String(i);
+  const d = new Date(SAT.frames[i]), tz = (S.fc && S.fc.timezone) || "Australia/Perth";
+  $("satTime").textContent = d.toLocaleString("en-AU", { timeZone: tz, weekday: "short", hour: "numeric", minute: "2-digit" }) + " local";
+}
+function satCenter() { if (!S.city) return; sat.setView([S.city.lat, S.city.lon], 5); if (SAT.pin) SAT.pin.remove(); SAT.pin = L.circleMarker([S.city.lat, S.city.lon], { radius: 6, color: "#e8b923", fillColor: "#e8b923", fillOpacity: 1 }).addTo(sat).bindTooltip(S.city.name, { permanent: true, direction: "right" }); }
+document.querySelectorAll("[data-band]").forEach((b) => b.onclick = () => { document.querySelectorAll("[data-band]").forEach((x) => x.classList.toggle("on", x === b)); SAT.band = b.dataset.band; buildSat(); });
+$("satPlay").onclick = () => { SAT.play = !SAT.play; $("satPlay").textContent = SAT.play ? "❚❚ Pause" : "▶ Play"; clearInterval(SAT.timer); if (SAT.play && SAT.frames.length) SAT.timer = setInterval(() => show((SAT.i + 1) % SAT.frames.length), 700); };
+$("satSlide").oninput = () => { SAT.play = false; $("satPlay").textContent = "▶ Play"; clearInterval(SAT.timer); show(+$("satSlide").value); };
+setInterval(() => { if (!document.hidden) buildSat(); }, 15 * 60000);   // new frames every 10 minutes
+
+// ---------- ISS ----------
+$("issVideo").src = "https://www.youtube.com/embed/live_stream?channel=UCLA_DiR1FfKNvjuUpBHmylQ&autoplay=1&mute=1";
+const iss = L.map("issmap", { zoomControl: false, attributionControl: true, worldCopyJump: true, minZoom: 1 }).setView([-25, 135], 1);
+L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", { subdomains: "abcd", attribution: "© OpenStreetMap · © CARTO" }).addTo(iss);
+const issDot = L.marker([0, 0], { icon: L.divIcon({ html: '<span style="font-size:26px;display:inline-block;transform:translate(-50%,-50%)">🛰️</span>', className: "", iconSize: null }) }).addTo(iss);
+const trail = L.polyline([], { color: "#e8b923", weight: 2, opacity: .7 }).addTo(iss);
+async function issTick() {
+  if (document.hidden) return;
+  try {
+    const j = await fetch("https://api.wheretheiss.at/v1/satellites/25544").then((r) => r.json());
+    const p = [j.latitude, j.longitude]; issDot.setLatLng(p);
+    const pts = trail.getLatLngs(); if (pts.length && Math.abs(pts[pts.length - 1].lng - p[1]) > 180) trail.setLatLngs([]); trail.addLatLng(p); if (trail.getLatLngs().length > 400) trail.setLatLngs(trail.getLatLngs().slice(-400));
+    if (!issTick.centred) { iss.setView(p, 2); issTick.centred = true; }
+    const overAU = j.latitude < -9 && j.latitude > -48 && j.longitude > 110 && j.longitude < 180;
+    $("issTxt").textContent = `ISS now at ${j.latitude.toFixed(1)}°, ${j.longitude.toFixed(1)}° · ${Math.round(j.altitude)} km up · ${Math.round(j.velocity).toLocaleString("en-AU")} km/h · in ${j.visibility === "daylight" ? "sunlight" : "Earth's shadow"}${overAU ? " · over Australia / New Zealand right now!" : ""}. Updates every 5 seconds.`;
+  } catch (e) { $("issTxt").textContent = "Couldn't reach the ISS tracker just now."; }
+}
+issTick(); setInterval(issTick, 5000);
+
+// ---------- start ----------
+fillSelect();
+const saved = store.get("city", null);
+choose(saved && saved.lat ? saved : CITIES[0]);
+loadMapTemps(); drawMoon(); buildSat();
+setInterval(() => { if (!document.hidden) { loadCity(); drawMoon(); } }, 20 * 60000);
+window.addEventListener("load", () => sat.invalidateSize());
+// redraw the moon once the city's time zone is known
+const mo = new MutationObserver(() => { if (S.fc) { drawMoon(); mo.disconnect(); } }); mo.observe($("nowCard"), { childList: true });
+})();
+</script>
+</body>
+</html>

@@ -4,7 +4,7 @@
 // shared portal menu (nav.js + nav.css) added at the top, with their old cross-links removed.
 const SB_URL = "https://sfuuzcgwbbhdjqzrchvv.supabase.co";
 const SB_KEY = "sb_publishable_uu0N60ZMVjJ1kl14FW1NBA_v-cm_U3_"; // publishable key: safe, RLS protects data
-const V = "44";
+const V = "45";
 const GATED = {
   kb: { page: "/_p/kb/", flag: "kb", name: "Knowledge Base" },
   catalogue: { page: "/_p/catalogue/", flag: "cat", name: "Parts Catalogue" },
@@ -12,7 +12,8 @@ const GATED = {
   flute: { page: "/_p/flute/", flag: "flute", name: "Flute Practice player" },   // staff, customers with flute_access (off by default)
   warehousing: { page: "/_p/warehousing/", flag: "intranet", name: "Warehousing" }, // purchase orders, parts & stock: hello@ only
   radio: { page: "/_p/radio/", flag: "radio", name: "Radio" },   // free internet radio: staff, and customers / vendors with radio_access (on by default)
-  logreview: { page: "/_p/logreview/", flag: "logreview", name: "Log Analysis" }   // staff, and vendor logins ticked for it (off by default)
+  logreview: { page: "/_p/logreview/", flag: "logreview", name: "Log Analysis" },
+  weather: { page: "/_p/weather/", flag: null, name: "Weather" }   // every signed-in login   // staff, and vendor logins ticked for it (off by default)
 };
 // Files the Warehousing page loads next to itself (served only to the same signed-in hello@ account).
 const WH_FILES = new Set(["catalog-mimaki.json", "warranty-mimaki.json", "logo-bw.png"]);
@@ -268,7 +269,7 @@ export default {
     }
     if (p.startsWith("/_p/")) return new Response("Not found", { status: 404 });
     if (/^\/po(\/|$)/.test(p)) return Response.redirect(url.origin + "/warehousing/", 302);
-    const key = /^\/kb(\/|$)/.test(p) ? "kb" : /^\/catalogue(\/|$)/.test(p) ? "catalogue" : /^\/vector(\/|$)/.test(p) ? "vector" : /^\/flute(\/|$)/.test(p) ? "flute" : /^\/warehousing(\/|$)/.test(p) ? "warehousing" : /^\/radio(\/|$)/.test(p) ? "radio" : /^\/logreview(\/|$)/.test(p) ? "logreview" : null;
+    const key = /^\/kb(\/|$)/.test(p) ? "kb" : /^\/catalogue(\/|$)/.test(p) ? "catalogue" : /^\/vector(\/|$)/.test(p) ? "vector" : /^\/flute(\/|$)/.test(p) ? "flute" : /^\/warehousing(\/|$)/.test(p) ? "warehousing" : /^\/radio(\/|$)/.test(p) ? "radio" : /^\/logreview(\/|$)/.test(p) ? "logreview" : /^\/weather(\/|$)/.test(p) ? "weather" : null;
     if (!key) return env.ASSETS.fetch(req);
     const whFile = key === "warehousing" ? p.slice("/warehousing/".length) : "";
     if (whFile && WH_FILES.has(whFile)) {
@@ -313,7 +314,8 @@ export default {
     h.set("Cache-Control", "private, no-store");
     h.set("X-Robots-Tag", "noindex");
     if (key === "flute") h.set("Permissions-Policy", "microphone=(self)");
-    if (key === "radio") h.set("Permissions-Policy", "autoplay=(self)");   // the player listens to the customer playing
+    if (key === "radio") h.set("Permissions-Policy", "autoplay=(self)");
+    if (key === "weather") h.set("Permissions-Policy", "geolocation=(self)");   // "Near me"   // the player listens to the customer playing
     h.delete("Content-Length");
     return new Response(out.body, { status: page.status, headers: h });
   }

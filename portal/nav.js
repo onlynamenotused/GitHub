@@ -13,6 +13,7 @@
     if (f.flute) out.push(["flute", "/flute/", "Flute Practice"]);
     if (f.logreview) out.push(["logreview", "/logreview/", "Log Analysis"]);
     if (f.radio) out.push(["radio", "/radio/", "Radio"]);
+    out.push(["weather", "/weather/", "Weather"]);
     if (f.reports) out.push(["reports", "/#reports", "Reports"]);
     if (!(f.appsOnly && !f.staff)) out.push(["contact", "/#contact", "Contact & booking"]);
     if (f.staff) out.push(["customers", "/#customers", "Customers (staff)"]);
