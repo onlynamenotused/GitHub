@@ -119,9 +119,11 @@ async function loadCore() {
     sb.rpc("is_apps_only"),
     sb.rpc("has_reports_access"),
     sb.rpc("my_hide_prices"),
-    sb.rpc("has_radio_access")
+    sb.rpc("has_radio_access"),
+    sb.rpc("has_warranty_returns")
   ]);
-  const [mf, inv, est, sv, va, fa, ao, ra, hp, rda] = rest;
+  const [mf, inv, est, sv, va, fa, ao, ra, hp, rda, wrr] = rest;
+  state.warReturns = wrr?.data === true;
   state.radioAccess = rda?.data === true;
   state.hidePrices = hp?.data === true;   // vendor login with "Hide prices" ticked
   state.reportsAccess = ra?.data === true;
@@ -350,12 +352,84 @@ function vendorInvoicesCard() {
   })();
   return card;
 }
+/* Warranty parts returns: faulty parts claimed under warranty that go back to the maker, and where each one is up to. */
+const WR_STATUS = { due: ["Due for return", "soon"], sent: ["Sent", "none"], received: ["Received by maker", "ok"], not_required: ["Not required", "ok"], cancelled: ["Claim cancelled", "none"] };
+const wrOverdue = (r) => r.status === "due" && r.due_by && r.due_by < localIso();
+function warrantyReturnsCard() {
+  const body = el("div", {}, el("p", { class: "muted small" }, "Loading…"));
+  const note = el("span", { class: "saved" });
+  const card = el("div", { class: "card wret" }, el("div", { class: "bhead" }, el("h2", {}, "Warranty parts returns"), note), body);
+  const f = (state.wrF = state.wrF || { show: "open" });
+  const load = async () => {
+    const { data, error } = await sb.from("warranty_returns").select("*").order("claimed_at", { ascending: false }).order("id");
+    if (error) { body.replaceChildren(el("p", { class: "msg err" }, "Couldn't load warranty returns.")); return; }
+    state.wrRows = data || []; draw();
+  };
+  const rowsFor = () => (state.wrRows || []).filter((r) => f.show === "all" || ["due", "sent"].includes(r.status));
+  const exportRows = () => [["Claimed", "Ticket", "Warranty PO", "Maker", "Customer", "Machine", "Serial", "Part", "Description", "Qty", "Due by", "Status", "Sent on", "Carrier", "Tracking", "Note", "Updated"],
+    ...rowsFor().map((r) => [String(r.claimed_at || "").slice(0, 10), r.ticket_num || "", r.po_number || "", r.vendor || "", r.customer || "", r.model || "", r.serial || "", r.part_code || "", r.part_desc || "", r.qty,
+      r.due_by || "", (wrOverdue(r) ? "Overdue · " : "") + (WR_STATUS[r.status] || [r.status])[0], r.sent_on || "", r.carrier || "", r.tracking || "", r.note || "", String(r.updated_at || "").slice(0, 10)])];
+  const vendorBtn = (r, st, label) => el("button", { class: "btn small" + (st === "received" ? " primary" : ""), type: "button", onclick: async (e) => {
+    e.currentTarget.disabled = true;
+    const { data, error } = await sb.rpc("vendor_return_update", { p_id: r.id, p_status: st, p_note: null });
+    if (error || !data?.ok) { flash(note, "Not saved", false); e.currentTarget.disabled = false; return; }
+    flash(note, r.part_code + ": " + WR_STATUS[st][0].toLowerCase(), true); load(); } }, label);
+  const staffEdit = (r, cell) => {
+    const stSel = el("select", { class: "field" }, ...Object.entries(WR_STATUS).map(([k, [l]]) => el("option", { value: k, selected: r.status === k }, l)));
+    const due = el("input", { class: "field", type: "date", value: r.due_by || "" }), sent = el("input", { class: "field", type: "date", value: r.sent_on || "" });
+    const car = el("input", { class: "field", value: r.carrier || "", placeholder: "Carrier, e.g. StarTrack" }), trk = el("input", { class: "field", value: r.tracking || "", placeholder: "Tracking / con note" });
+    const nt = el("input", { class: "field", value: r.note || "", placeholder: "Note" });
+    stSel.onchange = () => { if (stSel.value === "sent" && !sent.value) sent.value = localIso(); };
+    cell.replaceChildren(el("div", { class: "stack", style: "gap:6px;min-width:220px" },
+      el("label", { class: "small" }, "Status ", stSel), el("label", { class: "small" }, "Due by ", due), el("label", { class: "small" }, "Sent on ", sent), car, trk, nt,
+      el("span", { style: "display:flex;gap:6px" },
+        el("button", { class: "btn small primary", type: "button", onclick: async () => {
+          const { error } = await sb.from("warranty_returns").update({ status: stSel.value, due_by: due.value || null, sent_on: sent.value || null, carrier: car.value.trim() || null,
+            tracking: trk.value.trim() || null, note: nt.value.trim() || null, updated_at: new Date().toISOString(), updated_by: state.user?.email || null }).eq("id", r.id);
+          if (error) return flash(note, "Not saved", false); flash(note, "Saved", true); load(); } }, "Save"),
+        el("button", { class: "btn small ghost", type: "button", onclick: draw }, "Cancel"))));
+  };
+  const draw = () => {
+    const all = state.wrRows || [], rows = rowsFor();
+    const n = (fn) => all.filter(fn).length;
+    const stats = el("div", { class: "stats" }, ...[[n((r) => r.status === "due"), "Due for return"], [n(wrOverdue), "Overdue"], [n((r) => r.status === "sent"), "Sent, awaiting receipt"],
+      [n((r) => r.status === "received"), "Received by maker"]].map(([v, l]) => el("div", { class: "stat" }, el("div", { class: "n" }, v), el("div", { class: "l" }, l))));
+    const tabs = el("div", { class: "rtabs" }, ...[["open", "Open returns"], ["all", "All"]].map(([k, l]) =>
+      el("button", { type: "button", class: "chipbtn", "aria-selected": String(f.show === k), onclick: () => { f.show = k; draw(); } }, l)), dlMenu("Warranty parts returns", exportRows));
+    const table = rows.length ? el("div", { class: "tscroll" }, el("table", { class: "tbl rtbl" },
+      el("thead", {}, el("tr", {}, ...["Claimed", "Ticket / PO", "Customer & machine", "Part", "Qty", "Due by", "Status", "Shipping", ""].map((h) => el("th", { class: h === "Qty" ? "num" : null }, h)))),
+      el("tbody", {}, ...rows.map((r) => {
+        const [lb, cl] = WR_STATUS[r.status] || [r.status, "none"], od = wrOverdue(r);
+        const act = el("td", { class: "act" });
+        if (state.staff) act.append(el("button", { class: "btn small", type: "button", onclick: () => staffEdit(r, act) }, "Update"));
+        else if (r.status === "due" || r.status === "sent") act.append(el("span", { style: "display:inline-flex;gap:6px;flex-wrap:wrap" }, vendorBtn(r, "received", "Mark received"), vendorBtn(r, "not_required", "Not required")));
+        else if (r.status === "received" || r.status === "not_required") act.append(vendorBtn(r, "sent", "Undo"));
+        return el("tr", {},
+          el("td", { "data-l": "Claimed" }, fmtDate(String(r.claimed_at || "").slice(0, 10))),
+          el("td", { "data-l": "Ticket / PO" }, r.ticket_num || "—", r.po_number ? el("div", { class: "muted small mono" }, r.po_number) : null),
+          el("td", { "data-l": "Customer" }, r.customer || "—", el("div", { class: "muted small" }, [r.model, r.serial && "SN " + r.serial].filter(Boolean).join(" · "))),
+          el("td", { "data-l": "Part" }, el("span", { class: "mono" }, r.part_code || ""), el("div", { class: "muted small" }, r.part_desc || "")),
+          el("td", { class: "num", "data-l": "Qty" }, r.qty),
+          el("td", { "data-l": "Due by" }, r.due_by ? fmtDate(r.due_by) : "—"),
+          el("td", { "data-l": "Status" }, el("span", { class: "pill " + (od ? "over" : cl) }, od ? "Overdue" : lb), r.note ? el("div", { class: "muted small" }, r.note) : null),
+          el("td", { "data-l": "Shipping" }, [r.sent_on && "Sent " + fmtDate(r.sent_on), r.carrier, r.tracking].filter(Boolean).join(" · ") || "—"),
+          act); }))))
+      : el("p", { class: "muted small" }, f.show === "open" ? "No warranty parts waiting to go back." : "No warranty claims with parts yet.");
+    body.replaceChildren(stats, tabs, table,
+      el("p", { class: "muted small" }, state.staff
+        ? "Every part claimed on a warranty PO is listed here, due back 30 days after the claim. Update a row when it's sent (carrier and tracking) or when the maker says it isn't needed."
+        : "Faulty parts from warranty claims on your machines, and where each return is up to. Mark a part received when it arrives, or not required if you don't need it back."));
+  };
+  if (state.wrRows) draw(); else load();   // the dashboard redraws on every search keystroke: load once
+  return card;
+}
 function renderBilling() {
   const box = $("#billing"); if (!box) return;
   const inv = (state.invoices || []).slice(0, 12), est = (state.estimates || []).slice(0, 12);
   const owing = (state.invoices || []).filter((r) => r.status !== "paid").length;
   const parts = [];
   if (isSupervisor() && !state.staff) parts.push(vendorInvoicesCard());   // vendor / supervisor: invoices billed to them
+  if (state.warReturns && (state.staff || isSupervisor())) parts.push(warrantyReturnsCard());   // faulty parts due back to the maker
   if (!isVendorOnly()) parts.push(
     el("div", { class: "card" },
       el("div", { class: "bhead" }, el("h2", {}, "Recent invoices"), owing ? el("span", { class: "pill over" }, owing + " outstanding") : null),
@@ -1743,6 +1817,12 @@ async function renderSupervisorsAdmin(host) {
             const { error } = await sb.from("supervisor_access").update({ hide_prices: on }).eq("supervisor_id", sup.id).eq("email", u.email);
             if (error) { e.target.checked = !on; return flash(note, "Not changed", false); }
             u.hide_prices = on; flash(note, (on ? "Prices hidden for " : "Prices shown for ") + u.email, true); } }), " Hide prices"),
+        el("label", { class: "small", title: "Show this login the warranty parts returns (faulty parts due back to " + sup.name + " and their status) on their dashboard." },
+          el("input", { type: "checkbox", checked: u.warranty_returns !== false, onchange: async (e) => {
+            const on = e.target.checked;
+            const { error } = await sb.from("supervisor_access").update({ warranty_returns: on }).eq("supervisor_id", sup.id).eq("email", u.email);
+            if (error) { e.target.checked = !on; return flash(note, "Not changed", false); }
+            u.warranty_returns = on; flash(note, "Warranty returns " + (on ? "shown to " : "hidden from ") + u.email, true); } }), " Warranty returns"),
         el("button", { class: "btn ghost small", type: "button", onclick: async () => { await sb.from("supervisor_access").delete().eq("supervisor_id", sup.id).eq("email", u.email); renderSupervisorsAdmin(host); } }, "Remove")))),
       addLogins,
       ...(inv ? [] : [el("h3", {}, "Customers (" + custs.length + ")"),
