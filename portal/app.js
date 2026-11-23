@@ -1210,7 +1210,7 @@ async function loadReportData(force) {
       const lines = (r.lines || []).filter((l) => !/^(reports?|delivery)$/i.test(l.code || "") || Number(l.amount));
       const labour = lines.find((l) => /labou?r|day rate|hourly/i.test(l.code || ""));
       jobs.push({ key: "inv-" + r.id, ref: "Invoice " + r.number, number: r.number, date: r.issued, client_id: r.client_id, machine_id: r.machine_id, kind: r.kind,
-        title: r.po || (labour ? String(labour.desc || "").split("\n")[0] : "") || KIND_NAMES[r.kind], notes: r.notes || "",
+        title: r.po || (labour ? String(labour.desc || "").split("\n")[0] : "") || KIND_NAMES[r.kind], notes: r.notes || "", po: r.po || "",
         detail: labour ? labour.desc : "", lines, amount: Number(r.total_ex) || 0, status: r.status, src: "invoice" });
     }
     // Open and recent service desk jobs (not yet on an invoice)
@@ -1267,14 +1267,23 @@ const pdfBtn = (id, number) => /^fbinv-\d+$/.test(String(id || "")) ? el("button
   onclick: (e) => { e.stopPropagation(); downloadInvoicePdf(id, number, e.currentTarget); } }, "PDF") : null;
 /* Download menu for report tables: Excel, CSV or PDF (name may end in .csv; rows[0] is the header row). */
 let dlCollect = null;   // while set, report builders hand their tables here instead of drawing menus (full-report export)
-function dlMenu(name, getRows) {
+function dlMenu(name, getRows, detailed) {
   const base = String(name).replace(/\.csv$/i, "");
   if (dlCollect) { dlCollect.push({ title: base, getRows }); return null; }
   const go = (fmt) => async (e) => { e.preventDefault(); dd.open = false;
     try { const rows = getRows(); await exportTable(fmt, base, base, rows[0], rows.slice(1)); } catch (er) { console.error(er); } };
+  // detailed: { getRows, pdf } — every job in full (work notes, each line), as a second section of the menu
+  const goD = (fmt) => async (e) => { e.preventDefault(); dd.open = false;
+    try { if (fmt === "pdf" && detailed.pdf) return await detailed.pdf(); const rows = detailed.getRows(); await exportTable(fmt, base + " (detailed)", base + " detailed", rows[0], rows.slice(1)); } catch (er) { console.error(er); } };
+  const hd = (t) => el("div", { class: "xhd" }, t);
   const dd = el("details", { class: "xmenu" }, el("summary", { class: "btn small" }, "Download ▾"),
-    el("div", { class: "xpanel" }, el("button", { type: "button", class: "xopt", onclick: go("xlsx") }, "Excel (.xlsx)"),
-      el("button", { type: "button", class: "xopt", onclick: go("csv") }, "CSV"), el("button", { type: "button", class: "xopt", onclick: go("pdf") }, "PDF")));
+    el("div", { class: "xpanel" }, detailed ? hd("Summary · one line per job") : null,
+      el("button", { type: "button", class: "xopt", onclick: go("xlsx") }, "Excel (.xlsx)"),
+      el("button", { type: "button", class: "xopt", onclick: go("csv") }, "CSV"), el("button", { type: "button", class: "xopt", onclick: go("pdf") }, "PDF"),
+      ...(detailed ? [el("hr", { style: "border:0;border-top:1px solid var(--line);margin:6px 4px" }), hd("Detailed · full work notes and every line"),
+        el("button", { type: "button", class: "xopt", onclick: goD("xlsx") }, "Excel (.xlsx) · one row per line"),
+        el("button", { type: "button", class: "xopt", onclick: goD("csv") }, "CSV · one row per line"),
+        el("button", { type: "button", class: "xopt", onclick: goD("pdf") }, "PDF · each job in full")] : [])));
   document.addEventListener("click", (e) => { if (dd.open && !dd.contains(e.target)) dd.open = false; });
   return dd;
 }
@@ -1406,6 +1415,68 @@ function drawReports() {
         : "Your machines, their service history and usage, from our service desk and invoices. Export the full report (every section, with these filters), or download any single table as Excel, CSV or PDF. Amounts are ex GST."),
     ...[filters, f.tab === "desk" ? null : kpis, tabBar, body].filter(Boolean));
 }
+/* Service history in detail: one row per line on each job, with the job's full notes and work performed. */
+const jobSerial = (j) => (mOf(j.machine_id) || {}).serial || "";
+const jobMachine = (j) => { const m = mOf(j.machine_id); return m ? machineName(m) : ""; };
+function jobsDetailedRows(jobs) {
+  const head = ["Date", "Ref", "Status", "Customer", "Machine", "Serial", "Type", "Bill to", "PO / reference", "Job", "Reported issue / notes", "Work performed", "Line", "Item", "Description", "Qty", "Unit ex GST", "Line ex GST", "Job total ex GST"];
+  const rows = [];
+  for (const j of jobs) {
+    const base = [j.date || "", j.ref, j.status || "", cName(j.client_id), jobMachine(j), jobSerial(j), KIND_NAMES[j.kind] || j.kind || "", j.bill_to || "", j.po || "", j.title || "", j.notes || "", String(j.detail || "").trim()];
+    const total = (Number(j.amount) || 0).toFixed(2);
+    if (!j.lines.length) { rows.push([...base, "", "", "", "", "", "", total]); continue; }
+    j.lines.forEach((l, i) => { const q = Number(l.qty) || 0, a = Number(l.amount) || 0;
+      rows.push([...base, i + 1, l.code || "", String(l.desc || "").trim(), q, q && a ? (a / q).toFixed(2) : "", a ? a.toFixed(2) : "", i ? "" : total]); });
+  }
+  return [head, ...rows];
+}
+async function jobsDetailedPdf(jobs) {
+  await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js", () => window.jspdf);
+  await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js", () => window.jspdf && window.jspdf.jsPDF.API.autoTable);
+  const doc = new window.jspdf.jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), L = 12, R = W - 12, TW = R - L;
+  const who = state.staff ? "Whole service desk" : isSupervisor() ? supName() : state.clients.map((c) => c.name).join(", ");
+  doc.setFont("helvetica", "bold"); doc.setFontSize(15); doc.text("Highway Digital · Service history (detailed)", L, 15);
+  doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(90);
+  doc.text(doc.splitTextToSize(who + "  ·  " + reportScope() + "  ·  " + jobs.length + " jobs  ·  " + (state.hidePrices ? "prices hidden" : "amounts ex GST") + "  ·  exported " + new Date().toLocaleString("en-AU"), TW), L, 21);
+  let y = 30;
+  const need = (h) => { if (y + h > H - 14) { doc.addPage(); y = 14; } };
+  const para = (label, text) => { text = String(text || "").trim(); if (!text) return;
+    const lines = doc.splitTextToSize(text, TW - 4);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); doc.setTextColor(60); need(5); doc.text(label, L + 2, y); y += 4;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(30);
+    for (const ln of lines) { need(4.4); doc.text(ln, L + 2, y); y += 4.2; } y += 1.5; };
+  for (const j of jobs) {
+    need(22);
+    doc.setFillColor(20, 20, 20); doc.rect(L, y - 4.5, TW, 7, "F");
+    doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.setTextColor(232, 185, 35);
+    doc.text(fmtDate(j.date) + "   " + j.ref, L + 2, y);
+    doc.setTextColor(255); const amt = state.hidePrices || !j.amount ? "" : money(j.amount) + " ex GST"; if (amt) doc.text(amt, R - 2, y, { align: "right" });
+    y += 6.5;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(40);
+    const facts = [["Customer", cName(j.client_id)], ["Machine", [jobMachine(j), jobSerial(j) && "SN " + jobSerial(j)].filter(Boolean).join(" · ")], ["Type", KIND_NAMES[j.kind] || j.kind || ""],
+      ["Status", j.status || ""], ["Bill to", j.bill_to || ""], ["PO / reference", j.po || ""]].filter(([, v]) => v);
+    for (let i = 0; i < facts.length; i += 2) { need(4.6); facts.slice(i, i + 2).forEach(([k, v], c) => { const x = L + 2 + c * (TW / 2);
+      doc.setFont("helvetica", "bold"); doc.text(k + ":", x, y); doc.setFont("helvetica", "normal"); doc.text(doc.splitTextToSize(v, TW / 2 - 28)[0] || "", x + 24, y); }); y += 4.4; }
+    y += 1.5;
+    if (j.title) para("Job", j.title);
+    para("Reported issue / notes", j.notes);
+    para("Work performed", j.detail);
+    if (j.lines.length) {
+      need(12);
+      const hp = state.hidePrices;
+      doc.autoTable({ startY: y, margin: { left: L, right: 12 }, head: [hp ? ["Item", "Description", "Qty"] : ["Item", "Description", "Qty", "Line ex GST"]],
+        body: j.lines.map((l) => { const r = [l.code || "", String(l.desc || "").split("\n")[0], String(l.qty ?? "")]; if (!hp) r.push(Number(l.amount) ? money(l.amount) : ""); return r; }),
+        styles: { fontSize: 8, cellPadding: 1.3, overflow: "linebreak" }, headStyles: { fillColor: [235, 235, 235], textColor: [20, 20, 20] },
+        columnStyles: hp ? { 0: { cellWidth: 34 }, 2: { cellWidth: 14, halign: "right" } } : { 0: { cellWidth: 34 }, 2: { cellWidth: 14, halign: "right" }, 3: { cellWidth: 26, halign: "right" } } });
+      y = doc.lastAutoTable.finalY + 3;
+    }
+    y += 5;
+  }
+  const pages = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pages; i++) { doc.setPage(i); doc.setFontSize(8); doc.setTextColor(120); doc.text("Page " + i + " of " + pages + "  ·  portal.highwaydigital.com.au", R, H - 6, { align: "right" }); }
+  saveBlob("Service history (detailed) " + localIso() + ".pdf", doc.output("blob"));
+}
 function jobsReport(jobs) {
   const rows = jobs.map((j) => {
     const det = el("tr", { class: "rdet", hidden: true }, el("td", { colspan: 7 },
@@ -1422,7 +1493,8 @@ function jobsReport(jobs) {
   return el("div", { class: "card" },
     el("div", { class: "bhead" }, el("h2", {}, "Service history (" + jobs.length + ")"),
       dlMenu("Service history.csv", () => [["Date", "Ref", "Customer", "Machine", "Type", "Job", "Notes", "Parts", "Amount ex GST"],
-        ...jobs.map((j) => [j.date, j.ref, cName(j.client_id), mLabel(j.machine_id), KIND_NAMES[j.kind] || j.kind, j.title, j.notes, j.lines.filter(isPart).map((l) => l.qty + "x " + l.code).join("; "), j.amount.toFixed(2)])])),
+        ...jobs.map((j) => [j.date, j.ref, cName(j.client_id), mLabel(j.machine_id), KIND_NAMES[j.kind] || j.kind, j.title, j.notes, j.lines.filter(isPart).map((l) => l.qty + "x " + l.code).join("; "), j.amount.toFixed(2)])],
+        { getRows: () => jobsDetailedRows(jobs), pdf: () => jobsDetailedPdf(jobs) })),
     jobs.length ? el("div", { class: "tscroll" }, el("table", { class: "tbl rtbl" }, el("thead", {}, el("tr", {}, ...["Date", "Ref", "Customer", "Machine", "Type", "Job", "Amount"].map((h) => el("th", { class: h === "Amount" ? "num" : null }, h)))), el("tbody", {}, ...rows)))
       : el("p", { class: "muted small" }, "No jobs match these filters."),
     el("p", { class: "muted small" }, "Click a job to see the work notes and every line on it."));
