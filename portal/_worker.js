@@ -4,14 +4,15 @@
 // shared portal menu (nav.js + nav.css) added at the top, with their old cross-links removed.
 const SB_URL = "https://sfuuzcgwbbhdjqzrchvv.supabase.co";
 const SB_KEY = "sb_publishable_uu0N60ZMVjJ1kl14FW1NBA_v-cm_U3_"; // publishable key: safe, RLS protects data
-const V = "42";
+const V = "43";
 const GATED = {
   kb: { page: "/_p/kb/", flag: "kb", name: "Knowledge Base" },
   catalogue: { page: "/_p/catalogue/", flag: "cat", name: "Parts Catalogue" },
   vector: { page: "/_p/vector/", flag: "vector", name: "Vector Converter" },  // staff, supervisors, customers with vector_access
   flute: { page: "/_p/flute/", flag: "flute", name: "Flute Practice player" },   // staff, customers with flute_access (off by default)
   warehousing: { page: "/_p/warehousing/", flag: "intranet", name: "Warehousing" }, // purchase orders, parts & stock: hello@ only
-  radio: { page: "/_p/radio/", flag: "radio", name: "Radio" }   // free internet radio: staff, and customers / vendors with radio_access (on by default)
+  radio: { page: "/_p/radio/", flag: "radio", name: "Radio" },   // free internet radio: staff, and customers / vendors with radio_access (on by default)
+  logreview: { page: "/_p/logreview/", flag: "logreview", name: "Mimaki Log Review" }   // staff, and vendor logins ticked for it (off by default)
 };
 // Files the Warehousing page loads next to itself (served only to the same signed-in hello@ account).
 const WH_FILES = new Set(["catalog-mimaki.json", "warranty-mimaki.json", "logo-bw.png"]);
@@ -49,7 +50,7 @@ function filterCatalogue(html, allow) {
 }
 const attr = (s) => String(s).replace(/&/g, "&amp;").replace(/'/g, "&#39;").replace(/</g, "&lt;");
 function navBlock(f, active) {
-  const flags = JSON.stringify({ signedIn: true, email: f.email, staff: !!f.staff, intranet: !!f.intranet, kb: !!f.kb, cat: !!f.cat, vector: !!f.vector, flute: !!f.flute, radio: !!f.radio, appsOnly: !!f.apps_only, supervisor: !!f.supervisor, reports: !!f.reports, active });
+  const flags = JSON.stringify({ signedIn: true, email: f.email, staff: !!f.staff, intranet: !!f.intranet, kb: !!f.kb, cat: !!f.cat, vector: !!f.vector, flute: !!f.flute, radio: !!f.radio, logreview: !!f.logreview, appsOnly: !!f.apps_only, supervisor: !!f.supervisor, reports: !!f.reports, active });
   return `<div id="hd-nav" class="hdn-static" data-flags='${attr(flags)}'></div><script src="/nav.js?v=${V}"></script>`;
 }
 function notAvailable(name) {
@@ -109,6 +110,12 @@ async function apiRoute(req, env, url, p) {
     return jres(r.ok ? r.j || { ok: true } : { ok: false, error: (r.j && (r.j.message || r.j.error)) || "Couldn't save that." });
   }
   // Radio: station directory (Radio Browser, a free community list) and "now playing" for one stream.
+  // Mimaki Log Review (read-only portal copy): reviews only for machines this login can see.
+  if (p.startsWith("/logreview/api/")) {
+    const f = await menuFlags(token).catch(() => null);
+    if (!f || !f.logreview) return jres({ ok: false, error: "Log Review isn't turned on for your account." }, 403);
+    return logReviewData(env, url, p, token, f);
+  }
   if (p.startsWith("/radio/api/")) {
     const f = await menuFlags(token).catch(() => null);
     if (!f || !f.radio) return jres({ ok: false, error: "Radio isn't turned on for your account." }, 403);
@@ -164,6 +171,28 @@ async function apiRoute(req, env, url, p) {
     return new Response(JSON.stringify({ ok: true, parts: out }), { headers: { "content-type": "application/json", "Cache-Control": "private, max-age=300" } });
   }
   return null;
+}
+// ---------- Mimaki Log Review ----------
+const normSerial = (s) => String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+async function logReviewData(env, url, p, token, f) {
+  const asset = (name) => env.ASSETS.fetch(new Request(new URL("/_p/logreview/" + name, url.origin))).then((r) => r.json());
+  const priv = { "content-type": "application/json", "Cache-Control": "private, no-store", "X-Robots-Tag": "noindex" };
+  if (p === "/logreview/api/profiles") {
+    const j = await asset("profiles.json");
+    if (!f.staff) for (const list of Object.values(j.models || {})) for (const x of list) { delete x.customer; delete x.folder; }
+    return new Response(JSON.stringify(j), { headers: priv });
+  }
+  if (p === "/logreview/api/reviews") {
+    const j = await asset("reviews.json");
+    if (!f.staff) {
+      const r = await fetch(SB_URL + "/rest/v1/machines?select=serial&serial=not.is.null", { headers: { apikey: SB_KEY, Authorization: "Bearer " + token } });
+      const mine = new Set((r.ok ? await r.json() : []).map((m) => normSerial(m.serial)).filter((x) => x.length >= 5));
+      j.reviews = (j.reviews || []).filter((x) => mine.has(normSerial(x.serial)));
+      for (const x of j.reviews) { delete x.pdf; if (x.meta) { delete x.meta.source_folder; delete x.meta.sender; } }
+    }
+    return new Response(JSON.stringify(j), { headers: priv });
+  }
+  return jres({ ok: false }, 404);
 }
 // ---------- Radio ----------
 const RB_HOSTS = ["de1.api.radio-browser.info", "nl1.api.radio-browser.info", "at1.api.radio-browser.info", "de2.api.radio-browser.info", "fi1.api.radio-browser.info"];
@@ -233,13 +262,13 @@ export default {
   async fetch(req, env) {
     const url = new URL(req.url);
     const p = url.pathname;
-    if (p === "/_src/catalogue" || p === "/vector/log" || p.startsWith("/flute/api/") || p.startsWith("/radio/api/") || p.startsWith("/catalogue/quote") || p.startsWith("/service/")) {
+    if (p === "/_src/catalogue" || p === "/vector/log" || p.startsWith("/flute/api/") || p.startsWith("/radio/api/") || p.startsWith("/logreview/api/") || p.startsWith("/catalogue/quote") || p.startsWith("/service/")) {
       const r = await apiRoute(req, env, url, p);
       if (r) return r;
     }
     if (p.startsWith("/_p/")) return new Response("Not found", { status: 404 });
     if (/^\/po(\/|$)/.test(p)) return Response.redirect(url.origin + "/warehousing/", 302);
-    const key = /^\/kb(\/|$)/.test(p) ? "kb" : /^\/catalogue(\/|$)/.test(p) ? "catalogue" : /^\/vector(\/|$)/.test(p) ? "vector" : /^\/flute(\/|$)/.test(p) ? "flute" : /^\/warehousing(\/|$)/.test(p) ? "warehousing" : /^\/radio(\/|$)/.test(p) ? "radio" : null;
+    const key = /^\/kb(\/|$)/.test(p) ? "kb" : /^\/catalogue(\/|$)/.test(p) ? "catalogue" : /^\/vector(\/|$)/.test(p) ? "vector" : /^\/flute(\/|$)/.test(p) ? "flute" : /^\/warehousing(\/|$)/.test(p) ? "warehousing" : /^\/radio(\/|$)/.test(p) ? "radio" : /^\/logreview(\/|$)/.test(p) ? "logreview" : null;
     if (!key) return env.ASSETS.fetch(req);
     const whFile = key === "warehousing" ? p.slice("/warehousing/".length) : "";
     if (whFile && WH_FILES.has(whFile)) {

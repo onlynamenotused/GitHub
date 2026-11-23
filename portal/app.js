@@ -75,7 +75,7 @@ async function signOut() { await sb.auth.signOut(); setAccessCookie(null); histo
 const navHost = () => $("#hd-nav");
 function drawNav(active) {
   window.HDNav?.render(navHost(), state.user
-    ? { signedIn: true, email: state.user.email, staff: state.staff, intranet: state.intranet, kb: state.kbAccess || isSupervisor(), cat: state.catAccess, vector: state.vectorAccess, flute: state.fluteAccess, appsOnly: state.appsOnly, supervisor: isSupervisor(), reports: !!state.reportsAccess, radio: !!state.radioAccess, active }
+    ? { signedIn: true, email: state.user.email, staff: state.staff, intranet: state.intranet, kb: state.kbAccess || isSupervisor(), cat: state.catAccess, vector: state.vectorAccess, flute: state.fluteAccess, appsOnly: state.appsOnly, supervisor: isSupervisor(), reports: !!state.reportsAccess, radio: !!state.radioAccess, logreview: !!state.logReview, active }
     : { signedIn: false });
 }
 
@@ -120,9 +120,11 @@ async function loadCore() {
     sb.rpc("has_reports_access"),
     sb.rpc("my_hide_prices"),
     sb.rpc("has_radio_access"),
-    sb.rpc("has_warranty_returns")
+    sb.rpc("has_warranty_returns"),
+    sb.rpc("has_log_review")
   ]);
-  const [mf, inv, est, sv, va, fa, ao, ra, hp, rda, wrr] = rest;
+  const [mf, inv, est, sv, va, fa, ao, ra, hp, rda, wrr, lrv] = rest;
+  state.logReview = lrv?.data === true;
   state.warReturns = wrr?.data === true;
   state.radioAccess = rda?.data === true;
   state.hidePrices = hp?.data === true;   // vendor login with "Hide prices" ticked
@@ -430,6 +432,9 @@ function renderBilling() {
   const parts = [];
   if (isSupervisor() && !state.staff) parts.push(vendorInvoicesCard());   // vendor / supervisor: invoices billed to them
   if (state.warReturns && (state.staff || isSupervisor())) parts.push(warrantyReturnsCard());   // faulty parts due back to the maker
+  if (state.logReview && isSupervisor() && !state.staff) parts.push(el("div", { class: "card" },
+    el("div", { class: "bhead" }, el("h2", {}, "Mimaki Log Review"), el("a", { class: "btn small primary", href: "/logreview/" }, "Open Log Review")),
+    el("p", { class: "muted small" }, "Daily maintenance compliance, possible service visits and parameter changes, read from the log and parameter files saved at each visit, for the machines in your dashboard. You can also analyse a log or parameter file yourself; nothing you analyse is saved.")));
   if (!isVendorOnly()) parts.push(
     el("div", { class: "card" },
       el("div", { class: "bhead" }, el("h2", {}, "Recent invoices"), owing ? el("span", { class: "pill over" }, owing + " outstanding") : null),
@@ -1823,6 +1828,12 @@ async function renderSupervisorsAdmin(host) {
             const { error } = await sb.from("supervisor_access").update({ warranty_returns: on }).eq("supervisor_id", sup.id).eq("email", u.email);
             if (error) { e.target.checked = !on; return flash(note, "Not changed", false); }
             u.warranty_returns = on; flash(note, "Warranty returns " + (on ? "shown to " : "hidden from ") + u.email, true); } }), " Warranty returns"),
+        el("label", { class: "small", title: "Give this login the Mimaki Log Review (maintenance compliance, service visits and parameter changes from machine logs) for the machines they can see." },
+          el("input", { type: "checkbox", checked: !!u.log_review, onchange: async (e) => {
+            const on = e.target.checked;
+            const { error } = await sb.from("supervisor_access").update({ log_review: on }).eq("supervisor_id", sup.id).eq("email", u.email);
+            if (error) { e.target.checked = !on; return flash(note, "Not changed", false); }
+            u.log_review = on; flash(note, "Mimaki Log Review " + (on ? "on for " : "off for ") + u.email, true); } }), " Log Review"),
         el("button", { class: "btn ghost small", type: "button", onclick: async () => { await sb.from("supervisor_access").delete().eq("supervisor_id", sup.id).eq("email", u.email); renderSupervisorsAdmin(host); } }, "Remove")))),
       addLogins,
       ...(inv ? [] : [el("h3", {}, "Customers (" + custs.length + ")"),

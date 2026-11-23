@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mimaki Log Review – Beta version 0.1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root{--bg:#f6f6f3;--panel:#fff;--ink:#0b0b0b;--ink2:#52514e;--muted:#8a8984;--line:#e1e0d9;--axis:#c3c2b7;--brand:#1f3b63;--brand2:#2b6cb0;--brandsoft:#eef2f7;
+--good:#0ca30c;--warn:#fab219;--crit:#d03b3b;--nodata:#c3c2b7;--idle:#e4e3dc;--wkend:#f1f0ea;--r:10px}
+@media (prefers-color-scheme:dark){:root{--bg:#141413;--panel:#1a1a19;--ink:#f3f2ee;--ink2:#b9b8b2;--muted:#8a8984;--line:#2c2c2a;--axis:#383835;--brand:#9cc1f0;--brand2:#5b9be0;--brandsoft:#222b37;--wkend:#232321}}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 Inter,system-ui,sans-serif}
+header{display:flex;align-items:center;gap:16px;padding:14px 22px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5;flex-wrap:wrap}
+header h1{font-size:16px;margin:0;font-weight:700;letter-spacing:-.01em}header h1 span{color:var(--muted);font-weight:500}
+nav{display:flex;gap:4px;margin-left:auto;flex-wrap:wrap}nav button{border:0;background:none;color:var(--ink2);padding:7px 12px;border-radius:8px;font:500 13px Inter,sans-serif;cursor:pointer}
+nav button.on{background:var(--brandsoft);color:var(--brand)}nav button:hover{color:var(--ink)}
+main{max-width:1180px;margin:0 auto;padding:22px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px;margin-bottom:16px}
+.card h2{font-size:14px;margin:0 0 12px;font-weight:600}.card h2 small{color:var(--muted);font-weight:400;margin-left:6px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px}.tile .k{font-size:12px;color:var(--ink2)}.tile .v{font-size:26px;font-weight:700;letter-spacing:-.02em;margin-top:2px}.tile .s{font-size:12px;color:var(--muted)}
+table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;font-weight:600;color:var(--ink2);font-size:12px;padding:8px;border-bottom:1px solid var(--axis)}td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
+tr.click{cursor:pointer}tr.click:hover td{background:var(--brandsoft)}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;color:#fff;white-space:nowrap}
+.pill.green{background:var(--good)}.pill.yellow{background:var(--warn);color:#0b0b0b}.pill.red{background:var(--crit)}.pill.nodata{background:var(--nodata);color:#0b0b0b}.pill.idle{background:var(--idle);color:#0b0b0b}
+.mono{font-family:"JetBrains Mono",monospace;font-size:12px}.muted{color:var(--muted)}.small{font-size:12px}
+.grid{display:grid;grid-template-columns:110px repeat(7,minmax(26px,1fr)) 96px;gap:4px;align-items:center;font-size:12px}
+.grid .h{color:var(--ink2);text-align:center;font-size:11px}.grid .wl{color:var(--ink2);font-size:11px;text-align:right;padding-right:6px}
+.cell{height:28px;border-radius:5px;position:relative;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;cursor:default}
+.cell.green{background:var(--good)}.cell.yellow{background:var(--warn);color:#0b0b0b}.cell.red{background:var(--crit)}.cell.nodata{background:var(--nodata);color:#0b0b0b}.cell.idle{background:var(--idle);color:#52514e}.cell.off{background:var(--wkend);color:var(--muted)}.cell.none{background:transparent;border:1px dashed var(--line)}
+.cell .dia{position:absolute;top:3px;right:4px;width:7px;height:7px;background:var(--ink);transform:rotate(45deg);border:1px solid var(--panel)}
+.wk{height:28px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:12px;color:#fff}
+.wk.green{background:var(--good)}.wk.yellow{background:var(--warn);color:#0b0b0b}.wk.red{background:var(--crit)}.wk.nodata{background:var(--nodata);color:#0b0b0b}.wk.idle{background:var(--idle);color:#52514e}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--ink2);margin-top:10px}.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-2px;margin-right:5px}
+.tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--panel);font-size:12px;padding:7px 9px;border-radius:7px;max-width:280px;z-index:20;display:none;line-height:1.35}
+.drop{border:2px dashed var(--axis);border-radius:var(--r);padding:26px;text-align:center;color:var(--ink2);cursor:pointer}.drop.hover{border-color:var(--brand2);background:var(--brandsoft)}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}.row label{display:flex;flex-direction:column;font-size:12px;color:var(--ink2);gap:4px}
+input,select,textarea{font:13px Inter,sans-serif;padding:7px 9px;border:1px solid var(--axis);border-radius:7px;background:var(--panel);color:var(--ink)}
+button.b{font:600 13px Inter,sans-serif;padding:8px 14px;border-radius:8px;border:1px solid var(--brand2);background:var(--brand2);color:#fff;cursor:pointer}button.b.sec{background:transparent;color:var(--brand2)}button.b:disabled{opacity:.5;cursor:default}
+.bar{display:flex;align-items:center;gap:8px;margin:6px 0;font-size:12px}.bar .lab{width:150px;color:var(--ink2)}.bar .track{flex:1;height:14px;background:var(--wkend);border-radius:0 4px 4px 0;position:relative}.bar .fill{height:100%;border-radius:0 4px 4px 0;background:var(--brand2)}.bar .fill.alt{background:#9fb7d6}.bar .val{width:48px;text-align:right;font-weight:600}
+.note{background:var(--brandsoft);border-radius:8px;padding:10px 12px;font-size:12.5px;color:var(--ink2);margin-bottom:12px}
+.warnnote{background:#fff6e0;color:#5c4100;border-radius:8px;padding:10px 12px;font-size:12.5px;margin-bottom:12px}
+@media (prefers-color-scheme:dark){.warnnote{background:#3a2f12;color:#f3d48a}}
+.flex{display:flex;gap:16px;flex-wrap:wrap}.flex>*{flex:1;min-width:280px}
+.empty{padding:30px;text-align:center;color:var(--muted)}
+.codes td input{width:100%}.codes td:first-child{width:70px}.codes td:nth-child(2){width:70px}
+a{color:var(--brand2)}
+.hide{display:none}
+html.pdfmode{--bg:#ffffff;--panel:#fff;--ink:#0b0b0b;--ink2:#52514e;--muted:#8a8984;--line:#e1e0d9;--axis:#c3c2b7;--brand:#1f3b63;--brand2:#2b6cb0;--brandsoft:#eef2f7;--wkend:#f1f0ea;color-scheme:light}
+html.pdfmode body{background:#fff;color:#0b0b0b}
+html.pdfmode .ppnote{background:#eef4fb;color:#1a2b40;border-color:#2b6cb0}
+html.pdfmode .cibox{background:#eef4fb;color:#1a2b40;border-color:#2b6cb0}html.pdfmode .cibox.ci-off{background:#fbeaea;color:#5a1515;border-color:#d03b3b}html.pdfmode .cibox.ci-missing{background:#f3f2ee;color:#3a3a37;border-color:#8a8984}
+html.pdfmode .kschg td,html.pdfmode .kschg{background:#fdf1d3;color:#3a2f12}
+html.pdfmode .warnnote{background:#fdf1d3;color:#3a2f12}
+html.pdfmode .pdfBtn{display:none!important}
+@media print{
+ @page{size:A4;margin:12mm}
+ header,nav,#resetBtn,#status,.pdfBtn,section.hide,.tip,#tip,#v-machine > .row,#v-analyse > .card:first-child{display:none!important}
+ body{background:#fff!important}main{padding:0!important;max-width:none!important}
+ .card{box-shadow:none!important;border:1px solid #d8d7d0!important;break-inside:avoid}
+ table{break-inside:auto}tr{break-inside:avoid}
+ *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+ .printhead{display:block!important}
+}
+.printhead{display:none;margin-bottom:10px;font-size:12px;color:#52514e}
+
+.ppnote{border:1px solid #2b6cb0;background:#eef4fb;color:#1a2b40;border-radius:6px;padding:8px 10px;font-size:12px;margin:6px 0}
+@media (prefers-color-scheme:dark){.ppnote{background:#1c2a3c;color:#dce8f7;border-color:#5b9be0}}
+@media print{.ppnote{background:#eef4fb!important;color:#1a2b40!important;border-color:#2b6cb0!important}}
+.kschg td,.kschg{background:#fdf1d3;color:#3a2f12}
+@media (prefers-color-scheme:dark){.kschg td,.kschg{background:#3a2f12;color:#f3d48a}}
+@media print{.kschg td,.kschg{background:#fdf1d3!important;color:#3a2f12!important}}
+.ksh{font-size:13px;margin:10px 0 4px}
+.ksimp td{font-weight:700}
+.cibox{border:2px solid #2b6cb0;background:#eef4fb;color:#1a2b40;border-radius:8px;padding:10px 14px;margin:8px 0 10px}
+.cibox .cit{font-size:16px;font-weight:700}.cibox .cis{font-size:12px;opacity:.8;margin-top:2px}
+.cibox.ci-off{border-color:#d03b3b;background:#fbeaea;color:#5a1515}.cibox.ci-missing{border-color:#8a8984;background:#f3f2ee;color:#3a3a37}
+@media (prefers-color-scheme:dark){.cibox{background:#1c2a3c;color:#dce8f7;border-color:#5b9be0}.cibox.ci-off{background:#3a1c1c;color:#f5c9c9;border-color:#e06060}.cibox.ci-missing{background:#262624;color:#d8d7d0}}
+@media print{.cibox{background:#eef4fb!important;color:#1a2b40!important}.cibox.ci-off{background:#fbeaea!important;color:#5a1515!important}.cibox.ci-missing{background:#f3f2ee!important;color:#3a3a37!important}}
+.nologrow{grid-column:span 8;border:1px dashed var(--nodata);border-radius:6px;padding:3px 8px;font-size:11px;font-style:italic;color:var(--ink2,#52514e);background:var(--panel,#fff)}
+#resetBtn{margin-left:auto;padding:5px 12px}
+#resetBtn.arm{background:#d03b3b;border-color:#d03b3b;color:#fff}
+.ver{display:inline-block;margin-left:8px;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;letter-spacing:.02em;background:var(--wkend);color:var(--ink2,#52514e);border:1px solid var(--line,#d8d7d0);vertical-align:middle}
+</style>
+</head>
+<body>
+<header>
+  <h1>Mimaki Log Review <span>· Highway Digital</span> <span class="ver" title="Beta version 0.1">Beta version 0.1</span></h1>
+  <nav id="nav">
+    <button data-v="fleet" class="on">Fleet</button>
+    <button data-v="machine">Machine</button>
+    <button data-v="analyse">Analyse files</button>
+  </nav>
+  <button class="b sec" id="resetBtn" title="Clear filters, uploaded files and any review not saved to the database">Reset</button>
+</header>
+<main>
+  <div id="status" class="note hide"></div>
+
+  <section id="v-fleet">
+    <div class="tiles" id="fleetTiles"></div>
+    <div class="card"><h2>Machines reviewed <small>latest review per serial · click a row for detail</small></h2>
+      <div class="row" style="margin-bottom:10px"><label>Filter<input id="fFilter" placeholder="serial, model or customer"></label>
+        <label>Model<select id="fModel"><option value="">All models</option></select></label>
+        <label>Status<select id="fStatus"><option value="">All</option><option value="red">Poor</option><option value="yellow">Good</option><option value="green">Excellent</option></select></label></div>
+      <div id="fleetTable"></div></div>
+    <div class="card"><h2>Compliance by model <small>average % of working days with daily maintenance</small></h2><div id="modelBars"></div></div>
+  </section>
+
+  <section id="v-machine" class="hide">
+    <div class="row" style="margin-bottom:14px"><label>Serial<select id="mSerial"></select></label><label>Review<select id="mReview"></select></label><button class="b sec pdfBtn" data-scope="machine" style="margin-left:auto">Export as PDF</button></div>
+    <div id="machineBody"></div>
+  </section>
+
+  <section id="v-analyse" class="hide">
+    <div class="card"><h2>Analyse log &amp; parameter files</h2>
+      <div class="note">Drop a Mimaki <b>log</b> CSV and/or <b>parameter</b> CSV (an Excel-saved .xlsx works too). Files are read in your browser. Save the result to add it to the fleet database.</div>
+      <div class="warnnote"><b>Each Mimaki log file only holds about the last 2–5 weeks.</b> The printer keeps a fixed 65,536 log entries and overwrites the oldest as new ones arrive, so a busy machine's log reaches back only a couple of weeks from the day it was exported. Logs exported months apart will leave a gap that no file covers. Export the log every 2 weeks for a continuous record. Parameter files keep running totals, so the <i>parameter data only</i> section still covers the gap.</div>
+      <div class="drop" id="drop">Drop files here or click to choose<input type="file" id="file" multiple accept=".csv,.txt,.xlsx" class="hide"></div>
+      <div id="fileList" class="small muted" style="margin-top:8px"></div>
+      <div id="rangeNote" class="small muted" style="margin-top:4px"></div>
+      <div class="row" style="margin-top:12px">
+        <label>Serial number<input id="aSerial" placeholder="e.g. FD39B916"></label>
+        <label>Customer<input id="aCustomer" placeholder="optional"></label>
+        <label>State (holidays)<select id="aState"><option>WA</option><option>NSW</option><option>VIC</option><option>QLD</option><option>SA</option><option>TAS</option><option>ACT</option><option>NT</option></select></label>
+        <label>From<input type="date" id="aFrom" disabled></label>
+        <label>To<input type="date" id="aTo" disabled></label>
+        <button class="b" id="aRun">Analyse</button><button class="b sec" id="aSave" disabled hidden>Save to database</button><button class="b sec pdfBtn" data-scope="analyse">Export as PDF</button>
+      </div></div>
+    <div id="analyseBody"></div>
+  </section>
+
+  <section id="v-codes" class="hide">
+    <div class="card"><h2>Log code mapping <small id="codeStatus"></small></h2>
+      <div class="warnnote">Mimaki doesn't publish its log event codes. These rules were worked out from a known engineer visit (TxF150 FD39B916, 27/02/2025): <b>016/001</b> appears as a start→end pair (value 6→262) when the station/cap maintenance runs, and <b>004/xxx</b> and <b>005/xxx</b> appeared once each mid-visit. Confirm or correct them against more of your visit logs, then set the status to <i>confirmed</i>. The hourly task and this page both read the saved mapping.</div>
+      <div id="codesBody"></div>
+      <div class="row" style="margin-top:12px"><label>Status<select id="cStatus"><option value="draft">draft</option><option value="confirmed">confirmed</option></select></label><label style="flex:1">Notes<input id="cNotes"></label><button class="b" id="cSave">Save mapping</button></div>
+    </div>
+  </section>
+
+  <section id="v-about" class="hide">
+    <div class="card"><h2>How to run a review</h2>
+      <p class="small">Reviews are run by hand. There is no email intake or automatic reply.</p>
+      <ol class="small" style="line-height:1.7">
+        <li><b>In a Claude chat</b>: attach the machine's log and parameter CSVs (or point Claude at a folder on your PC) and ask for a Mimaki log review. Claude reads the serial from the parameter file, compares the machine with its previous reviews and the fleet, files the PDF in <span class="mono">Vendors › Log Review › &lt;SERIAL&gt;</span> and saves the review here.</li>
+        <li><b>Or in this page</b>: open <b>Analyse files</b>, drop the CSV/XLSX files in, check the result and click <b>Save to database</b>. Use the chat route when you need the PDF report.</li>
+        <li>To compare before and after, upload both parameter files together, in any order and with any names. They are put in time order from the machine's own counters (power-on time, power-off day counter, wipes, print length, cleanings) and the engineer-only changes between them are listed. Changes since the machine's previous review are listed too.</li><li><b>Each log file only holds about the last 2–5 weeks</b>: the printer keeps a fixed 65,536 entries and overwrites the oldest. Export logs every 2 weeks for a continuous record; gaps between logs show as <i>no log data</i>, and the <i>parameter data only</i> section uses the parameter files' dates and running totals to cover them.</li><li><b>Export as PDF</b> (Machine view and Analyse files) prints the review on screen; choose <i>Save as PDF</i> in the print dialog.</li><li><b>Reset</b> (top right) takes you back to the fleet dashboard and clears filters, uploaded files and any review you haven't saved. Saved reviews stay in the database.</li><li>In <b>Analyse files</b> the From/To dates show the period the uploaded logs cover; narrow them to review only part of it.</li><li>When the earliest parameter file is factory-fresh (power-on counter, wipes and print length near zero) the visit is treated as a <b>new install</b>: the before and after files are compared with other installs of the same model, and settings that every other install changed but this one didn't are listed as possibly missed.</li>
+      </ol>
+      <p class="small muted">Working days exclude weekends and Australian national + state public holidays (machine state, WA by default). Green = maintenance run within the last 2 working days, Yellow = 3–6 working days without, Red = 7+ working days without. A week takes its worst day.</p>
+    </div>
+  </section>
+</main>
+<div class="tip" id="tip"></div>
+
+<script>
+// ---------------------------------------------------------------- state
+const APP_VERSION="Beta version 0.1";
+const S={reviews:[],codes:null,db:null,canWrite:true,current:null,files:[]};
+const STATUS={green:"Excellent",yellow:"Good",red:"Poor",nodata:"No data",idle:"Not used",nolog:"No log data"};
+const DEFAULT_CODES={version:1,status:"draft",
+ daily_maintenance:[{code:"016",sub:"001",label:"Station maintenance (cap / wiper clean)"}],
+ cleaning:[{code:"016",sub:"000",label:"Head cleaning (manual/auto)"}],
+ adjust:[{code:"004",sub:"*",label:"Adjust / service function (group 004)"},{code:"005",sub:"*",label:"Adjust / service function (group 005)"}],
+ ignore:[{code:"032",sub:"005",label:"Periodic sensor reading (log flood)"},{code:"042",sub:"*",label:"Boot-time checks after power on"}],
+ activity:[{code:"001",sub:"000",label:"Operator / print activity (machine in use that day)"}],
+ power_on:[{code:"053",sub:"005",label:"Power on"}],notes:"Inferred mapping. 016/001 start(6)->end(262) pairs; 004/027 and 005/004 single events mid-visit."};
+const ENGINEER_SECTIONS=["SystemParam","Mainte","Servo","Head","Scan","Ink2"];
+const $=s=>document.querySelector(s);const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const pill=s=>`<span class="pill ${s||'nodata'}">${s==="red"?"●":s==="yellow"?"▲":s==="green"?"✓":"–"} ${STATUS[s||'nodata']}</span>`;
+function note(msg,warn){const n=$("#status");if(!msg){n.classList.add("hide");return}n.className=warn?"warnnote":"note";n.innerHTML=msg}
+
+// ---------------------------------------------------------------- nav
+const VIEWS=["fleet","machine","analyse","codes","about"];
+function show(v){VIEWS.forEach(x=>$("#v-"+x).classList.toggle("hide",x!==v));document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b.dataset.v===v));if(location.hash.slice(1)!==v)history.replaceState(null,"","#"+v)}
+$("#nav").onclick=e=>{if(e.target.dataset.v)show(e.target.dataset.v)};
+window.addEventListener("hashchange",()=>{const h=location.hash.slice(1);if(VIEWS.includes(h))show(h)});
+
+// ---------------------------------------------------------------- holidays
+function easter(y){const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),mo=Math.floor((h+l-7*m+114)/31),da=((h+l-7*m+114)%31)+1;return D(y,mo,da)}
+function D(y,m,d){return new Date(Date.UTC(y,m-1,d))}const iso=d=>d.toISOString().slice(0,10);const add=(d,n)=>new Date(d.getTime()+n*864e5);const wd=d=>(d.getUTCDay()+6)%7;
+function nth(y,m,w,n){if(n>0){let d=D(y,m,1);d=add(d,(w-wd(d)+7)%7);return add(d,7*(n-1))}let d=add(D(y,m+1,1),-1);return add(d,-((wd(d)-w+7)%7))}
+function obs(d){return wd(d)===5?add(d,2):wd(d)===6?add(d,1):d}
+const HC={};function holidays(y,s){s=(s||"WA").toUpperCase();const k=y+s;if(HC[k])return HC[k];const H={};const a=(d,n)=>{H[iso(d)]=H[iso(d)]||n};
+ const ny=D(y,1,1);a(ny,"New Year's Day");a(obs(ny),"New Year's Day (obs)");const ad=D(y,1,26);a(wd(ad)>=5?obs(ad):ad,"Australia Day");
+ const e=easter(y);a(add(e,-2),"Good Friday");a(add(e,1),"Easter Monday");if(["NSW","VIC","QLD","SA","ACT","NT"].includes(s))a(add(e,-1),"Easter Saturday");if(["NSW","VIC","QLD","ACT"].includes(s))a(e,"Easter Sunday");
+ const an=D(y,4,25);a(an,"Anzac Day");if(wd(an)>=5&&["WA","ACT","NT"].includes(s))a(add(an,7-wd(an)),"Anzac Day (obs)");
+ const xm=D(y,12,25),bx=D(y,12,26);a(xm,"Christmas Day");a(bx,s==="SA"?"Proclamation Day":"Boxing Day");
+ if(wd(xm)===5){a(D(y,12,27),"Christmas (obs)");a(D(y,12,28),"Boxing Day (obs)")}else if(wd(xm)===6)a(D(y,12,27),"Christmas (obs)");else if(wd(bx)>=5)a(D(y,12,28),"Boxing Day (obs)");
+ if(s==="WA"){a(nth(y,3,0,1),"Labour Day");a(nth(y,6,0,1),"WA Day");a(nth(y,9,0,-1),"King's Birthday")}
+ else if(s==="QLD"){a(nth(y,5,0,1),"Labour Day");a(nth(y,10,0,1),"King's Birthday")}
+ else if(s==="NT"){a(nth(y,5,0,1),"May Day");a(nth(y,8,0,1),"Picnic Day");a(nth(y,6,0,2),"King's Birthday")}else a(nth(y,6,0,2),"King's Birthday");
+ if(s==="VIC"){a(nth(y,3,0,2),"Labour Day");a(add(nth(y,11,0,1),1),"Melbourne Cup")}if(s==="TAS")a(nth(y,3,0,2),"Eight Hours Day");
+ if(s==="SA"){a(nth(y,3,0,2),"Adelaide Cup");a(nth(y,10,0,1),"Labour Day")}if(s==="NSW")a(nth(y,10,0,1),"Labour Day");
+ if(s==="ACT"){a(nth(y,3,0,2),"Canberra Day");a(nth(y,10,0,1),"Labour Day");const r=D(y,5,27);a(add(r,(7-wd(r))%7),"Reconciliation Day")}
+ return HC[k]=H}
+function working(d,s){if(wd(d)>=5)return[false,"Weekend"];const h=holidays(d.getUTCFullYear(),s)[iso(d)];return[!h,h||null]}
+
+// ---------------------------------------------------------------- parsing
+async function fileText(f){if(/\.xlsx?$/i.test(f.name)){const wb=XLSX.read(await f.arrayBuffer(),{type:"array",cellDates:false,raw:true});const ws=wb.Sheets[wb.SheetNames[0]];return XLSX.utils.sheet_to_csv(ws,{FS:"\t",rawNumbers:true})}
+ const buf=await f.arrayBuffer();try{return new TextDecoder("utf-8",{fatal:true}).decode(buf)}catch(e){return new TextDecoder("latin1").decode(buf)}}
+function header(lines){let model=null,fw=null,serial=null;for(const l of lines.slice(0,40)){const t=l.trim();if(t.startsWith(";")&&!t.includes("Upload")&&t.length>1)model=t.slice(1).replace("EPL5_","").trim();const m=t.match(/<([A-Z]{1,3}\d{2}[A-Z]\d{3,4})/);if(m)serial=m[1];if(t.includes("FW Ver"))fw=t.split(/[,\t]/).pop().trim()}return{model,fw,serial}}
+const pad=(s,n)=>String(s).padStart(n,"0");
+function fixSwap(d){const y=d.getUTCFullYear(),m=d.getUTCMonth(),dd=d.getUTCDate();const r=new Date(Date.UTC(2000+dd,m,y-2000,d.getUTCHours(),d.getUTCMinutes(),d.getUTCSeconds()));return isNaN(r)?d:r}
+function parseLog(text,name){const lines=text.split(/\r?\n/);const h=header(lines);const ev=[];let swapped=false;
+ for(const l of lines){const p=l.split(/[,\t]/).map(x=>x.trim());if(p.length<7||!/^\d+$/.test(p[0]))continue;const[a,b,c,flag,code,sub,val]=p;let ts;
+  try{if(b.includes("/")&&c.includes(":")){const q=b.split("/");if(q[0].length===2&&+q[1]<=12){ts=new Date(Date.UTC(2000+ +q[0],+q[1]-1,+q[2],...c.split(":").map(Number)))}else{ts=fixSwap(new Date(Date.UTC(+q[2],+q[0]-1,+q[1],...c.split(":").map(Number))));swapped=true}}
+   else{const ser=parseFloat(b),fr=parseFloat(c);if(isNaN(ser))continue;ts=fixSwap(new Date(Date.UTC(1899,11,30)+Math.round((ser+(isNaN(fr)?0:fr))*864e5)));swapped=true}
+   if(isNaN(ts))continue;ev.push({ts,code:pad(code,3),sub:pad(sub,3),val})}catch(e){}}
+ ev.sort((x,y)=>x.ts-y.ts);return{...h,events:ev,excel_converted:swapped,file:name,kind:"log"}}
+function parseParam(text,name){const lines=text.split(/\r?\n/);const h=header(lines);const sec={};let cur=null;
+ for(const l of lines){const t=l.trim();if(!t||t.startsWith(";"))continue;const p=t.split(/[,\t]/).map(x=>x.trim());
+  if(p.length===1&&/^[A-Za-z][\w ]*$/.test(p[0])){cur=p[0];sec[cur]=sec[cur]||{};continue}
+  if(cur&&p.length>=3&&/^\d+$/.test(p[0])){let v=p[2];const n=parseInt(v.replace("+",""),10);v=isNaN(n)?v:n;let k=p[1],i=2;while(k in sec[cur])k=p[1]+"#"+(i++);sec[cur][k]=v}}
+ const ps=serialFromSections(sec);return{...h,serial:ps||h.serial,serial_source:ps?"param Info SERIAL No1-8":(h.serial?"PlotterName":null),sections:sec,file:name,kind:"param"}}
+// Mimaki keeps the serial in Info > SERIAL No1..No8, one ASCII code each (70,68,51,57,66,56,54,57 = FD39B869)
+function serialFromSections(sec){for(const name of ["Info",...Object.keys(sec).filter(k=>k!=="Info")]){const d=sec[name]||{};let out="";
+  for(let i=1;i<=8;i++){const v=d["SERIAL No"+i];if(typeof v!=="number"||v===0||v===32)break;if((v>=48&&v<=57)||(v>=65&&v<=90)||(v>=97&&v<=122))out+=String.fromCharCode(v).toUpperCase();else{out="";break}}
+  if(out.length>=6&&/[A-Z]/.test(out))return out}return null}
+function isParam(text){return /\n\s*(Operation|SystemParam|Mainte)\s*\r?\n/.test(text)}
+const hl=(s,H,L)=>(typeof s[H]==="number"&&typeof s[L]==="number")?s[H]*65536+(s[L]&0xffff):undefined;
+function paramMetrics(p){if(!p)return{};const k=p.sections.Ink1||{};const m={fw:p.fw,clean_normal:k.ClnCntN,clean_hard:k.ClnCntH,clean_soft:k.ClnCntS,wipe_count:k.WipeCnt,maint_count:k.CMntCount,
+ print_length:hl(k,"LengthH","LengthL"),print_area:hl(k,"PtAreaH","PtAreaL"),power_on_time:hl(k,"PonTimH","PonTimL"),last_station_maint_day:k.LastStMaintD,last_power_off_day:k["P.off U"]};
+ m.wipe_total=k.WipeACC;m.cap_clean=k.CapClen;
+ const pd=mimakiDate(k["P.off U"])||mimakiDate(k["Day Log"]);if(pd)m.param_date=pd;const lsm=mimakiDate(k.LastStMaintD);if(lsm)m.last_station_maint_date=lsm;const su=mimakiDate(k.SetUpDay);if(su)m.setup_date=su;
+ if(lsm&&pd)m.days_since_station_maint_at_poweroff=Math.round((new Date(pd)-new Date(lsm))/864e5);Object.keys(m).forEach(x=>m[x]===undefined&&delete m[x]);return m}
+// Mimaki packs dates in parameter files as (yy<<9)|(month<<5)|day, e.g. 12849 = 2025-01-17
+function mimakiDate(v){if(typeof v!=="number")return null;const y=v>>9,mo=(v>>5)&15,d=v&31;if(y<10||y>60||mo<1||mo>12||d<1||d>31)return null;
+ const dt=new Date(Date.UTC(2000+y,mo-1,d));return dt.getUTCMonth()===mo-1?iso(dt):null}
+const PERIOD_COUNTERS=[["clean_normal","Head cleanings (normal)"],["clean_hard","Head cleanings (hard)"],["clean_soft","Head cleanings (soft)"],["wipe_total","Wiper wipes (lifetime total)"],
+ ["wipe_count","Wiper wipes (since last wiper change)"],["cap_clean","Cap cleaning counter"],["maint_count","Maintenance counter (CMntCount)"],["print_length","Print length counter"],["power_on_time","Power-on time"]];
+// running totals between two parameter snapshots: parameter data only
+function paramPeriod(m0,m1,state,f0,f1){if(!m0||!m1||!m0.param_date||!m1.param_date)return null;if(m1.param_date<m0.param_date){[m0,m1]=[m1,m0];[f0,f1]=[f1,f0]}
+ const d0=new Date(m0.param_date+"T00:00:00Z"),d1=new Date(m1.param_date+"T00:00:00Z"),cal=Math.round((d1-d0)/864e5);if(cal<1)return null;
+ let wdn=0;for(let i=1;i<=cal;i++)if(working(add(d0,i),state)[0])wdn++;
+ const rows=[];for(const[k,label]of PERIOD_COUNTERS){const a=m0[k],b=m1[k];if(typeof a!=="number"||typeof b!=="number")continue;const r={key:k,label,from:a,to:b};
+  if(b<a)r.reset=true;else{r.change=b-a;if(wdn)r.per_working_day=Math.round(100*(b-a)/wdn)/100}
+  if(k==="power_on_time"){r.from_hours=Math.round(a/360)/10;r.to_hours=Math.round(b/360)/10;if("change" in r){r.change_hours=Math.round(r.change/360)/10;r.hours_per_day=Math.round(r.change/3600/cal*10)/10}}rows.push(r)}
+ const out={from:m0.param_date,to:m1.param_date,calendar_days:cal,working_days:wdn,expected_daily_maintenance:wdn,counters:rows,source:"parameter files only",files:[f0||null,f1||null]};
+ if(m0.last_station_maint_date)out.last_station_maint_start=m0.last_station_maint_date;
+ if(m1.last_station_maint_date){out.last_station_maint_end=m1.last_station_maint_date;let n=0;const l=new Date(m1.last_station_maint_date+"T00:00:00Z");for(let i=1;i<=Math.round((d1-l)/864e5);i++)if(working(add(l,i),state)[0])n++;out.working_days_since_last_station_maint=n}
+ const cl=rows.filter(r=>["clean_normal","clean_hard","clean_soft"].includes(r.key)).reduce((s,r)=>s+(r.change||0),0);out.cleanings_total=cl;out.cleanings_per_working_day=wdn?Math.round(100*cl/wdn)/100:null;return out}
+// key station + auto-clean settings (same list as the engine's KEY_POSITIONS / KEY_AUTOCLEAN); labels are a reading of Mimaki's short names
+const KEY_POSITIONS=[["SystemParam", "WipPosY", "Wiper position (Y)", "WIPER POS.(Y)"], ["SystemParam", "WpPosX1", "Wiper position H1", "WIPER POS.(H1)"], ["SystemParam", "WpPosX2", "Wiper position H2", "WIPER POS.(H2)"], ["SystemParam", "WWipPosY1", "Wiper position head 1 (Y)", ""], ["SystemParam", "WWipPosY2", "Wiper position head 2 (Y)", ""], ["SystemParam", "WWipPosY3", "Wiper position head 3 (Y)", ""], ["SystemParam", "WWipPosY4", "Wiper position head 4 (Y)", ""], ["SystemParam", "WipHght", "Wiper height", "WIPER HEIGHT"], ["SystemParam", "WipEscY", "Wiper escape position (Y)", ""], ["SystemParam", "StWipeP", "Station wiper offset", ""], ["SystemParam", "CapPosY", "Capping position (Y)", "CAPPING POS."], ["SystemParam", "CapHght", "Capping height", ""], ["SystemParam", "ZCapAdj", "Capping Z adjust", ""], ["SystemParam", "StCapPo", "Station capping offset", ""], ["SystemParam", "AirVacY", "Air pull position (Y)", "AIR PULL POS."], ["SystemParam", "StAirVa", "Station air pull offset", ""], ["SystemParam", "FLSposY", "Flushing position (Y)", "FLUSHING POS."], ["SystemParam", "StFlsPo", "Station flushing offset", ""], ["SystemParam", "PRGposY", "Purge position (Y)", ""]];
+const KEY_AUTOCLEAN=[["Operation", "ClIntvTm", "Cleaning interval (auto maintenance), hours"], ["Operation", "AMclnType", "Auto-maintenance cleaning type"], ["Operation", "AMclnType_Hi", "Auto-maintenance cleaning type (high)"], ["Operation", "CLNintv", "Interval cleaning setting"], ["Operation", "FLSintv", "Interval refresh / flushing setting"], ["Operation", "FlIntvTm", "Refresh / flushing interval time"], ["Operation", "OPrefresh", "Refresh level"], ["Operation", "PClIntTm", "Periodic cleaning interval time"], ["Operation", "PonClen", "Cleaning at power-on"], ["Operation", "ClnTimSB", "Standby cleaning time (4 on every file so far)"], ["Operation", "ACLmode", "Auto cleaning during printing (mode)"], ["Operation", "ACLtype", "Auto cleaning during printing (type)"], ["Operation", "ACLpage", "Auto cleaning during printing (pages)"], ["Operation", "ACLfeed", "Auto cleaning during printing (length)"], ["Operation", "ACLtime", "Auto cleaning during printing (time)"], ["Operation", "AUTOCLCAP", "Auto cap cleaning"], ["Operation", "NzClnType", "Nozzle recovery cleaning type"], ["Operation", "NcActPr", "Nozzle check before printing"], ["Operation", "NcPrCln", "Cleanings when nozzle check fails (printing)"], ["Operation", "NcActSt", "Nozzle check at start-up / standby"], ["Operation", "NcStCln", "Cleanings when nozzle check fails (standby)"], ["Operation", "WhFlItv", "White ink flushing interval"], ["Operation", "autocln", "Auto cleaning"], ["Operation", "slp-cln", "Sleep cleaning"], ["Operation", "ClnItIt", "Cleaning interval"], ["Operation", "SlpClnType", "Sleep cleaning type"], ["Operation", "SpRgClnTyp", "Regular cleaning type"], ["Operation", "SpSlpClnIt", "Sleep cleaning interval"], ["Operation", "OPWipScn", "Wipe every N scans"]];
+function findSetting(sec,s,k){const d=sec[s]||{};if(k in d)return d[k];const lk=k.toLowerCase();for(const n of [s,...Object.keys(sec).filter(x=>x!==s)])for(const [kk,v] of Object.entries(sec[n]||{}))if(kk.toLowerCase()===lk)return v;return null}
+function keySettings(params){if(!params||!params.length)return null;
+ const rows=(defs,pos)=>defs.map(d=>{const vals=params.map(p=>findSetting(p.sections,d[0],d[1]));if(vals.every(v=>v===null||v===undefined))return null;
+  const r={key:d[1],section:d[0],label:d[2],values:vals.map(v=>v===undefined?null:v),changed:new Set(vals.filter(v=>v!==null&&v!==undefined)).size>1};if(pos&&d[3])r.panel=d[3];return r}).filter(Boolean);
+ const ac=rows(KEY_AUTOCLEAN,false),last=r=>r.values[r.values.length-1];
+ return{files:params.map(p=>p.file),positions:rows(KEY_POSITIONS,true),auto_clean:ac,auto_clean_summary:{on:ac.filter(r=>typeof last(r)==="number"&&last(r)!==0&&r.key!=="OPWipScn").map(r=>r.label),off:ac.filter(r=>last(r)===0&&r.key!=="OPWipScn").map(r=>r.label),interval:(ac.find(r=>r.key==="ClIntvTm")?last(ac.find(r=>r.key==="ClIntvTm")):null)}}}
+function cleaningIntervalText(ks){const r=((ks||{}).auto_clean||[]).find(x=>x.key==="ClIntvTm");if(!r)return["not found in this model's parameter file","missing"];
+ const vals=r.values.filter(v=>v!==null&&v!==undefined),v=vals.length?vals[vals.length-1]:null,chg=r.changed&&vals.length?` (changed from ${vals[0]} h in the first file)`:"";
+ if(v===0)return["OFF (0) - auto-maintenance cleaning is not running"+chg,"off"];if(typeof v==="number"&&v>24)return[`${v} hours - outside the panel's 1-24 hour range, check the setting`+chg,"off"];
+ return[`every ${v} hours${v===4?"":" (usual setting is 4 hours)"}`+chg,"ok"]}
+function cleaningIntervalBox(ks){const [t,l]=cleaningIntervalText(ks);return `<div class="cibox ci-${l}"><div class="cit">Cleaning interval (auto maintenance): ${esc(t)}</div><div class="cis">Parameter ClIntvTm. The panel allows 1–24 hours; 4 hours is the usual setting.</div></div>`}
+function keySettingsView(ks){if(!ks)return"";const f=ks.files||[];const idx=f.length<=3?f.map((_,i)=>i):[0,f.length-1];
+ const heads=idx.map(i=>f.length===1?"Value":`File ${i+1}${i===0?" (first)":i===f.length-1?" (latest)":""}`);
+ const t=(rows,panel)=>`<table class="kstbl"><tr><th>Setting</th>${panel?"<th>Panel name</th>":""}${heads.map(h=>`<th>${h}</th>`).join("")}</tr>${rows.map(r=>`<tr class="${r.changed?"kschg":""}${r.key==="ClIntvTm"?" ksimp":""}"><td>${esc(r.label)} <span class="mono muted">${esc(r.key)}</span></td>${panel?`<td class="mono">${esc(r.panel||"")}</td>`:""}${idx.map(i=>`<td>${r.values[i]===null?"–":esc(String(r.values[i]))}</td>`).join("")}</tr>`).join("")}</table>`;
+ const sm=ks.auto_clean_summary||{on:[],off:[]};
+ return `<h2 style="margin-top:14px">Key station settings <small>from the parameter file</small></h2>
+ ${f.length>1?`<p class="small">Files in time order: ${f.map((x,i)=>`${i+1}. ${esc(x)}`).join(", ")}. <span class="kschg" style="padding:1px 5px;border-radius:4px">Shaded rows</span> changed between the files.</p>`:""}
+ ${cleaningIntervalBox(ks)}
+ <h3 class="ksh">Wiper, capping, air pull and flushing positions</h3>${ks.positions.length?t(ks.positions,true):'<p class="small muted">This model\'s parameter file doesn\'t hold the station position settings.</p>'}
+ ${ks.auto_clean.length?`<h3 class="ksh">Auto-clean settings</h3><p class="small">${sm.on.length?`<b>Set (non-zero):</b> ${sm.on.map(esc).join("; ")}. `:""}${sm.off.length?`<b>Zero / off:</b> ${sm.off.map(esc).join("; ")}.`:""}</p>${t(ks.auto_clean,false)}`:""}
+ <p class="small muted">Setting names are read from Mimaki's short parameter names (shown in grey) and should be confirmed against the panel. Values are the raw numbers in the file; 0 normally means the function is off.</p>`}
+function paramPeriodView(pp,state){if(!pp)return"";const f=pp.files||[];
+ return `<h2 style="margin-top:14px">Running totals between parameter files <small>parameter data only</small></h2>
+ <div class="ppnote"><b>PARAMETER DATA ONLY.</b> This section uses only the two parameter files' built-in dates and running counters. It doesn't use the log, so it covers the whole period between the two files even where no log exists. Counters show totals, not which days things happened, and cleanings and wipes also run automatically, so treat them as an indication of activity, not proof the operator did daily maintenance.</div>
+ <table><tr><th>Counter</th><th>At ${esc(pp.from)}</th><th>At ${esc(pp.to)}</th><th>Change</th><th>Per working day</th></tr>${pp.counters.map(r=>r.key==="power_on_time"
+  ?`<tr><td>${esc(r.label)} (hours)</td><td>${r.from_hours}</td><td>${r.to_hours}</td><td>${"change_hours" in r?r.change_hours.toLocaleString():"reset"}</td><td>${"hours_per_day" in r?r.hours_per_day+" h / calendar day":""}</td></tr>`
+  :`<tr><td>${esc(r.label)}</td><td>${r.from.toLocaleString()}</td><td>${r.to.toLocaleString()}</td><td>${"change" in r?r.change.toLocaleString():"reset"}</td><td>${r.per_working_day??""}</td></tr>`).join("")}</table>
+ ${pp.last_station_maint_end?`<p class="small">Last station maintenance recorded in the parameters: <b>${esc(pp.last_station_maint_end)}</b>, ${pp.working_days_since_last_station_maint} working day(s) before the later file was saved.</p>`:""}`}
+// time order of parameter files from the machine's own counters (they only increase), not file names
+const ORDER_KEYS=["power_on_time","last_power_off_day","wipe_count","print_length","clean_normal"];
+function orderParams(params){if(!params.length)return{ordered:[],info:null};
+ const rows=params.map((p,i)=>{const m=paramMetrics(p);return{p,i,m,key:ORDER_KEYS.map(k=>typeof m[k]==="number"?m[k]:-1)}});
+ const cmp=(a,b)=>{for(let j=0;j<a.key.length;j++)if(a.key[j]!==b.key[j])return a.key[j]-b.key[j];return a.i-b.i};rows.sort(cmp);
+ const notes=[];for(let j=1;j<rows.length;j++){const a=rows[j-1],b=rows[j];if(a.key.every((x,n)=>x===b.key[n]))notes.push(`${a.p.file} and ${b.p.file} have identical counters`);
+  else{const back=ORDER_KEYS.filter((k,n)=>a.key[n]>=0&&b.key[n]>=0&&b.key[n]<a.key[n]);if(back.length)notes.push(`${b.p.file} is newer by power-on time but lower on ${back.join(", ")}`)}}
+ const ser=new Set(params.map(p=>p.serial).filter(Boolean));if(ser.size>1)notes.push("files are from different machines: "+[...ser].join(", "));
+ const n=rows.length;return{ordered:rows.map(r=>r.p),info:{method:"machine counters",certain:!notes.length,notes,
+  files:rows.map((r,j)=>({file:r.p.file,serial:r.p.serial,position:j+1,role:n<2?"only":j===0?"before":j===n-1?"after":"between",...Object.fromEntries(ORDER_KEYS.filter(k=>typeof r.m[k]==="number").map(k=>[k,r.m[k]]))}))}}}
+// ---- install check (same rules as the engine): new install = factory-fresh first parameter file
+const INST_SKIP=new Set(["Cart","Ink1","MecaInfo","Strings","PlotterName","Info","WInf","Nozzle"]),INST_TABLE=/^(Wave\d*|WaveP|Wfsel|Landing|Pressure)$/,
+ INST_COUNTER=/(Cnt|Count|Tim[HL]?$|Length|PtArea|P\.off|LastSt|Date|Day|Time|Hour|Num$|Total|Usage|Remain)/i;
+function isFresh(p){const m=paramMetrics(p);return (m.power_on_time||0)<50000&&(m.wipe_count||0)<=50&&(m.print_length||0)<=5000}
+function installChanges(a,b){const out=[];if(a.fw!==b.fw)out.push(["Firmware","FW version",a.fw,b.fw]);const tab={};
+ for(const sec of [...new Set([...Object.keys(a.sections),...Object.keys(b.sections)])].sort()){if(INST_SKIP.has(sec))continue;const x=a.sections[sec]||{},y=b.sections[sec]||{};
+  for(const k of [...new Set([...Object.keys(x),...Object.keys(y)])].sort()){if(INST_COUNTER.test(k))continue;const xv=k in x?x[k]:0,yv=k in y?y[k]:0;if(xv===yv)continue;
+   if(INST_TABLE.test(sec)){const t=sec.replace(/\d+$/,"");tab[t]=(tab[t]||0)+1}else if(!(k in x)&&(sec in a.sections)&&a.fw!==b.fw)continue;else out.push([sec,k,xv,yv])}}
+ for(const[t,n]of Object.entries(tab))out.push([t+" tables",t+" table values","",n+" values updated"]);return out}
+// plain-English summary of head adjustment values (same rules as the engine's summarize_param_changes / summarize_missed)
+const HF=[[/^([SR])(\d{2,3})([NH]) ?(\d{1,2})([A-D])$/,"dotpos"],[/^BI ?(U?)W(\d{2,3})([NH])$/,"bidir"],[/^WF(\d)([SML])_Vol(\d+)$/,"wfvol"],[/^H(\d) ?Vpp/,"vpp"],[/^H(\d) ?Vof/,"vof"],[/^H(\d)SNO/,"sno"]];
+function headFamily(name){const n=String(name).split("#")[0].trim();for(const [rx,fam] of HF){const m=n.match(rx);if(!m)continue;
+ if(fam==="dotpos")return["dotpos_"+m[1],"Dot position correction (nozzle row alignment), "+(m[1]==="S"?"outward pass":"return pass"),{line:+m[4],mode:m[2],speed:m[3]}];
+ if(fam==="bidir")return["bidir"+m[1],"Bi-directional correction (lines up return pass with outward pass)"+(m[1]?", second set (BIUW)":""),{mode:m[2],speed:m[3]}];
+ if(fam==="wfvol")return["wfvol","Head drive voltage per waveform",{wave:+m[1],drop:m[2]}];
+ return[fam,{vpp:"Head drive voltage",vof:"Head drive voltage offset",sno:"Head serial number record (head fitted / replaced)"}[fam],{head:+m[1]}]}return null}
+function ranges(nums){nums=[...new Set(nums)].sort((a,b)=>a-b);const out=[];for(const x of nums){if(out.length&&x===out[out.length-1][1]+1)out[out.length-1][1]=x;else out.push([x,x])}return out.map(([a,b])=>a===b?`${a}`:`${a}-${b}`).join(", ")}
+function familyDetail(items){const p=[],lines=items.filter(i=>"line" in i).map(i=>i.line),heads=items.filter(i=>"head" in i).map(i=>i.head),modes=[...new Set(items.filter(i=>"mode" in i).map(i=>i.mode))].sort(),speeds=[...new Set(items.filter(i=>"speed" in i).map(i=>i.speed))];
+ if(heads.length)p.push((new Set(heads).size===1?"head ":"heads ")+ranges(heads));if(lines.length)p.push((new Set(lines).size===1?"nozzle line ":"nozzle lines ")+ranges(lines));
+ if(modes.length)p.push((modes.length===1?"print mode ":"print modes ")+modes.join(", "));
+ const waves=items.filter(i=>"wave" in i).map(i=>i.wave),drops=["S","M","L"].filter(d=>items.some(i=>i.drop===d));
+ if(waves.length)p.push((new Set(waves).size===1?"waveform ":"waveforms ")+ranges(waves));if(drops.length)p.push(drops.map(d=>({S:"small",M:"medium",L:"large"})[d]).join(", ")+" drops");
+ if(speeds.length)p.push(speeds.length===1?({N:"normal speed",H:"high speed"})[speeds[0]]:"normal and high speed");return p.join("; ")}
+function knownLabel(name){const b=String(name).split("#")[0];const d=[...KEY_POSITIONS,...KEY_AUTOCLEAN].find(x=>x[1]===b);return d?`${d[2]} (${name})`:name}
+function summarizeParamChanges(changes){const g={},order=[],out=[];for(const c of changes||[]){const hf=headFamily(c.name);if(!hf){out.push({section:c.section,label:knownLabel(c.name),before:c.before,after:c.after,summary:false});continue}
+ const [k,lab,info]=hf;if(!g[k]){g[k]={label:lab,items:[],deltas:[],section:c.section};order.push(k)}g[k].items.push(info);if(typeof c.before==="number"&&typeof c.after==="number"&&k!=="sno")g[k].deltas.push(Math.abs(c.after-c.before))}
+ return order.map(k=>{const x=g[k],n=x.items.length;let t=`${x.label}: ${n} value${n!==1?"s":""} changed - ${familyDetail(x.items)}`;if(x.deltas.length)t+=`; largest change ${Math.max(...x.deltas)}`;return{section:x.section,label:t,before:"",after:"",summary:true,count:n}}).concat(out)}
+function summarizeMissed(missed){const g={},order=[],out=[];for(const m of missed||[]){const hf=headFamily(m.name);if(!hf){out.push({...m,label:knownLabel(m.name)});continue}
+ const [k,lab,info]=hf;if(!g[k]){g[k]={label:lab,items:[],conf:new Set(),kind:new Set(),section:m.section};order.push(k)}g[k].items.push(info);g[k].conf.add(m.confidence);g[k].kind.add(m.kind)}
+ return order.map(k=>{const x=g[k],n=x.items.length;return{section:x.section,name:k,label:`${x.label}: ${n} value${n!==1?"s":""} not re-set - ${familyDetail(x.items)}`,value:"not re-adjusted",other_installs_set:["re-adjusted"],kind:[...x.kind].filter(Boolean).sort().join("/"),confidence:x.conf.has("likely missed")?"likely missed":[...x.conf].filter(Boolean).sort()[0],summary:true}}).concat(out)}
+function installCheck(ordered,model,serial,profiles){if(!ordered.length||!isFresh(ordered[0]))return null;const before=ordered[0],after=ordered.length>1?ordered[ordered.length-1]:null;
+ const m0=paramMetrics(before);const rec={evidence:"factory-fresh counters in the first parameter file",before:before.file,after:after?after.file:null,before_counters:Object.fromEntries(ORDER_KEYS.map(k=>[k,m0[k]]))};
+ const peers=(((profiles||{}).models||{})[model]||[]).filter(p=>p.serial!==serial);rec.peers=peers.map(p=>p.serial);
+ if(!after){rec.finding="Only one parameter file from the install visit, so the completed-install copy is missing or wasn't saved.";return rec}
+ const ch=installChanges(before,after);rec.changes=ch.map(([section,name,b,a])=>({section,name,before:b,after:a}));
+ if(!peers.length){rec.finding="No other install of this model with before/after files to compare against yet.";return rec}
+ const key=(s,k)=>s+"\u0001"+k,mine=new Set(ch.map(c=>key(c[0],c[1]))),cnt={};peers.forEach(p=>new Set(p.changes.map(c=>key(c[0],c[1]))).forEach(k=>cnt[k]=(cnt[k]||0)+1));
+ const need=peers.length<=2?peers.length:Math.ceil(peers.length*2/3);const common=Object.keys(cnt).filter(k=>cnt[k]>=need);const missed=[];
+ const doneFams=new Set([...mine].map(k=>headFamily(k.split("\u0001")[1])).filter(Boolean).map(f=>f[0]));
+ for(const k of common.sort()){if(mine.has(k))continue;const[s,n]=k.split("\u0001");{const hf=headFamily(n);if(hf&&doneFams.has(hf[0]))continue}const vals=peers.flatMap(p=>p.changes.filter(c=>c[0]===s&&c[1]===n).map(c=>c[2]));
+  const val=s==="Firmware"?after.fw:(s.endsWith(" tables")?null:((after.sections[s]||{})[n]??null));const same=new Set(vals.map(String)).size===1;
+  if(val===null&&!s.endsWith(" tables"))continue;if(same&&String(val)===String(vals[0]))continue;
+  missed.push({section:s,name:n,value:val,other_installs_set:vals,kind:same?"setting":"adjustment",confidence:peers.length>=2?"likely missed":"check (only one other install to compare)"})}
+ rec.common_steps=common.length;rec.missed=missed;
+ const nM=summarizeMissed(missed).length,nC=summarizeParamChanges(common.map(k=>{const[s,n]=k.split("\u0001");return{section:s,name:n}})).length;
+ rec.finding=common.length?(missed.length?`${nM} of the ${nC} steps normally done on a ${model} install look skipped.`:`All ${nC} steps normally done on a ${model} install were done (or were already at the usual value).`):"Other installs of this model don't share a common set of changes yet.";return rec}
+function installView(ic,model){return `<h2 style="margin-top:14px">New install check</h2><div class="${(ic.missed||[]).length?"warnnote":"note"}"><b>${esc(ic.finding)}</b><br><span class="small">${esc(ic.evidence)}. Before: <span class="mono">${esc(ic.before)}</span>, after: <span class="mono">${esc(ic.after||"not supplied")}</span>. Compared with ${(ic.peers||[]).length} other ${esc(model||"")} install(s)${(ic.peers||[]).length?": "+ic.peers.map(esc).join(", "):""}.</span></div>
+ ${(ic.missed||[]).length?`<table><tr><th>Section</th><th>Setting</th><th>This machine</th><th>Other installs set it to</th><th>Type</th><th>Status</th></tr>${summarizeMissed(ic.missed).slice(0,80).map(m=>`<tr><td>${esc(m.section)}</td><td>${esc(m.label||m.name)}</td><td>${m.section.endsWith(" tables")?"not updated":esc(m.value)}</td><td>${esc(m.other_installs_set.join(", "))}</td><td>${esc(m.kind)}</td><td>${esc(m.confidence)}</td></tr>`).join("")}</table>`:""}`}
+function paramDiff(cur,prevSnap){if(!cur||!prevSnap)return[];const out=[];for(const s of [...ENGINEER_SECTIONS,"Feed"]){const a=prevSnap[s]||{},b=cur.sections[s]||{};for(const k of new Set([...Object.keys(a),...Object.keys(b)])){if(s==="Feed"&&!["System","RvsXAdj"].includes(k.split("#")[0]))continue;if((a[k]??0)!==(b[k]??0))out.push({section:s,name:k,before:a[k]??0,after:b[k]??0})}}return out}
+
+// ---------------------------------------------------------------- analysis
+const match=(e,rules)=>(rules||[]).find(r=>r.code===e.code&&(r.sub==="*"||r.sub===e.sub));
+const MAX_AGE_YEARS=null; // no age limit (a Mimaki log only holds the last ~2-5 weeks anyway); set a number to limit
+function cutoffISO(){if(!MAX_AGE_YEARS)return"2000-01-01";const d=new Date();d.setFullYear(d.getFullYear()-MAX_AGE_YEARS);return d.toISOString().slice(0,10)}
+function inWindow(r){const d=rk(r);return !d||d>=cutoffISO()}
+function analyse(logs,params,serial,state,codes,fleet,meta,opt){opt=opt||{};
+ const CUT=cutoffISO();let nOld=0,nOut=0;const LO=opt.from&&opt.from>CUT?opt.from:CUT,HI=opt.to||null;
+ logs=logs.map(L=>({...L,events:L.events.filter(e=>{const d=e.ts.toISOString().slice(0,10);if(d<CUT){nOld++;return false}if(d<LO||(HI&&d>HI)){nOut++;return false}return true})}));fleet=(fleet||[]).filter(inWindow);
+ const best=new Map();for(const L of logs){const c=new Map();for(const e of L.events){const k=e.ts.getTime()+"|"+e.code+"|"+e.sub+"|"+e.val;c.set(k,(c.get(k)||0)+1)}for(const[k,n]of c)best.set(k,Math.max(best.get(k)||0,n))}
+ const events=[];for(const[k,n]of best){const[t,code,sub,val]=k.split("|");for(let i=0;i<n;i++)events.push({ts:new Date(+t),code,sub,val})}events.sort((a,b)=>a.ts-b.ts);
+ const model=[...logs,...params].map(x=>x.model).find(Boolean)||null,fw=[...params,...logs].map(x=>x.fw).find(Boolean)||null;
+ const res={engine_version:"1.0.0-web",serial,model,fw,state,generated:new Date().toISOString().slice(0,19),codes_status:codes.status||"draft",files:[...logs,...params].map(x=>x.file),meta,data_limit:{years:MAX_AGE_YEARS,from:CUT,asof:new Date().toISOString().slice(0,10),old_log_events_excluded:nOld},...(MAX_AGE_YEARS?{}:{data_limit:undefined}),...(opt.from||opt.to?{date_filter:{from:opt.from||null,to:opt.to||null,events_outside:nOut}}:{})};
+ if(!events.length&&!params.length){res.error="No log events or parameter data found";return res}
+ const per={},adj=[],cDays={},cCnt={};
+ for(const e of events){const d=iso(e.ts);const P=per[d]=per[d]||{events:0,maint:[],clean:0,adjust:[]};P.events++;const k=e.code+"/"+e.sub;(cDays[k]=cDays[k]||new Set()).add(d);cCnt[k]=(cCnt[k]||0)+1;
+  if(codes.activity&&codes.activity.length){if(match(e,codes.activity))P.used=(P.used||0)+1}
+  if(match(e,codes.ignore))continue;if(!(codes.activity&&codes.activity.length))P.used=(P.used||0)+1;if(match(e,codes.daily_maintenance)){P.maint.push(e.ts.toISOString().slice(11,16));continue}if(match(e,codes.cleaning)){P.clean++;continue}if(match(e,codes.power_on))continue;
+  const r=match(e,codes.adjust);if(r){const it={ts:e.ts.toISOString().slice(0,19).replace("T"," "),code:k,value:e.val,label:r.label||k};if(r.supporting)it.supporting=true;P.adjust.push(it)}}
+  for(const P of Object.values(per)){const real=P.adjust.filter(a=>!a.supporting),sup=P.adjust.filter(a=>a.supporting);P.adjust=real.length?real.concat(sup.slice(0,1)):[];adj.push(...P.adjust)}adj.sort((a,b)=>a.ts.localeCompare(b.ts));
+ // what each uploaded log covers; days between files (e.g. two logs a year apart) have no data
+ const cov=[];logs.filter(L=>L.events.length).map(L=>{let a=L.events[0].ts,b=a;L.events.forEach(e=>{if(e.ts<a)a=e.ts;if(e.ts>b)b=e.ts});return[iso(a),iso(b)]}).sort().forEach(([a,b])=>{const l=cov[cov.length-1];if(l&&a<=iso(add(new Date(l[1]+"T00:00:00Z"),1))){if(b>l[1])l[1]=b}else cov.push([a,b])});
+ const covered=ds=>cov.some(([a,b])=>a<=ds&&ds<=b);
+ const days=[];if(events.length){let d=new Date(Date.UTC(events[0].ts.getUTCFullYear(),events[0].ts.getUTCMonth(),events[0].ts.getUTCDate()));const end=iso(events[events.length-1].ts);let gap=null;
+  while(iso(d)<=end){const[w,h]=working(d,state);const P=per[iso(d)];const done=!!(P&&P.maint.length);const used=!!(P&&(P.used||done));
+   // only working days the machine was actually used count; maintenance on any day resets the count
+   const cv=covered(iso(d));
+   if(!cv)gap=null;else if(done)gap=0;else if(w&&used)gap=gap===null?1:gap+1;
+   let st=null;if(!cv)st="nolog";else if(w){st=(!used&&!done)?"idle":gap===null?"nodata":gap>=7?"red":gap>=3?"yellow":"green"}
+   days.push({d:iso(d),w,h:h&&h!=="Weekend"?h:null,act:used,m:done,mt:P?P.maint.slice(0,8):[],c:P?P.clean:0,a:P?P.adjust.length:0,g:(w&&used)?gap:null,s:st});d=add(d,1)}}
+ res.window=events.length?{start:iso(events[0].ts),end:iso(events[events.length-1].ts),events:events.length,excel_converted:logs.some(l=>l.excel_converted)}:null;
+ res.days=days;res.weeks=weeksOf(days);
+ const visits=[];for(const x of days)if(x.a){const ev=adj.filter(a=>a.ts.startsWith(x.d));const sm={};ev.forEach(a=>sm[a.label]=(sm[a.label]||0)+1);visits.push({date:x.d,count:ev.length,first:ev[0].ts.slice(11,16),last:ev[ev.length-1].ts.slice(11,16),functions:Object.entries(sm).map(([label,count])=>({label,count})),codes:[...new Set(ev.map(a=>a.code))].sort()})}
+ res.possible_service_visits=visits;
+ const mapped=new Set();["daily_maintenance","cleaning","adjust","ignore","power_on"].forEach(g=>(codes[g]||[]).forEach(r=>mapped.add(r.code+"/"+r.sub)));
+ res.rare_unmapped_codes=Object.keys(cCnt).filter(k=>!mapped.has(k)&&!mapped.has(k.split("/")[0]+"/*")&&cDays[k].size<=2&&cCnt[k]<=6).sort().map(k=>({code:k,count:cCnt[k],dates:[...cDays[k]].sort()}));
+ const work=days.filter(x=>x.w&&(x.act||x.m)),wt=work.length,md=work.filter(x=>x.m).length;
+ const k={working_days_in_window:days.filter(x=>x.w&&x.s!=="nolog").length,no_log_working_days:days.filter(x=>x.w&&x.s==="nolog").length,idle_working_days:days.filter(x=>x.s==="idle").length,working_days:wt,maint_days:md,compliance_pct:wt?Math.round(1000*md/wt)/10:null,max_gap:Math.max(0,...work.filter(x=>x.s!=="nodata"&&x.s!=="idle").map(x=>x.g||0)),
+  weeks_green:res.weeks.filter(w=>w.status==="green").length,weeks_yellow:res.weeks.filter(w=>w.status==="yellow").length,weeks_red:res.weeks.filter(w=>w.status==="red").length,
+  adjust_events:adj.length,service_visit_days:visits.length,cleanings:days.reduce((s,x)=>s+x.c,0)};
+ k.overall=k.weeks_red?"red":k.weeks_yellow?"yellow":k.weeks_green?"green":"nodata";res.kpi=k;
+ const ord=orderParams(params);params=ord.ordered;if(params.length>1)res.param_order=ord.info;
+ const P=params[params.length-1];res.param=paramMetrics(P);
+ if(params.length>1){const F=params[0];res.param_changes_between_files=paramDiff(P,F.sections);const m0=paramMetrics(F);res.param_counters_between_files={};
+  ["clean_normal","clean_hard","wipe_count","maint_count","print_length","power_on_time","last_power_off_day"].forEach(x=>{if(typeof res.param[x]==="number"&&typeof m0[x]==="number")res.param_counters_between_files[x]=res.param[x]-m0[x]})}if(!res.serial&&P&&P.serial)res.serial=P.serial;
+ const prev=(fleet||[]).filter(r=>r.serial===res.serial).sort((a,b)=>rk(a).localeCompare(rk(b))).pop();
+ {let pp=null;if(params.length>1)pp=paramPeriod(paramMetrics(params[0]),res.param,state,params[0].file,P.file);
+  if(!pp&&prev&&prev.param&&res.param)pp=paramPeriod(prev.param,res.param,state,"previous review",P?P.file:null);if(pp)res.param_period=pp}
+ {const ks=keySettings(params);if(ks&&(ks.positions.length||ks.auto_clean.length))res.key_settings=ks}
+ res.param_engineer_changes=prev&&prev.param_snapshot&&P?paramDiff(P,prev.param_snapshot):[];
+ if(prev&&prev.param&&res.param){res.param_delta_since_last_review={};["clean_normal","clean_hard","wipe_count","maint_count","print_length","power_on_time"].forEach(x=>{if(typeof res.param[x]==="number"&&typeof prev.param[x]==="number")res.param_delta_since_last_review[x]=res.param[x]-prev.param[x]})}
+ if(P){res.param_snapshot={};[...ENGINEER_SECTIONS,"Feed"].forEach(s=>{const o={};Object.entries(P.sections[s]||{}).forEach(([k,v])=>{if(v!==0&&v!=="0")o[k]=v});res.param_snapshot[s]=o})}
+ return res}
+function weeksOf(days){const W={};for(const x of days){const d=new Date(x.d+"T00:00:00Z");const k=iso(add(d,-wd(d)));(W[k]=W[k]||[]).push(x)}const rank={nodata:0,idle:0,nolog:0,green:1,yellow:2,red:3};
+ const out=[];Object.keys(W).sort().forEach(k=>{const ds=W[k],w=ds.filter(x=>x.w);let st="nodata";w.forEach(x=>{if(x.s&&x.s!=="idle"&&x.s!=="nolog"&&rank[x.s]>rank[st])st=x.s});if(st==="nodata"&&w.some(x=>x.s==="idle"))st="idle";
+  if(st==="nodata"&&ds.every(x=>x.s==="nolog"))st="nolog";
+  if(st==="nolog"){const l=out[out.length-1];if(l&&l.status==="nolog"){l.week_end=k;l.weeks++;return}out.push({week_start:k,week_end:k,weeks:1,status:"nolog",working_days:0,maint_days:0,max_gap:0,holidays:[],adjust_events:0});return}
+  out.push(wkObj(k,st,ds,w))});return out}
+function wkObj(k,st,ds,w){
+  return{week_start:k,status:st,working_days:w.length,maint_days:w.filter(x=>x.m).length,max_gap:Math.max(0,...w.map(x=>x.g||0)),holidays:ds.filter(x=>x.h).map(x=>x.d+" "+x.h),adjust_events:ds.reduce((s,x)=>s+(x.a||0),0)}}
+// normalise days from python records ({d,s,m,a,w}) or web ({...})
+function normDays(r){return(r.days||[]).map(x=>({d:x.d||x.date,s:x.s??x.status,m:x.m??x.maint_done,a:x.a??x.adjust_count??0,w:x.w??x.working,h:x.h??(x.holiday&&x.holiday!=="Weekend"?x.holiday:null),mt:x.mt||x.maint_times||[],g:x.g??x.gap_working_days,c:x.c??x.cleanings}))}
+
+// ---------------------------------------------------------------- render helpers
+const tip=$("#tip");document.addEventListener("mousemove",e=>{const t=e.target.closest("[data-tip]");if(!t){tip.style.display="none";return}tip.innerHTML=t.dataset.tip;tip.style.display="block";tip.style.left=Math.min(e.clientX+14,innerWidth-300)+"px";tip.style.top=(e.clientY+14)+"px"});
+function weekGrid(r){const days=normDays(r);const map={};days.forEach(x=>map[x.d]=x);const weeks=r.weeks||weeksOf(days);if(!weeks.length)return`<div class="empty">No dated log events.</div>`;
+ let h=`<div class="grid"><div></div>${["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d=>`<div class="h">${d}</div>`).join("")}<div class="h">Week</div>`;
+ const fmt=d=>d.toLocaleDateString("en-AU",{day:"2-digit",month:"short",year:"2-digit",timeZone:"UTC"});
+ for(const w of weeks){const ws=new Date(w.week_start+"T00:00:00Z");
+  if(w.status==="nolog"){const we=add(new Date((w.week_end||w.week_start)+"T00:00:00Z"),6);h+=`<div class="wl">${fmt(ws)} –</div><div class="nologrow">No log data ${fmt(ws)} – ${fmt(we)} (${w.weeks||1} week${(w.weeks||1)==1?"":"s"}): not covered by the uploaded logs</div>`;continue}
+  h+=`<div class="wl">w/c ${fmt(ws)}</div>`;
+  for(let i=0;i<7;i++){const d=iso(add(ws,i)),x=map[d];if(!x||x.s==="nolog"){h+=`<div class="cell none"></div>`;continue}
+   const tipt=`<b>${new Date(d+"T00:00:00Z").toLocaleDateString("en-AU",{weekday:"short",day:"numeric",month:"short",year:"numeric",timeZone:"UTC"})}</b><br>${x.w?(x.m?"Maintenance run "+(x.mt||[]).join(", "):"No maintenance run")+(x.g!=null?`<br>Gap: ${x.g} working day(s)`:"")+`<br>Status: ${STATUS[x.s||"nodata"]}`:(x.h||"Weekend")}${x.a?`<br>◆ ${x.a} Adjust event(s)`:""}${x.act?"":"<br><i>No log activity</i>"}`;
+   const cls=x.w?(x.s||"nodata"):"off";const txt=x.h?"PH":(x.m?"✓":"");h+=`<div class="cell ${cls}" data-tip="${esc(tipt)}">${txt}${x.a?'<span class="dia"></span>':""}</div>`}
+  h+=`<div class="wk ${w.status}" data-tip="${esc(`${w.maint_days}/${w.working_days} working days maintained · longest gap ${w.max_gap}${w.holidays.length?"<br>"+w.holidays.join("<br>"):""}`)}">${STATUS[w.status]}</div>`}
+ return h+`</div><div class="legend"><span><i style="background:var(--good)"></i>Excellent (done within 2 working days in use)</span><span><i style="background:var(--warn)"></i>Good (3–6 working days)</span><span><i style="background:var(--crit)"></i>Poor (7+ working days)</span><span><i style="background:var(--idle)"></i>Not used (no print activity, not counted)</span><span><i style="background:#fff;border:1px dashed var(--nodata)"></i>No log data (between uploaded logs)</span><span><i style="background:var(--wkend)"></i>Weekend</span><span>PH public holiday</span><span>✓ maintenance run</span><span>◆ Adjust activity</span></div>`}
+function bars(rows){const mx=100;return rows.map((r,i)=>`<div class="bar"><div class="lab">${esc(r.label)}</div><div class="track"><div class="fill ${i?"alt":""}" style="width:${Math.max(0,Math.min(100,(r.v||0)/mx*100))}%"></div></div><div class="val">${r.v==null?"–":r.v+"%"}</div></div>`).join("")}
+function avg(a){a=a.filter(x=>typeof x==="number");return a.length?Math.round(a.reduce((s,x)=>s+x,0)/a.length*10)/10:null}
+function rk(r){return (r.window&&r.window.end)||(r.review_date&&r.review_date!=="undated"?r.review_date:"")||(r.generated||"").slice(0,10)}
+S.bulk=[];S.dbReviews=[];
+function mergeReviews(){const ids=new Set(S.dbReviews.map(r=>r._id));S.reviews=S.dbReviews.concat(S.bulk.filter(r=>!ids.has(r._id))).filter(inWindow);renderAll()}
+fetch("/logreview/api/profiles",{credentials:"same-origin"}).then(r=>r.ok?r.json():null).then(j=>{if(j)S.installProfiles=j}).catch(()=>{});
+fetch("/logreview/api/reviews",{credentials:"same-origin"}).then(r=>r.ok?r.json():null).then(j=>{if(j&&j.reviews){S.bulk=j.reviews.map(r=>({...r,_id:r._doc_id}));mergeReviews()}}).catch(()=>{});
+function latestBySerial(){const m={};for(const r of S.reviews){if(!r.serial)continue;if(!m[r.serial]||rk(r)>rk(m[r.serial]))m[r.serial]=r}return Object.values(m)}
+
+function reportView(r,saved){const k=r.kpi||{},w=r.window||{},latest=latestBySerial().filter(x=>x.serial!==r.serial);const same=latest.filter(x=>x.model===r.model);
+ const hist=S.reviews.filter(x=>x.serial===r.serial).sort((a,b)=>rk(a).localeCompare(rk(b)));
+ let h=`<div class="tiles"><div class="tile"><div class="k">Overall</div><div class="v">${pill(k.overall)}</div><div class="s">${esc(r.serial||"Unknown serial")} · ${esc(r.model||"")} ${esc(r.fw||"")}</div></div>
+ <div class="tile"><div class="k">Compliance</div><div class="v">${k.compliance_pct??"–"}%</div><div class="s">${k.maint_days??0} of ${k.working_days??0} working days in use${k.idle_working_days?` · ${k.idle_working_days} not used`:""}</div></div>
+ <div class="tile"><div class="k">Longest gap</div><div class="v">${k.max_gap??0}</div><div class="s">working days without maintenance</div></div>
+ <div class="tile"><div class="k">Service Mode\\Adjustments</div><div class="v">${k.service_visit_days??0}</div><div class="s">${k.adjust_events??0} Adjust event(s)</div></div>${r.key_settings?(()=>{const [t,l]=cleaningIntervalText(r.key_settings);const iv=(r.key_settings.auto_clean||[]).find(x=>x.key==="ClIntvTm");const v=iv?iv.values[iv.values.length-1]:null;return `<div class="tile cibox ci-${l}" style="margin:0"><div class="k">Cleaning interval (auto maint.)</div><div class="v">${v===null||v===undefined?"–":v===0?"OFF":v+" h"}</div><div class="s">${esc(t)}</div></div>`})():""}</div>`;
+ h+=`<div class="card"><h2>Weekly daily-maintenance breakdown <small>${w.start?`${w.start} → ${w.end} · ${(w.events||0).toLocaleString()} events · ${esc(r.state||"WA")} holidays`:""}</small></h2>${w.excel_converted?'<div class="note">This log had been saved through Excel, so its dates were corrected from Excel\'s DD/MM/YY mis-read.</div>':""}${weekGrid(r)}</div>`;
+ h+=`<div class="flex"><div class="card"><h2>Service Mode\\Adjustments <small>Adjust-menu activity · operators can't open it</small></h2>${(r.possible_service_visits||[]).length?`<table><tr><th>Date</th><th>Time</th><th>Functions</th></tr>${r.possible_service_visits.map(v=>`<tr><td>${v.date}</td><td>${v.first}–${v.last}</td><td>${v.functions.map(f=>esc(f.label)+" ×"+f.count).join("<br>")}<div class="mono muted">${v.codes.join(", ")}</div></td></tr>`).join("")}</table>`:'<div class="muted small">None detected in this log window.</div>'}
+ ${r.date_filter?`<div class="note">Review limited to <b>${esc(r.date_filter.from||"start of log")}</b> – <b>${esc(r.date_filter.to||"end of log")}</b>; ${r.date_filter.events_outside} log events outside that range left out.</div>`:""}
+ ${r.param_period?paramPeriodView(r.param_period,r.state):""}
+ ${r.key_settings?keySettingsView(r.key_settings):""}
+ ${r.install_check?installView(r.install_check,r.model):""}
+ ${r.data_limit&&r.data_limit.old_log_events_excluded?`<p class="small muted">Only data from the last ${r.data_limit.years} years is used (from ${esc(r.data_limit.from)}); ${r.data_limit.old_log_events_excluded} older log events were left out.</p>`:""}
+ ${r.param_order?`<h2 style="margin-top:14px">Parameter files compared <small>ordered by the machine's counters</small></h2>${r.param_order.certain?"":`<div class="warnnote">Check the order: ${esc(r.param_order.notes.join("; "))}</div>`}<table><tr><th>#</th><th>File</th><th>Role</th><th>Power-on counter</th><th>Power-off day</th><th>Wipes</th><th>Print length</th><th>Cleanings</th></tr>${r.param_order.files.map(f=>`<tr><td>${f.position}</td><td class="mono">${esc(f.file)}</td><td>${esc(f.role)}</td>${ORDER_KEYS.map(k=>`<td>${f[k]??"–"}</td>`).join("")}</tr>`).join("")}</table>
+ ${(r.param_changes_between_files||[]).length?`<h2 style="margin-top:14px">Engineer-only parameters changed between earliest and latest file</h2><table><tr><th>Section</th><th>What changed</th><th>Earliest</th><th>Latest</th></tr>${summarizeParamChanges(r.param_changes_between_files).slice(0,80).map(c=>`<tr><td>${esc(c.section)}</td><td>${esc(c.label)}</td><td>${esc(c.before)}</td><td>${esc(c.after)}</td></tr>`).join("")}</table>`:`<p class="small muted">No engineer-only parameter values differ between the earliest and latest file.</p>`}`:""}
+ ${(r.param_engineer_changes||[]).length?`<h2 style="margin-top:14px">Engineer-only parameters changed since last review</h2><table><tr><th>Section</th><th>What changed</th><th>Before</th><th>After</th></tr>${summarizeParamChanges(r.param_engineer_changes).slice(0,60).map(c=>`<tr><td>${esc(c.section)}</td><td>${esc(c.label)}</td><td>${esc(c.before)}</td><td>${esc(c.after)}</td></tr>`).join("")}</table>`:""}</div>
+ <div class="card"><h2>Compared with fleet</h2>${bars([{label:"This review",v:k.compliance_pct},{label:(r.model||"Model")+` avg (${same.length})`,v:avg(same.map(x=>x.kpi?.compliance_pct))},{label:`Fleet avg (${latest.length})`,v:avg(latest.map(x=>x.kpi?.compliance_pct))}])}
+ <table style="margin-top:10px"><tr><th>Metric</th><th>This</th><th>Model avg</th><th>Fleet avg</th></tr>${[["Longest gap","max_gap"],["Adjust events","adjust_events"],["Service Mode\\Adjustments days","service_visit_days"]].map(([n,f])=>`<tr><td>${n}</td><td>${k[f]??"–"}</td><td>${avg(same.map(x=>x.kpi?.[f]))??"–"}</td><td>${avg(latest.map(x=>x.kpi?.[f]))??"–"}</td></tr>`).join("")}</table>
+ ${hist.length>1||(!saved&&hist.length)?`<h2 style="margin-top:14px">Review history</h2><table><tr><th>Reviewed</th><th>Window</th><th>Status</th><th>Compliance</th></tr>${hist.map(x=>`<tr><td>${(x.generated||"").slice(0,10)}</td><td class="small">${x.window?.start||""} → ${x.window?.end||""}</td><td>${pill(x.kpi?.overall)}</td><td>${x.kpi?.compliance_pct??"–"}%</td></tr>`).join("")}</table>`:""}</div></div>`;
+ const pm=r.param||{};const names={fw:"Firmware",clean_normal:"Cleanings (normal)",clean_hard:"Cleanings (hard)",clean_soft:"Cleanings (soft)",wipe_count:"Wiper count",maint_count:"Maintenance count",print_length:"Print length counter",print_area:"Print area counter",power_on_time:"Power-on time counter",days_since_station_maint_at_poweroff:"Days since station maint. at last power-off"};
+ if(Object.keys(pm).length){const d=r.param_delta_since_last_review||{};h+=`<div class="card"><h2>Parameter file counters</h2><table><tr><th>Counter</th><th>Value</th><th>Change since last review</th></tr>${Object.entries(names).filter(([x])=>x in pm).map(([x,n])=>`<tr><td>${n}</td><td>${typeof pm[x]==="number"?pm[x].toLocaleString():esc(pm[x])}</td><td>${x in d?(d[x]>=0?"+":"")+d[x].toLocaleString():""}</td></tr>`).join("")}</table></div>`}
+ if((r.rare_unmapped_codes||[]).length)h+=`<div class="card"><h2>Rare unmapped codes <small>candidates for the code mapping</small></h2><table><tr><th>Code</th><th>Count</th><th>Dates</th></tr>${r.rare_unmapped_codes.slice(0,40).map(c=>`<tr><td class="mono">${c.code}</td><td>${c.count}</td><td class="small">${c.dates.join(", ")}</td></tr>`).join("")}</table></div>`;
+ h+=`<div class="muted small">Files: ${(r.files||[]).map(esc).join(", ")} · code mapping ${esc(r.codes_status||"draft")} · ${r.meta?.sender?"requested by "+esc(r.meta.sender)+" · ":""}generated ${(r.generated||"").replace("T"," ").slice(0,16)}</div>`;return h}
+
+// ---------------------------------------------------------------- views
+function renderFleet(){const L=latestBySerial();const models=[...new Set(L.map(r=>r.model).filter(Boolean))].sort();
+ const sel=$("#fModel"),cur=sel.value;sel.innerHTML=`<option value="">All models</option>`+models.map(m=>`<option ${m===cur?"selected":""}>${esc(m)}</option>`).join("");
+ const red=L.filter(r=>r.kpi?.overall==="red").length,yel=L.filter(r=>r.kpi?.overall==="yellow").length;
+ $("#fleetTiles").innerHTML=`<div class="tile"><div class="k">Machines reviewed</div><div class="v">${L.length}</div><div class="s">${S.reviews.length} review(s) in total</div></div>
+ <div class="tile"><div class="k">Fleet compliance</div><div class="v">${avg(L.map(r=>r.kpi?.compliance_pct))??"–"}%</div><div class="s">average of latest reviews</div></div>
+ <div class="tile"><div class="k">Poor / Good</div><div class="v">${red} <span class="muted" style="font-size:18px">/ ${yel}</span></div><div class="s">machines on latest review</div></div>
+ <div class="tile"><div class="k">Service Mode\\Adjustments</div><div class="v">${L.reduce((s,r)=>s+(r.kpi?.service_visit_days||0),0)}</div><div class="s">days with Adjust activity</div></div>`;
+ const f=$("#fFilter").value.toLowerCase(),fm=$("#fModel").value,fs=$("#fStatus").value;
+ const rows=L.filter(r=>(!f||[r.serial,r.model,r.meta?.customer].join(" ").toLowerCase().includes(f))&&(!fm||r.model===fm)&&(!fs||r.kpi?.overall===fs)).sort((a,b)=>({red:0,yellow:1,green:2,nodata:3}[a.kpi?.overall]??4)-({red:0,yellow:1,green:2,nodata:3}[b.kpi?.overall]??4));
+ $("#fleetTable").innerHTML=rows.length?`<table><tr><th>Serial</th><th>Model</th><th>Customer</th><th>Status</th><th>Compliance</th><th>Longest gap</th><th>Service Mode\\Adjustments</th><th>Log window</th><th>Reviewed</th></tr>${rows.map(r=>`<tr class="click" data-s="${esc(r.serial)}"><td class="mono">${esc(r.serial)}</td><td>${esc(r.model||"")}</td><td>${esc(r.meta?.customer||"")}</td><td>${pill(r.kpi?.overall)}</td><td>${r.kpi?.compliance_pct??"–"}%</td><td>${r.kpi?.max_gap??"–"}</td><td>${r.kpi?.service_visit_days??0}</td><td class="small">${r.window?.start||""} → ${r.window?.end||""}</td><td class="small">${(r.generated||"").slice(0,10)}</td></tr>`).join("")}</table>`
+  :`<div class="empty">${S.reviews.length?"No machines match the filter.":"No reviews yet. Upload files in a Claude chat, or use <b>Analyse files</b>."}</div>`;
+ const byM={};L.forEach(r=>{if(r.model)(byM[r.model]=byM[r.model]||[]).push(r.kpi?.compliance_pct)});
+ $("#modelBars").innerHTML=Object.keys(byM).length?bars(Object.entries(byM).sort().map(([m,v])=>({label:`${m} (${v.length})`,v:avg(v)}))).replace(/fill alt/g,"fill"):`<div class="muted small">Appears once reviews exist.</div>`}
+["#fFilter","#fModel","#fStatus"].forEach(s=>$(s).addEventListener("input",renderFleet));
+$("#fleetTable").onclick=e=>{const tr=e.target.closest("tr[data-s]");if(tr){openMachine(tr.dataset.s)}};
+function openMachine(serial,id){show("machine");renderMachine(serial,id)}
+function renderMachine(serial,id){const serials=[...new Set(S.reviews.map(r=>r.serial).filter(Boolean))].sort();serial=serial||$("#mSerial").value||serials[0];
+ $("#mSerial").innerHTML=serials.map(s=>`<option ${s===serial?"selected":""}>${esc(s)}</option>`).join("");
+ const revs=S.reviews.filter(r=>r.serial===serial).sort((a,b)=>rk(b).localeCompare(rk(a)));id=id||revs[0]?._id;
+ $("#mReview").innerHTML=revs.map(r=>`<option value="${esc(r._id)}" ${r._id===id?"selected":""}>${(r.generated||"").slice(0,16).replace("T"," ")} · ${r.window?.start||""}→${r.window?.end||""}</option>`).join("");
+ const r=revs.find(x=>x._id===id);$("#machineBody").innerHTML=r?reportView(r,true):`<div class="card empty">No reviews yet.</div>`}
+$("#mSerial").onchange=()=>renderMachine($("#mSerial").value);$("#mReview").onchange=()=>renderMachine($("#mSerial").value,$("#mReview").value);
+
+// analyse view
+const drop=$("#drop"),fin=$("#file");drop.onclick=()=>fin.click();
+drop.ondragover=e=>{e.preventDefault();drop.classList.add("hover")};drop.ondragleave=()=>drop.classList.remove("hover");
+drop.ondrop=e=>{e.preventDefault();drop.classList.remove("hover");addFiles(e.dataTransfer.files)};fin.onchange=()=>addFiles(fin.files);
+async function addFiles(fl){for(const f of fl){const t=await fileText(f);const isP=isParam(t);const o=isP?parseParam(t,f.name):parseLog(t,f.name);S.files.push(o);if(o.serial&&(!$("#aSerial").value||o.kind==="param"))$("#aSerial").value=o.serial}
+ $("#fileList").innerHTML=S.files.map(f=>`${f.kind==="param"?"Parameter":"Log"}: <b>${esc(f.file)}</b> ${esc(f.model||"")} ${f.kind==="log"?`· ${f.events.length.toLocaleString()} events`:""}`).join("<br>")+(S.files.length?` · <a href="#analyse" id="clr">clear</a>`:"");
+ const c=$("#clr");if(c)c.onclick=e=>{e.preventDefault();S.files=[];$("#fileList").innerHTML="";$("#analyseBody").innerHTML="";$("#aSave").disabled=true;setRange()};setRange()}
+// date range the uploaded logs cover; the review can be limited to any part of it
+function setRange(){const ds=S.files.filter(f=>f.kind==="log").flatMap(f=>f.events.map(e=>e.ts.toISOString().slice(0,10)));const F=$("#aFrom"),T=$("#aTo");
+ if(!ds.length){F.disabled=T.disabled=true;F.value=T.value="";$("#rangeNote").textContent="";return}
+ let lo=ds.reduce((a,b)=>a<b?a:b),hi=ds.reduce((a,b)=>a>b?a:b);const cut=cutoffISO();const clipped=lo<cut;if(clipped)lo=cut;
+ if(lo>hi){F.disabled=T.disabled=true;$("#rangeNote").textContent="The logs contain no valid dates.";return}
+ F.disabled=T.disabled=false;F.min=T.min=lo;F.max=T.max=hi;F.value=lo;T.value=hi;
+ const per=S.files.filter(f=>f.kind==="log"&&f.events.length).map(f=>{let a=f.events[0].ts,b=a;f.events.forEach(e=>{if(e.ts<a)a=e.ts;if(e.ts>b)b=e.ts});return[iso(a),iso(b),f.file]}).sort();
+ const gaps=[];let end=null;per.forEach(([a,b])=>{if(end&&a>iso(add(new Date(end+"T00:00:00Z"),1)))gaps.push([iso(add(new Date(end+"T00:00:00Z"),1)),iso(add(new Date(a+"T00:00:00Z"),-1))]);if(!end||b>end)end=b});
+ $("#rangeNote").innerHTML=`Logs cover <b>${lo}</b> to <b>${hi}</b>${clipped?" (dates before 2000 left out: clock reset)":""}. Narrow the dates to review part of that period.`+
+  (gaps.length?`<br>No log covers ${gaps.map(([a,b])=>`<b>${a}</b> to <b>${b}</b>`).join(", ")}; that period is shown as no log data and isn't scored.`:"")}
+$("#aRun").onclick=()=>{if(!S.files.length){$("#analyseBody").innerHTML=`<div class="warnnote">Add a log and/or parameter file first.</div>`;return}
+ const serial=$("#aSerial").value.trim().toUpperCase()||null;
+ const F=$("#aFrom"),T=$("#aTo");let from=F.disabled?null:F.value||null,to=T.disabled?null:T.value||null;
+ if(from&&to&&from>to){$("#analyseBody").innerHTML=`<div class="warnnote">The From date is after the To date.</div>`;return}
+ if(from===F.min)from=null;if(to===T.max)to=null;
+ const r=analyse(S.files.filter(f=>f.kind==="log"),S.files.filter(f=>f.kind==="param"),serial,$("#aState").value,S.codes||DEFAULT_CODES,S.reviews,{customer:$("#aCustomer").value.trim(),source:"web upload"},{from,to});
+ if(!r.error){const ic=installCheck(orderParams(S.files.filter(f=>f.kind==="param")).ordered,r.model,r.serial,S.installProfiles);if(ic)r.install_check=ic}
+ if(r.error){$("#analyseBody").innerHTML=`<div class="warnnote">${esc(r.error)}</div>`;return}S.current=r;$("#analyseBody").innerHTML=reportView(r,false);$("#aSave").disabled=!S.db||!S.canWrite||!r.serial;
+ if(!r.serial)$("#analyseBody").insertAdjacentHTML("afterbegin",`<div class="warnnote">Enter the serial number to save this review.</div>`)};
+$("#aSave").onclick=async()=>{const r=S.current;if(!r||!S.db)return;$("#aSave").disabled=true;
+ const rec=JSON.parse(JSON.stringify(r));delete rec.rare_unmapped_codes;rec.days=r.days.map(x=>({d:x.d,s:x.s,m:x.m,a:x.a,w:x.w,h:x.h,mt:x.mt.slice(0,4),g:x.g,c:x.c}));
+ const id=(r.serial+"_"+r.generated.replace(/[-:T]/g,"").slice(0,12)).replace(/[^A-Za-z0-9_.\-]/g,"");
+ try{await S.db.collection("reviews").doc(id).set(rec);
+  const entry={id,serial:rec.serial,model:rec.model,generated:rec.generated,state:rec.state,customer:rec.meta?.customer||"",window:rec.window,kpi:rec.kpi};
+  const ix=S.db.doc("fleet/index");const cur=await ix.get();if(cur.exists)await ix.update({entries:{[id]:entry}});else await ix.set({entries:{[id]:entry}});
+  note(`Saved review <b>${esc(id)}</b>.`)}catch(e){$("#aSave").disabled=false;note("Couldn't save: "+esc(e.message||e.code),true)}};
+
+// codes view
+function renderCodes(){const c=S.codes||DEFAULT_CODES;$("#codeStatus").textContent=`· ${c.status||"draft"}${c.updated?" · updated "+c.updated.slice(0,10):""}`;$("#cStatus").value=c.status||"draft";$("#cNotes").value=c.notes||"";
+ const groups=[["daily_maintenance","Daily maintenance (operator)","Counts as the day's maintenance"],["adjust","Adjust / service functions","Shown under Service Mode\\Adjustments"],["cleaning","Head cleaning","Counted, not scored"],["activity","Machine in use","A working day with this activity counts as a day the machine was used; days without it are shown as not used"],["power_on","Power on","Ignored for scoring"],["ignore","Ignore","Noise excluded from analysis"]];
+ $("#codesBody").innerHTML=groups.map(([g,n,d])=>`<h2 style="margin-top:14px">${n} <small>${d}</small></h2><table class="codes" data-g="${g}"><tr><th>Code</th><th>Sub</th><th>Label</th><th></th><th></th></tr>${(c[g]||[]).map(r=>row(r)).join("")}</table><button class="b sec small" style="margin-top:6px;padding:4px 10px" data-add="${g}">+ Add rule</button>`).join("")}
+const row=r=>`<tr><td><input value="${esc(r.code)}" maxlength="3" class="mono"></td><td><input value="${esc(r.sub)}" maxlength="3" class="mono" title="* = any"></td><td><input value="${esc(r.label)}"></td><td><label class="small muted" title="Only counts on a day that also has a real Adjust function"><input type="checkbox" ${r.supporting?"checked":""}> supporting</label></td><td><button class="b sec" style="padding:3px 9px" data-del>✕</button></td></tr>`;
+$("#codesBody").onclick=e=>{if(e.target.dataset.add!=null){e.target.previousElementSibling.insertAdjacentHTML("beforeend",row({code:"",sub:"*",label:""}))}if(e.target.hasAttribute("data-del"))e.target.closest("tr").remove()};
+$("#cSave").onclick=async()=>{const c={version:((S.codes||DEFAULT_CODES).version||1)+1,status:$("#cStatus").value,notes:$("#cNotes").value,updated:new Date().toISOString()};
+ document.querySelectorAll("#codesBody table").forEach(t=>{c[t.dataset.g]=[...t.querySelectorAll("tr")].slice(1).map(tr=>{const i=tr.querySelectorAll("input");return{code:i[0].value.trim().padStart(3,"0"),sub:i[1].value.trim()==="*"?"*":i[1].value.trim().padStart(3,"0"),label:i[2].value.trim(),...(i[3]&&i[3].checked?{supporting:true}:{})}}).filter(r=>/^\d{3}$/.test(r.code))});
+ if(!S.db){note("The database isn't available in this view, so the mapping can't be saved.",true);return}
+ try{await S.db.doc("config/codes").set(c);note("Code mapping saved. New reviews will use it.")}catch(e){note("Couldn't save mapping: "+esc(e.message||e.code),true)}};
+
+// ---------------------------------------------------------------- boot
+// Reset: back to the dashboard, clears filters, uploaded files and any unsaved review. Saved reviews are not touched.
+let resetTimer=null;
+$("#resetBtn").onclick=()=>{const b=$("#resetBtn");const unsaved=!!(S.files.length||S.current&&!$("#aSave").disabled);
+ if(!b.classList.contains("arm")){b.classList.add("arm");b.textContent=unsaved?"Discard unsaved review?":"Confirm reset";clearTimeout(resetTimer);
+  resetTimer=setTimeout(()=>{b.classList.remove("arm");b.textContent="Reset"},4000);return}
+ clearTimeout(resetTimer);b.classList.remove("arm");b.textContent="Reset";
+ S.files=[];S.current=null;
+ ["#aSerial","#aCustomer","#fFilter"].forEach(id=>{const el=$(id);if(el)el.value=""});["#fModel","#fStatus"].forEach(id=>{const el=$(id);if(el)el.value=""});
+ $("#aState").value="WA";const fi=$("#file");if(fi)fi.value="";$("#fileList").innerHTML="";$("#analyseBody").innerHTML="";$("#aSave").disabled=true;setRange();
+ const st=$("#status");if(st){st.classList.add("hide");st.innerHTML=""}
+ const ms=$("#mSerial");if(ms)ms.value="";show("fleet");renderAll();window.scrollTo(0,0);
+ note("Reset. Uploaded files and unsaved results were cleared; reviews saved to the database are unchanged.")};
+// Export as PDF: the viewer blocks window.print, so the page draws the review itself (html2canvas + jsPDF)
+// and hands the file over with the platform's downloads capability (the viewer confirms the save).
+/* Portal copy: files download straight from the browser. */
+let DL={save:async({filename,data})=>{const u=URL.createObjectURL(data instanceof Blob?data:new Blob([data]));const a=document.createElement("a");a.href=u;a.download=filename;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000)}};
+document.addEventListener("click",async e=>{const b=e.target.closest(".pdfBtn");if(!b)return;
+ const scope=b.dataset.scope;const body=scope==="machine"?$("#machineBody"):$("#analyseBody");
+ if(!body||!body.innerHTML.trim()){note(scope==="machine"?"Choose a machine first.":"Analyse some files first, then export.",true);return}
+ if(!window.html2canvas||!window.jspdf){note("The PDF tools didn't load. Reload the page and try again.",true);return}
+ if(!DL){note("Downloads aren't available in this view. Open the tool on claude.ai and try again.",true);return}
+ const r=scope==="machine"?(S.reviews.find(x=>x._id===$("#mReview").value)||{serial:$("#mSerial").value}):(S.current||{});
+ const stamp=new Date().toISOString().slice(0,10);const fname=`Mimaki Log Review ${r.serial||"unknown"} ${stamp}.pdf`.replace(/[\\/:*?"<>|]/g,"");
+ const label=b.textContent;b.disabled=true;b.textContent="Building PDF…";
+ const head=document.createElement("div");head.className="card";head.style.cssText="padding:10px 14px";
+ head.innerHTML=`<b style="font-size:16px">Mimaki Log &amp; Parameter Review</b><div class="small">${esc(r.serial||"")} ${esc(r.model||"")} · ${esc((r.meta&&r.meta.customer)||"")} · exported ${stamp} · Highway Digital · ${esc(APP_VERSION)}</div>`;
+ body.prepend(head);document.documentElement.classList.add("pdfmode");
+ try{const {jsPDF}=window.jspdf;const pdf=new jsPDF({unit:"mm",format:"a4",orientation:"portrait"});
+  const PW=210,PH=297,M=10,CW=PW-2*M,CH=PH-2*M;let y=M,first=true;
+  const blocks=[...body.children].filter(x=>x.offsetHeight>0);
+  for(const el of blocks){const cv=await html2canvas(el,{scale:2,backgroundColor:"#ffffff",useCORS:true,logging:false});
+   const ratio=CW/cv.width;let hmm=cv.height*ratio;
+   if(hmm<=CH){if(y+hmm>PH-M&&!first){pdf.addPage();y=M}
+    pdf.addImage(cv.toDataURL("image/jpeg",0.92),"JPEG",M,y,CW,hmm);y+=hmm+4;first=false}
+   else{// taller than a page: slice it
+    let sy=0;const sliceH=Math.floor(CH/ratio);
+    if(!first&&y>M){pdf.addPage();y=M}
+    while(sy<cv.height){const h2=Math.min(sliceH,cv.height-sy);const c2=document.createElement("canvas");c2.width=cv.width;c2.height=h2;
+     c2.getContext("2d").drawImage(cv,0,sy,cv.width,h2,0,0,cv.width,h2);
+     pdf.addImage(c2.toDataURL("image/jpeg",0.92),"JPEG",M,M,CW,h2*ratio);sy+=h2;y=M+h2*ratio+4;if(sy<cv.height)pdf.addPage()}
+    first=false}}
+  const n=pdf.getNumberOfPages();for(let i=1;i<=n;i++){pdf.setPage(i);pdf.setFontSize(7);pdf.setTextColor(120);pdf.text(`Highway Digital · Mimaki log review ${r.serial||""} · page ${i} of ${n}`,M,PH-4)}
+  const blob=pdf.output("blob");
+  try{await DL.save({filename:fname,data:blob});note("PDF saved: "+esc(fname))}
+  catch(err){const c=err&&err.code;note(c==="declined"?"PDF save cancelled.":c==="rate_limited"?"A save is already waiting for your answer. Try again in a moment.":"The PDF couldn't be saved here ("+(c||"error")+").",c!=="declined")}
+ }catch(err){note("Couldn't build the PDF: "+esc(String(err&&err.message||err)),true)}
+ finally{head.remove();document.documentElement.classList.remove("pdfmode");b.disabled=false;b.textContent=label}});
+function renderAll(){renderFleet();if(!$("#v-machine").classList.contains("hide"))renderMachine($("#mSerial").value,$("#mReview").value);renderCodes()}
+renderAll();{const h=location.hash.slice(1);if(VIEWS.includes(h))show(h)}
+/* Portal copy (read-only): reviews come from the Highway Digital review database, filtered to the machines this login can see. */
+</script>
+</body>
+</html>
