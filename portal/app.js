@@ -374,7 +374,18 @@ async function renderKb() {
 async function renderCustomers() {
   const body = $("#custRows");
   if (!state.staff) { body.replaceChildren(); return; }
-  if (!renderCustomers.sup) { renderCustomers.sup = true; renderSupervisorsAdmin($("#supAdmin")); }
+  if (!renderCustomers.tabs) {
+    renderCustomers.tabs = true;
+    const showTab = (k) => {
+      document.querySelectorAll("#custTabs [data-ctab]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.ctab === k)));
+      $("#custPanel").hidden = k !== "list"; $("#supAdmin").hidden = k !== "vendors"; $("#custSearch").hidden = k !== "list";
+      if (k === "vendors" && !renderCustomers.sup) { renderCustomers.sup = true; renderSupervisorsAdmin($("#supAdmin")); }
+      try { sessionStorage.setItem("hd-ctab", k); } catch (_) {}
+    };
+    document.querySelectorAll("#custTabs [data-ctab]").forEach((b) => { b.onclick = () => showTab(b.dataset.ctab); });
+    let k0 = "list"; try { k0 = sessionStorage.getItem("hd-ctab") || "list"; } catch (_) {}
+    showTab(k0 === "vendors" ? "vendors" : "list");
+  }
   if (!state.access) {
     body.replaceChildren(el("tr", {}, el("td", { colspan: "9", class: "muted" }, "Loading…")));
     const [{ data, error }, vx] = await Promise.all([sb.from("portal_access").select("client_id,email"), sb.rpc("vector_export_counts")]);
@@ -1294,7 +1305,7 @@ async function renderSupervisorsAdmin(host) {
         if (error) return flash(note, "Customer not added", false); renderSupervisorsAdmin(host); } }, pick, el("button", { class: "btn small", type: "submit" }, "Add customer"))]),
       el("p", {}, sync, " ", note));
   });
-  host.replaceChildren(el("h2", { style: "margin-top:24px" }, "Vendors and supervisors"), ...cards);
+  host.replaceChildren(el("p", { class: "muted small" }, "Vendors see jobs invoiced to them; supervisors see their contracted customers' whole fleets."), ...cards);
 }
 
 // ---------- all jobs for the account: open jobs on My machines, and exports ----------

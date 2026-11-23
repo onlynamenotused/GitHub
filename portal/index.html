@@ -95,6 +95,11 @@
       <h1>Customers</h1>
       <input id="custSearch" class="field" type="search" placeholder="Search customer name">
     </div>
+    <div class="rtabs" role="tablist" id="custTabs">
+      <button type="button" role="tab" class="chipbtn" data-ctab="list" aria-selected="true">Customers</button>
+      <button type="button" role="tab" class="chipbtn" data-ctab="vendors" aria-selected="false">Vendors and supervisors</button>
+    </div>
+    <div id="custPanel">
     <form id="addCustForm" class="inline addcust">
       <input id="newCustName" class="field" placeholder="New customer name" aria-label="New customer name" required>
       <button class="btn primary" type="submit">Add customer</button>
@@ -106,7 +111,8 @@
         <tbody id="custRows"></tbody>
       </table>
     </div>
-    <div id="supAdmin"></div>
+    </div>
+    <div id="supAdmin" hidden></div>
   </section>
 
   <section id="view-kits" hidden></section>
