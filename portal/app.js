@@ -306,19 +306,51 @@ function billingTable(rows, kind) {
           isInv ? (open ? "Pay now" : "View") : (open ? "Review & accept" : "View"))));
     })));
 }
+/* Vendor / supervisor logins: their own invoices from us (billed to the vendor), newest first. */
+function vendorInvoicesCard() {
+  const name = supName();
+  const card = el("div", { class: "card vinv" }, el("div", { class: "bhead" }, el("h2", {}, "Recent invoices to " + name), el("a", { class: "btn small", href: "#reports" }, "All in Reports")),
+    el("p", { class: "muted small" }, "Loading…"));
+  (async () => {
+    if (!state.vendorInv) {
+      const ids = (state.supervisors || []).map((x) => x.id);
+      const { data, error } = await sb.from("service_records").select("id,client_id,machine_id,number,issued,status,kind,po,total_ex,total_inc,lines")
+        .in("supervisor_id", ids).order("issued", { ascending: false }).limit(15);
+      if (error) { card.lastChild.replaceWith(el("p", { class: "msg err" }, "Couldn't load invoices.")); return; }
+      state.vendorInv = data || [];
+    }
+    const rows = state.vendorInv;
+    const total = rows.reduce((a, r) => a + (Number(r.total_ex) || 0), 0);
+    const mOfId = (id) => state.machines.find((m) => m.id === id);
+    const custOf = (id) => state.clients.find((c) => c.id === id)?.name || "Not matched to a customer";
+    card.lastChild.replaceWith(rows.length ? el("div", { class: "tscroll" }, el("table", { class: "tbl rtbl" },
+      el("thead", {}, el("tr", {}, ...["Date", "Invoice", "Customer", "Machine", "PO / reference", "Status", "Ex GST"].map((h) => el("th", { class: h === "Ex GST" ? "num" : null }, h)))),
+      el("tbody", {}, ...rows.map((r) => { const m = mOfId(r.machine_id); const lab = (r.lines || []).find((l) => /labou?r|day rate|hourly/i.test(l.code || ""));
+        return el("tr", { class: "rrow", tabindex: 0, title: lab ? String(lab.desc || "").split("\n").slice(0, 4).join(" · ") : "", onclick: () => { rep.f.q = r.number; rep.f.tab = "jobs"; location.hash = "#reports"; } },
+          el("td", { "data-l": "Date" }, fmtDate(r.issued)), el("td", { class: "mono", "data-l": "Invoice" }, r.number), el("td", { "data-l": "Customer" }, custOf(r.client_id)),
+          el("td", { "data-l": "Machine" }, m ? machineName(m) + (m.serial ? " · SN " + m.serial : "") : "—"), el("td", { "data-l": "PO" }, r.po || "—"),
+          el("td", { "data-l": "Status" }, el("span", { class: "pill " + (r.status === "paid" ? "ok" : "soon") }, r.status || "")),
+          el("td", { class: "num", "data-l": "Ex GST" }, money(r.total_ex))); }))),
+      el("p", { class: "muted small" }, rows.length + " most recent · " + money(total) + " ex GST. Click one to open it in Reports with its full job notes and parts."))
+      : el("p", { class: "muted small" }, "No invoices to " + name + " yet."));
+  })();
+  return card;
+}
 function renderBilling() {
   const box = $("#billing"); if (!box) return;
   const inv = (state.invoices || []).slice(0, 12), est = (state.estimates || []).slice(0, 12);
   const owing = (state.invoices || []).filter((r) => r.status !== "paid").length;
-  box.replaceChildren(
+  const parts = [];
+  if (isSupervisor() && !state.staff) parts.push(vendorInvoicesCard());   // vendor / supervisor: invoices billed to them
+  if (!isVendorOnly()) parts.push(
     el("div", { class: "card" },
       el("div", { class: "bhead" }, el("h2", {}, "Recent invoices"), owing ? el("span", { class: "pill over" }, owing + " outstanding") : null),
       inv.length ? billingTable(inv, "inv") : el("p", { class: "muted small" }, "No invoices yet."),
       el("p", { class: "muted small" }, "Pay now and View open your FreshBooks client area. Sign in there with this email address to see the full invoice and pay by card.")),
     el("div", { class: "card" },
       el("h2", {}, "Estimates"),
-      est.length ? billingTable(est, "est") : el("p", { class: "muted small" }, "No estimates have been sent to you yet."))
-  );
+      est.length ? billingTable(est, "est") : el("p", { class: "muted small" }, "No estimates have been sent to you yet.")));
+  box.replaceChildren(...parts);
 }
 
 async function renderMachine(id) {
