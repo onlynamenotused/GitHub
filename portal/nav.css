@@ -13,7 +13,7 @@
 #hd-nav .hdn-out{color:#f7f7f7;text-decoration:none;font:600 14px Inter,arial,sans-serif;padding:8px 14px;border:1px solid transparent;border-radius:48px}
 #hd-nav .hdn-out:hover{border-color:#e8b923}
 #hd-nav .hdn-tabs{display:flex;gap:4px;overflow-x:auto;padding-bottom:0}
-#hd-nav .hdn-tabs a{display:inline-block;padding:9px 12px;color:#e2e2e2;background:none;text-decoration:none;font:500 13px Inter,arial,sans-serif;letter-spacing:.08em;text-transform:uppercase;border:0;border-bottom:2px solid transparent;border-radius:0;white-space:nowrap}
+#hd-nav .hdn-tabs a{flex:0 0 auto;min-width:auto;display:inline-block;padding:9px 12px;color:#e2e2e2;background:none;text-decoration:none;font:500 13px Inter,arial,sans-serif;letter-spacing:.08em;text-transform:uppercase;border:0;border-bottom:2px solid transparent;border-radius:0;white-space:nowrap}
 #hd-nav .hdn-tabs a:hover{color:#fff}
 #hd-nav .hdn-tabs a[aria-current=page]{color:#f7f7f7;border-bottom-color:#e8b923}
 @media (max-width:560px){#hd-nav .hdn-logo{height:26px}#hd-nav .hdn-brand small,#hd-nav .hdn-who{display:none}}
