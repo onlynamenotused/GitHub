@@ -8,12 +8,12 @@
 <meta name="theme-color" content="#000000">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="styles.css?v=39">
+<link rel="stylesheet" href="styles.css?v=41">
 <link rel="stylesheet" href="nav.css?v=38">
 <link rel="icon" href="favicon.ico">
 <script src="config.js?v=35"></script>
 <script src="nav.js?v=39"></script>
-<script type="module" src="app.js?v=41"></script>
+<script type="module" src="app.js?v=42"></script>
 </head>
 <body>
 <div id="hd-nav"></div>
@@ -64,9 +64,16 @@
   <section id="view-machines" hidden>
     <div class="head">
       <h1 id="clientTitle">My machines</h1>
-      <input id="machineSearch" class="field" type="search" placeholder="Search model, serial or site">
       <span id="exportHost"></span>
       <a id="addMachineBtn" class="btn primary" href="#add-machine" hidden>+ Add a machine</a>
+    </div>
+    <div id="mFilter" class="mfilter" role="search">
+      <input id="machineSearch" class="field msearch" type="search" placeholder="🔍 Search model, serial, site or customer" aria-label="Search machines">
+      <select id="mfCust" class="field" aria-label="Filter by customer"></select>
+      <select id="mfBrand" class="field" aria-label="Filter by brand"></select>
+      <select id="mfModel" class="field" aria-label="Filter by model"></select>
+      <button id="mfClear" class="btn ghost small" type="button" hidden>Clear</button>
+      <span id="mfCount" class="muted small"></span>
     </div>
     <div id="stats" class="stats"></div>
     <section id="openJobs" class="card openjobs" hidden></section>

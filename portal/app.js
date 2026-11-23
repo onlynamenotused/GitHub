@@ -174,10 +174,33 @@ function resourcesForMachine(res, m) {
 }
 
 // ---------- views ----------
+/* Machine filters: customer, brand, model (model choices follow the brand), plus the search box. */
+function machineFilters() {
+  const cs = $("#mfCust"), bs = $("#mfBrand"), ms = $("#mfModel");
+  const cv = cs.value, bv = bs.value, mv = ms.value;
+  const opt = (v, l, cur) => el("option", { value: v, selected: v === cur }, l);
+  const custIds = [...new Set(state.machines.map((m) => m.client_id).filter(Boolean))];
+  const cnames = custIds.map((id) => [String(id), state.clients.find((c) => c.id === id)?.name || "Customer " + id]).sort((a, b) => a[1].localeCompare(b[1]));
+  cs.replaceChildren(opt("", "All customers (" + cnames.length + ")", cv), ...cnames.map(([id, n]) => opt(id, n, cv)));
+  cs.hidden = cnames.length < 2;
+  const inCust = state.machines.filter((m) => !cs.value || String(m.client_id) === cs.value);
+  const brands = [...new Set(inCust.map((m) => m.brand).filter(Boolean))].sort();
+  bs.replaceChildren(opt("", "All brands", bv), ...brands.map((b) => opt(b, b, bv)));
+  if (bv && !brands.includes(bv)) bs.value = "";
+  const models = [...new Set(inCust.filter((m) => !bs.value || m.brand === bs.value).map((m) => m.model).filter(Boolean))].sort((a, b) => a.localeCompare(b, "en", { numeric: true }));
+  ms.replaceChildren(opt("", "All models", mv), ...models.map((x) => opt(x, x, mv)));
+  if (mv && !models.includes(mv)) ms.value = "";
+  [cs, bs, ms].forEach((x) => x.classList.toggle("on", !!x.value));
+}
 function renderMachines() {
-  const q = norm($("#machineSearch").value);
-  const list = state.machines.filter((m) =>
-    !q || [m.brand, m.model, m.serial, m.site, m.location, m.sub_category].some((v) => norm(v).includes(q)));
+  machineFilters();
+  const q = norm($("#machineSearch").value), fc = $("#mfCust").value, fb = $("#mfBrand").value, fm = $("#mfModel").value;
+  const cnm = (id) => state.clients.find((c) => c.id === id)?.name || "";
+  const list = state.machines.filter((m) => (!fc || String(m.client_id) === fc) && (!fb || m.brand === fb) && (!fm || m.model === fm) &&
+    (!q || [m.brand, m.model, m.serial, m.site, m.location, m.sub_category, cnm(m.client_id), machineName(m)].some((v) => norm(v).includes(q))));
+  const filtered = !!(q || fc || fb || fm);
+  $("#mfClear").hidden = !filtered;
+  $("#mfCount").textContent = filtered ? list.length + " of " + state.machines.length + " machines" : state.machines.length + " machines";
   $("#clientTitle").textContent = state.staff ? "Customer Assets" : isSupervisor() ? supName() + (isVendorOnly() ? " jobs" : " fleet") : state.clients.length === 1 ? state.clients[0].name : "My machines";
 
   const counts = { over: 0, soon: 0, ok: 0 };
@@ -1901,6 +1924,11 @@ function route() {
 }
 window.addEventListener("hashchange", route);
 $("#machineSearch").addEventListener("input", renderMachines);
+["#mfCust", "#mfBrand", "#mfModel"].forEach((id) => $(id).addEventListener("change", renderMachines));
+$("#mfClear").addEventListener("click", () => { $("#machineSearch").value = ""; $("#mfCust").value = ""; $("#mfBrand").value = ""; $("#mfModel").value = ""; renderMachines(); $("#machineSearch").focus(); });
+// keep the filter bar just under the menu: track the menu's height
+{ const setNavH = () => { const n = document.getElementById("hd-nav"); document.documentElement.style.setProperty("--navh", (n && getComputedStyle(n).position === "sticky" ? n.offsetHeight : 0) + "px"); };
+  addEventListener("resize", setNavH); setTimeout(setNavH, 300); setInterval(setNavH, 3000); }
 $("#kbSearch").addEventListener("input", renderKb);
 $("#custSearch").addEventListener("input", renderCustomers);
 
