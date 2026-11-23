@@ -100,8 +100,7 @@
       <button class="btn primary" type="submit">Add customer</button>
       <span id="addCustMsg" class="saved"></span>
     </form>
-    <p class="muted small">Tick <b>Knowledge Base</b> to give that customer's logins the Knowledge Base, tick <b>Vector Converter</b> to give them the image-to-vector and print &amp; cut tool, tick <b>Flute Practice</b> to give them the flute practice player (off for every customer unless ticked), tick <b>Apps only</b> for a login that should only see its apps (no machines or booking), and pick the <b>Parts Catalogue</b> brands (Mimaki, Mutoh, Brother, Epilog, Others) that customer can see, with prices. Untick every brand to remove catalogue access. New customers start with the Knowledge Base and Vector Converter unticked and only <b>Others</b> ticked in the catalogue; tick the brands of the machines they own. Changes save straight away. Sub-contractor logins always get the Knowledge Base and never the catalogue. <b>Vector exports</b> counts every file that customer's logins have downloaded from the Vector Converter (hover the number for the file types and last date).</p>
-    <div class="card" style="padding:0;overflow-x:auto">
+    <div class="card custwrap" style="padding:0">
       <table class="tbl">
         <thead><tr><th>Customer</th><th>Machines</th><th>Portal logins</th><th>Knowledge Base</th><th>Vector Converter</th><th>Flute Practice</th><th title="Apps only: no machines, booking or catalogue in the menu, just the apps ticked">Apps only</th><th title="Files downloaded from the Vector Converter by this customer's logins, all time">Vector exports</th><th>Parts Catalogue</th></tr></thead>
         <tbody id="custRows"></tbody>
