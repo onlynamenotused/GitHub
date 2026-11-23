@@ -1238,8 +1238,10 @@ function repFiltered() {
     (!q || norm([j.ref, j.title, j.notes, j.detail, cName(j.client_id), mLabel(j.machine_id), ...j.lines.map((l) => l.code + " " + l.desc)].join(" ")).includes(q)));
 }
 /* Download menu for report tables: Excel, CSV or PDF (name may end in .csv; rows[0] is the header row). */
+let dlCollect = null;   // while set, report builders hand their tables here instead of drawing menus (full-report export)
 function dlMenu(name, getRows) {
   const base = String(name).replace(/\.csv$/i, "");
+  if (dlCollect) { dlCollect.push({ title: base, getRows }); return null; }
   const go = (fmt) => async (e) => { e.preventDefault(); dd.open = false;
     try { const rows = getRows(); await exportTable(fmt, base, base, rows[0], rows.slice(1)); } catch (er) { console.error(er); } };
   const dd = el("details", { class: "xmenu" }, el("summary", { class: "btn small" }, "Download ▾"),
@@ -1247,6 +1249,79 @@ function dlMenu(name, getRows) {
       el("button", { type: "button", class: "xopt", onclick: go("csv") }, "CSV"), el("button", { type: "button", class: "xopt", onclick: go("pdf") }, "PDF")));
   document.addEventListener("click", (e) => { if (dd.open && !dd.contains(e.target)) dd.open = false; });
   return dd;
+}
+/* Whole Reports tab in one file: every section (with the current filters) as its own Excel sheet or PDF section. */
+function reportSections() {
+  const jobs = repFiltered(), f = rep.f;
+  const fleet = state.machines.filter((m) => (!f.client || String(m.client_id) === f.client) && (!f.machine || m.id === f.machine));
+  dlCollect = [];
+  try {
+    if (state.staff) deskReport(jobs, fleet);
+    assetsReport(fleet, jobs); machineReport(jobs, fleet); jobsReport(jobs); partsReport(jobs); trendsReport(jobs);
+    return dlCollect.map((x) => { const r = x.getRows(); return { title: x.title, head: r[0], rows: r.slice(1) }; });
+  } finally { dlCollect = null; }
+}
+function reportScope() {
+  const f = rep.f, bits = [];
+  if (f.client) bits.push(cName(Number(f.client)));
+  if (f.machine) bits.push(mLabel(f.machine));
+  bits.push(f.from || f.to ? (f.from ? fmtDate(f.from) : "start") + " to " + (f.to ? fmtDate(f.to) : "today") : "all dates");
+  if (f.q) bits.push("search “" + f.q + "”");
+  return bits.join(" · ");
+}
+async function exportReportBook(fmt) {
+  const secs = reportSections(), stamp = localIso(), name = "Highway Digital report " + stamp;
+  const who = state.staff ? "Whole service desk" : isSupervisor() ? supName() : state.clients.map((c) => c.name).join(", ");
+  if (fmt === "xlsx") {
+    await loadScript("https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js", () => window.XLSX);
+    const wb = XLSX.utils.book_new(), used = new Set();
+    const sum = [["Highway Digital report"], ["For", who], ["Filters", reportScope()], ["Exported", new Date().toLocaleString("en-AU")], ["Amounts", "ex GST"], [], ["Sheet", "Rows"], ...secs.map((x) => [x.title, x.rows.length])];
+    const s0 = XLSX.utils.aoa_to_sheet(sum); s0["!cols"] = [{ wch: 34 }, { wch: 60 }]; XLSX.utils.book_append_sheet(wb, s0, "Summary");
+    for (const x of secs) {
+      let n = x.title.replace(/[\[\]:*?\/\\]/g, " ").slice(0, 31).trim() || "Sheet"; let k = 2; while (used.has(n.toLowerCase())) n = n.slice(0, 28) + " " + k++; used.add(n.toLowerCase());
+      const ws = XLSX.utils.aoa_to_sheet([x.head, ...x.rows]);
+      ws["!cols"] = x.head.map((h, i) => ({ wch: Math.min(60, Math.max(String(h).length, ...x.rows.map((r) => String(r[i] ?? "").split("\n")[0].length)) + 2) }));
+      if (x.rows.length) ws["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: x.rows.length, c: x.head.length - 1 } }) };
+      XLSX.utils.book_append_sheet(wb, ws, n);
+    }
+    return saveBlob(name + ".xlsx", new Blob([XLSX.write(wb, { bookType: "xlsx", type: "array" })], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+  }
+  if (fmt === "csv") {
+    const esc = (c) => { c = String(c ?? ""); return /[",\n]/.test(c) ? '"' + c.replace(/"/g, '""') + '"' : c; };
+    const out = [["Highway Digital report"], ["For", who], ["Filters", reportScope()], ["Exported", new Date().toLocaleString("en-AU")], []];
+    for (const x of secs) out.push([x.title + " (" + x.rows.length + ")"], x.head, ...x.rows, []);
+    return saveBlob(name + ".csv", new Blob(["\ufeff" + out.map((r) => r.map(esc).join(",")).join("\r\n")], { type: "text/csv" }));
+  }
+  await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js", () => window.jspdf);
+  await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js", () => window.jspdf && window.jspdf.jsPDF.API.autoTable);
+  const doc = new window.jspdf.jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+  doc.setFont("helvetica", "bold"); doc.setFontSize(16); doc.text("Highway Digital · Service report", 12, 15);
+  doc.setFont("helvetica", "normal"); doc.setFontSize(9.5); doc.setTextColor(90);
+  doc.text(who + "  ·  " + reportScope() + "  ·  amounts ex GST  ·  exported " + new Date().toLocaleString("en-AU"), 12, 21, { maxWidth: 270 });
+  let y = 28;
+  secs.forEach((x, i) => {
+    if (i && y > 170) { doc.addPage(); y = 14; }
+    doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(20); doc.text(x.title + " (" + x.rows.length + ")", 12, y);
+    doc.autoTable({ startY: y + 3, head: [x.head], body: x.rows.length ? x.rows.map((r) => r.map((c) => String(c ?? ""))) : [["Nothing in this period."]], margin: { left: 10, right: 10 },
+      styles: { fontSize: 7.2, cellPadding: 1.5, overflow: "linebreak", valign: "top" }, headStyles: { fillColor: [20, 20, 20], textColor: [232, 185, 35] },
+      alternateRowStyles: { fillColor: [246, 246, 246] } });
+    y = doc.lastAutoTable.finalY + 10;
+  });
+  const pages = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pages; i++) { doc.setPage(i); doc.setFontSize(8); doc.setTextColor(120); doc.text("Page " + i + " of " + pages + "  ·  portal.highwaydigital.com.au", doc.internal.pageSize.getWidth() - 70, doc.internal.pageSize.getHeight() - 6); }
+  saveBlob(name + ".pdf", doc.output("blob"));
+}
+function fullReportMenu() {
+  const msg = el("span", { class: "muted small" });
+  const go = (fmt) => async (e) => { e.preventDefault(); dd.open = false; msg.textContent = "Building the report…";
+    try { await exportReportBook(fmt); msg.textContent = ""; } catch (er) { console.error(er); msg.textContent = "Couldn't build the report."; } };
+  const dd = el("details", { class: "xmenu" }, el("summary", { class: "btn small primary" }, "Export full report ▾"),
+    el("div", { class: "xpanel" },
+      el("button", { type: "button", class: "xopt", onclick: go("xlsx") }, "Excel (.xlsx) · one sheet per section"),
+      el("button", { type: "button", class: "xopt", onclick: go("pdf") }, "PDF · every section"),
+      el("button", { type: "button", class: "xopt", onclick: go("csv") }, "CSV · every section in one file")));
+  document.addEventListener("click", (e) => { if (dd.open && !dd.contains(e.target)) dd.open = false; });
+  return el("span", { style: "display:inline-flex;gap:8px;align-items:center;margin-left:auto" }, msg, dd);
 }
 function csvDownload(name, rows) {
   const csv = rows.map((r) => r.map((c) => { c = String(c ?? ""); return /[",\n]/.test(c) ? '"' + c.replace(/"/g, '""') + '"' : c; }).join(",")).join("\n");
@@ -1295,12 +1370,12 @@ function drawReports() {
   const body = f.tab === "parts" ? partsReport(jobs) : f.tab === "trends" ? trendsReport(jobs) : f.tab === "machines" ? machineReport(jobs, fleet)
     : f.tab === "assets" ? assetsReport(fleet, jobs) : f.tab === "desk" && state.staff ? deskReport(jobs, fleet) : jobsReport(jobs);
   v.replaceChildren(
-    el("div", { class: "head" }, el("h1", {}, "Reports"), el("span", { class: "muted small" }, state.staff ? "Whole service desk" : isSupervisor() ? supName() : state.clients.map((c) => c.name).join(", "))),
+    el("div", { class: "head", style: "display:flex;flex-wrap:wrap;gap:10px;align-items:center" }, el("h1", {}, "Reports"), el("span", { class: "muted small" }, state.staff ? "Whole service desk" : isSupervisor() ? supName() : state.clients.map((c) => c.name).join(", ")), fullReportMenu()),
     el("p", { class: "muted small" }, state.staff
-      ? "Every customer, machine and job in the service desk, with invoices from FreshBooks. Every table downloads as Excel, CSV or PDF. Amounts are ex GST."
+      ? "Every customer, machine and job in the service desk, with invoices from FreshBooks. Export the full report (every section, with these filters), or download any single table as Excel, CSV or PDF. Amounts are ex GST."
       : isSupervisor()
-        ? "Jobs billed to " + supName() + " (Bill to " + supName() + "), for any customer: invoices from our accounts and open service desk jobs, with the machines they were on. Every table downloads as Excel, CSV or PDF. Amounts are ex GST."
-        : "Your machines, their service history and usage, from our service desk and invoices. Every table downloads as Excel, CSV or PDF. Amounts are ex GST."),
+        ? "Jobs billed to " + supName() + " (Bill to " + supName() + "), for any customer: invoices from our accounts and open service desk jobs, with the machines they were on. Export the full report (every section, with these filters), or download any single table as Excel, CSV or PDF. Amounts are ex GST."
+        : "Your machines, their service history and usage, from our service desk and invoices. Export the full report (every section, with these filters), or download any single table as Excel, CSV or PDF. Amounts are ex GST."),
     ...[filters, f.tab === "desk" ? null : kpis, tabBar, body].filter(Boolean));
 }
 function jobsReport(jobs) {
