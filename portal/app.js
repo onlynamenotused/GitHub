@@ -28,6 +28,7 @@ function fmtDate(d) {
   return isNaN(x) ? d : x.toLocaleDateString("en-AU", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 function pmStatus(m) {
+  if (state.hideSchedule) return { cls: "none", label: "" };   // vendor logins: service schedules aren't set up for them yet
   if (!m.pm_next_due) return { cls: "none", label: "No service schedule" };
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const due = new Date(m.pm_next_due + "T00:00:00");
@@ -127,6 +128,9 @@ async function loadCore() {
   if (c.error) throw c.error;
   if (m.error) throw m.error;
   state.clients = c.data; state.machines = m.data;
+  // Vendor logins (e.g. Mimaki) don't see service schedule dates: they aren't set up correctly for vendors yet.
+  state.hideSchedule = !s.data && (state.supervisors || []).length > 0 && state.supervisors.every((x) => x.scope === "invoiced");
+  if (state.hideSchedule) for (const x of state.machines) { x.pm_next_due = null; x.pm_last_done = null; x.pm_interval_months = null; }
   state.kbAccess = k.data === true; state.staff = s.data === true;
   state.catAccess = g.data === true;
   state.intranet = it.data === true;
@@ -205,11 +209,11 @@ function renderMachines() {
 
   const counts = { over: 0, soon: 0, ok: 0 };
   for (const m of state.machines) { const s = pmStatus(m).cls; if (s in counts) counts[s]++; }
-  $("#stats").replaceChildren(
+  $("#stats").replaceChildren(...[
     el("div", { class: "stat" }, el("div", { class: "n" }, state.machines.length), el("div", { class: "l" }, "Machines")),
-    el("div", { class: "stat" }, el("div", { class: "n" }, counts.over), el("div", { class: "l" }, "Service overdue")),
-    el("div", { class: "stat" }, el("div", { class: "n" }, counts.soon), el("div", { class: "l" }, "Due in the next 30 days"))
-  );
+    state.hideSchedule ? null : el("div", { class: "stat" }, el("div", { class: "n" }, counts.over), el("div", { class: "l" }, "Service overdue")),
+    state.hideSchedule ? null : el("div", { class: "stat" }, el("div", { class: "n" }, counts.soon), el("div", { class: "l" }, "Due in the next 30 days"))
+  ].filter(Boolean));
 
   const box = $("#machineList");
   $("#addMachineBtn").hidden = !isCustomer();
@@ -233,7 +237,7 @@ function renderMachines() {
       el("span", { class: "muted small" }, [m.sub_category || m.category, m.serial && "SN " + m.serial].filter(Boolean).join(" · ")),
       (state.clients.length > 1 || state.staff) ? el("span", { class: "small cust" }, clientName(m.client_id)) : null,
       el("span", { class: "muted small" }, m.location || m.site || ""),
-      el("span", { class: "pill " + s.cls }, s.label + (m.pm_next_due ? " · " + fmtDate(m.pm_next_due) : "")),
+      s.label ? el("span", { class: "pill " + s.cls }, s.label + (m.pm_next_due ? " · " + fmtDate(m.pm_next_due) : "")) : null,
       m.added_via === "portal" && m.desk_seen === false ? el("span", { class: "muted small" }, "Added by you · we'll check the details") : null,
       filesFor(m).length ? el("span", { class: "muted small" }, "📄 " + filesFor(m).length + " parameter/log file" + (filesFor(m).length > 1 ? "s" : "")) : null,
       state.staff || isVendorOnly() ? null : el("span", { class: "mbook", role: "link", title: "Book a service or log a job for this machine",
@@ -333,15 +337,15 @@ async function renderMachine(id) {
     el("div", { class: "detail" },
       el("div", { class: "card" },
         el("h1", {}, machineName(m)),
-        el("p", {}, el("span", { class: "pill " + s.cls }, s.label)),
+        s.label ? el("p", {}, el("span", { class: "pill " + s.cls }, s.label)) : null,
         el("dl", { class: "kv" },
           el("dt", {}, "Customer"), el("dd", {}, client?.name || "—"),
           el("dt", {}, "Serial"), el("dd", {}, m.serial || "—"),
           el("dt", {}, "Type"), el("dd", {}, [m.category, m.sub_category].filter(Boolean).join(" · ") || "—"),
           m.ink_set && el("dt", {}, "Ink set"), m.ink_set && el("dd", {}, m.ink_set),
           el("dt", {}, "Location"), el("dd", {}, m.location || m.site || "—"),
-          el("dt", {}, "Last service"), el("dd", {}, fmtDate(m.pm_last_done)),
-          el("dt", {}, "Next service due"), el("dd", {}, fmtDate(m.pm_next_due)),
+          !state.hideSchedule && el("dt", {}, "Last service"), !state.hideSchedule && el("dd", {}, fmtDate(m.pm_last_done)),
+          !state.hideSchedule && el("dt", {}, "Next service due"), !state.hideSchedule && el("dd", {}, fmtDate(m.pm_next_due)),
           m.pm_interval_months && el("dt", {}, "Service interval"), m.pm_interval_months && el("dd", {}, "Every " + m.pm_interval_months + " months"),
           m.warranty_end && el("dt", {}, "Warranty until"), m.warranty_end && el("dd", {}, fmtDate(m.warranty_end)),
           m.added_via === "portal" && el("dt", {}, "Added"), m.added_via === "portal" && el("dd", {}, m.desk_seen === false ? "By you, waiting for us to check" : "By you, checked by Highway Digital")
@@ -1178,7 +1182,7 @@ function drawReports() {
   const overdue = fleet.filter((m) => pmStatus(m).cls === "over").length;
   const kpis = el("div", { class: "stats" },
     ...[[jobs.length, "Jobs"], [cnt("service") + cnt("fault"), "Service visits & repairs"], [cnt("install"), "Installations"], [cnt("parts"), "Parts orders"],
-        [money(spend), "Billed ex GST"], [fleet.length, "Machines"], [overdue, "PM overdue"]]
+        [money(spend), "Billed ex GST"], [fleet.length, "Machines"], ...(state.hideSchedule ? [] : [[overdue, "PM overdue"]])]
       .map(([n, l]) => el("div", { class: "stat" }, el("div", { class: "n" }, n), el("div", { class: "l" }, l))));
 
   const tabs = [...(state.staff ? [["desk", "Service desk overview"]] : []), ["assets", "Assets"], ["machines", "Usage by machine"], ["jobs", "Service history"], ["parts", "Parts used"], ["trends", "Trends"]];
@@ -1283,7 +1287,7 @@ function assetsReport(fleet, jobs) {
         el("td", { "data-l": "Machine" }, el("b", {}, machineName(r.m)), el("br"), el("span", { class: "muted small" }, [r.m.serial && "SN " + r.m.serial, r.m.firmware && "FW " + r.m.firmware].filter(Boolean).join(" · "))),
         el("td", { "data-l": "Customer" }, cName(r.m.client_id)), el("td", { "data-l": "Location" }, r.m.location || r.m.site || "—"),
         el("td", { "data-l": "Installed" }, r.m.install_date ? fmtDate(r.m.install_date) : "—"), el("td", { "data-l": "Warranty" }, r.war || "—"),
-        el("td", { "data-l": "Service plan" }, el("span", { class: "pill " + r.pm.cls }, r.pm.label + (r.m.pm_next_due ? " · " + fmtDate(r.m.pm_next_due) : ""))),
+        el("td", { "data-l": "Service plan" }, r.pm.label ? el("span", { class: "pill " + r.pm.cls }, r.pm.label + (r.m.pm_next_due ? " · " + fmtDate(r.m.pm_next_due) : "")) : "—"),
         el("td", { class: "num", "data-l": "Jobs" }, r.n), el("td", { "data-l": "Last job" }, r.last ? fmtDate(r.last) : "—"))))))
       : el("p", { class: "muted small" }, "No machines match these filters."));
 }
@@ -1348,7 +1352,7 @@ function machineReport(jobs, fleet) {
         el("td", { "data-l": "Customer" }, cName(r.m.client_id)), el("td", { class: "num", "data-l": "Jobs" }, r.n), el("td", { class: "num", "data-l": "Visits" }, r.visits),
         el("td", { class: "num", "data-l": "Avg gap" }, r.gap == null ? "—" : r.gap + " days"), el("td", { class: "num", "data-l": "Parts" }, r.parts),
         el("td", { class: "num", "data-l": "Billed" }, money(r.spend)), el("td", { "data-l": "Last job" }, fmtDate(r.last)),
-        el("td", { "data-l": "Service" }, el("span", { class: "pill " + r.pm.cls }, r.pm.label + (r.m.pm_next_due ? " · " + fmtDate(r.m.pm_next_due) : ""))),
+        el("td", { "data-l": "Service" }, r.pm.label ? el("span", { class: "pill " + r.pm.cls }, r.pm.label + (r.m.pm_next_due ? " · " + fmtDate(r.m.pm_next_due) : "")) : "—"),
         el("td", { "data-l": "Firmware / logs" }, [r.fw && "FW " + r.fw, r.files ? r.files + " file" + (r.files > 1 ? "s" : "") : "", r.lastLog && "last log " + fmtDate(r.lastLog)].filter(Boolean).join(" · ") || "—")))))),
     el("p", { class: "muted small" }, "Usage figures (print volumes, ink use, running hours) come from the machine logs we save at each service; machines show their latest firmware and log date here. " +
       (unmatched ? unmatched + " job" + (unmatched > 1 ? "s" : "") + " in this period couldn't be tied to a specific machine and count only in the customer totals." : "")));
