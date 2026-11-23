@@ -429,7 +429,9 @@ function machineHistoryCard(m) {
     else iBox.replaceChildren(r.data.length ? el("div", { class: "tscroll" }, el("table", { class: "tbl rtbl" },
       el("thead", {}, el("tr", {}, ...["Date", "Invoice", "Work", "Status", "Ex GST"].map((h) => el("th", { class: h === "Ex GST" ? "num" : null }, h)))),
       el("tbody", {}, ...r.data.map((x) => { const lab = (x.lines || []).find((l) => /labou?r|day rate|hourly/i.test(l.code || ""));
-        const work = x.po || (lab ? String(lab.desc || "").split("\n").map((s) => s.trim()).filter((s) => s && !/^(date|model|job|serial|end user|install)/i.test(s))[0] : "") || ({ service: "Service", install: "Installation", parts: "Parts" }[x.kind] || "");
+        const ld = String((lab && lab.desc) || "");
+        const issue = (ld.match(/reported issue:\s*([^\n]+)/i) || [])[1] || ld.split("\n").map((s) => s.trim()).filter((s) => s && !/^(date|model|job|serial|end user|install|work outstanding)/i.test(s))[0] || "";
+        const work = [issue.replace(/^work performed:\s*/i, "").slice(0, 140), x.po && "PO " + x.po.replace(/^po\s*/i, "")].filter(Boolean).join(" · ") || ({ service: "Service", install: "Installation", parts: "Parts" }[x.kind] || "");
         const parts = (x.lines || []).filter(isPart).map((l) => (Number(l.qty) || 1) + "× " + l.code).slice(0, 4).join(", ");
         return el("tr", {}, el("td", { "data-l": "Date" }, fmtDate(x.issued)), el("td", { class: "mono", "data-l": "Invoice" }, x.number),
           el("td", { "data-l": "Work" }, work || "—", parts ? el("div", { class: "muted small" }, parts) : null),
