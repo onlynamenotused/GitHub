@@ -306,6 +306,16 @@ function billingTable(rows, kind) {
           isInv ? (open ? "Pay now" : "View") : (open ? "Review & accept" : "View"))));
     })));
 }
+async function vendorInvoiceRows() {
+  const ids = (state.supervisors || []).map((x) => x.id);
+  const { data, error } = await allRows(() => sb.from("service_records").select("id,client_id,machine_id,number,issued,status,kind,po,total_ex,total_inc,lines").in("supervisor_id", ids).order("issued", { ascending: false }).order("id"));
+  if (error) throw error;
+  const head = ["Date", "Invoice", "Customer", "Machine", "Serial", "PO / reference", "Type", "Status", "Reported issue", "Parts", "Ex GST", "Inc GST"];
+  return [head, (data || []).map((r) => { const m = state.machines.find((x) => x.id === r.machine_id); const lab = (r.lines || []).find((l) => /labou?r|day rate|hourly/i.test(l.code || ""));
+    return [r.issued || "", r.number, state.clients.find((c) => c.id === r.client_id)?.name || "", m ? machineName(m) : "", m?.serial || "", r.po || "", KIND_NAMES[r.kind] || r.kind || "", r.status || "",
+      (String((lab && lab.desc) || "").match(/reported issue:\s*([^\n]+)/i) || [])[1] || "", (r.lines || []).filter(isPart).map((l) => (Number(l.qty) || 1) + " x " + l.code).join("; "),
+      (Number(r.total_ex) || 0).toFixed(2), (Number(r.total_inc) || 0).toFixed(2)]; })];
+}
 /* Vendor / supervisor logins: their own invoices from us (billed to the vendor), newest first. */
 function vendorInvoicesCard() {
   const name = supName();
@@ -1227,6 +1237,17 @@ function repFiltered() {
     (!f.client || String(j.client_id) === f.client) && (!f.machine || j.machine_id === f.machine) &&
     (!q || norm([j.ref, j.title, j.notes, j.detail, cName(j.client_id), mLabel(j.machine_id), ...j.lines.map((l) => l.code + " " + l.desc)].join(" ")).includes(q)));
 }
+/* Download menu for report tables: Excel, CSV or PDF (name may end in .csv; rows[0] is the header row). */
+function dlMenu(name, getRows) {
+  const base = String(name).replace(/\.csv$/i, "");
+  const go = (fmt) => async (e) => { e.preventDefault(); dd.open = false;
+    try { const rows = getRows(); await exportTable(fmt, base, base, rows[0], rows.slice(1)); } catch (er) { console.error(er); } };
+  const dd = el("details", { class: "xmenu" }, el("summary", { class: "btn small" }, "Download ▾"),
+    el("div", { class: "xpanel" }, el("button", { type: "button", class: "xopt", onclick: go("xlsx") }, "Excel (.xlsx)"),
+      el("button", { type: "button", class: "xopt", onclick: go("csv") }, "CSV"), el("button", { type: "button", class: "xopt", onclick: go("pdf") }, "PDF")));
+  document.addEventListener("click", (e) => { if (dd.open && !dd.contains(e.target)) dd.open = false; });
+  return dd;
+}
 function csvDownload(name, rows) {
   const csv = rows.map((r) => r.map((c) => { c = String(c ?? ""); return /[",\n]/.test(c) ? '"' + c.replace(/"/g, '""') + '"' : c; }).join(",")).join("\n");
   const url = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv" }));
@@ -1296,8 +1317,8 @@ function jobsReport(jobs) {
   }).flat();
   return el("div", { class: "card" },
     el("div", { class: "bhead" }, el("h2", {}, "Service history (" + jobs.length + ")"),
-      el("button", { class: "btn small", type: "button", onclick: () => csvDownload("Service history.csv", [["Date", "Ref", "Customer", "Machine", "Type", "Job", "Notes", "Parts", "Amount ex GST"],
-        ...jobs.map((j) => [j.date, j.ref, cName(j.client_id), mLabel(j.machine_id), KIND_NAMES[j.kind] || j.kind, j.title, j.notes, j.lines.filter(isPart).map((l) => l.qty + "x " + l.code).join("; "), j.amount.toFixed(2)])]) }, "Download CSV")),
+      dlMenu("Service history.csv", () => [["Date", "Ref", "Customer", "Machine", "Type", "Job", "Notes", "Parts", "Amount ex GST"],
+        ...jobs.map((j) => [j.date, j.ref, cName(j.client_id), mLabel(j.machine_id), KIND_NAMES[j.kind] || j.kind, j.title, j.notes, j.lines.filter(isPart).map((l) => l.qty + "x " + l.code).join("; "), j.amount.toFixed(2)])])),
     jobs.length ? el("div", { class: "tscroll" }, el("table", { class: "tbl rtbl" }, el("thead", {}, el("tr", {}, ...["Date", "Ref", "Customer", "Machine", "Type", "Job", "Amount"].map((h) => el("th", { class: h === "Amount" ? "num" : null }, h)))), el("tbody", {}, ...rows)))
       : el("p", { class: "muted small" }, "No jobs match these filters."),
     el("p", { class: "muted small" }, "Click a job to see the work notes and every line on it."));
@@ -1314,8 +1335,8 @@ function partsReport(jobs) {
   const list = [...by.values()].sort((a, b) => b.spend - a.spend || b.qty - a.qty);
   return el("div", { class: "card" },
     el("div", { class: "bhead" }, el("h2", {}, "Parts used (" + list.length + " part numbers)"),
-      el("button", { class: "btn small", type: "button", onclick: () => csvDownload("Parts used.csv", [["Part", "Description", "Qty", "Times supplied", "Spend ex GST", "Last supplied", "Customers", "Machines"],
-        ...list.map((p) => [p.code, p.desc, p.qty, p.orders, p.spend.toFixed(2), p.last, [...p.customers].join("; "), [...p.machines].join("; ")])]) }, "Download CSV")),
+      dlMenu("Parts used.csv", () => [["Part", "Description", "Qty", "Times supplied", "Spend ex GST", "Last supplied", "Customers", "Machines"],
+        ...list.map((p) => [p.code, p.desc, p.qty, p.orders, p.spend.toFixed(2), p.last, [...p.customers].join("; "), [...p.machines].join("; ")])])),
     list.length ? el("div", { class: "tscroll" }, el("table", { class: "tbl rtbl" },
       el("thead", {}, el("tr", {}, ...["Part", "Description", "Qty", "Times", "Spend", "Last supplied", "Customers"].map((h) => el("th", { class: ["Qty", "Times", "Spend"].includes(h) ? "num" : null }, h)))),
       el("tbody", {}, ...list.map((p) => el("tr", {}, el("td", { class: "mono", "data-l": "Part" }, p.code), el("td", { "data-l": "Description" }, p.desc), el("td", { class: "num", "data-l": "Qty" }, p.qty),
@@ -1342,11 +1363,13 @@ function trendsReport(jobs) {
   const topCodes = [...codes.entries()].filter(([, n]) => n > 1).sort((a, b) => b[1] - a[1]).slice(0, 10);
   const half = Math.floor(months.length / 2), a = visits.slice(0, half).reduce((s, x) => s + x[1], 0), b = visits.slice(half).reduce((s, x) => s + x[1], 0);
   return el("div", { class: "stack" },
-    el("div", { class: "card" }, el("h2", {}, "Service visits and repairs per month"),
+    el("div", { class: "card" }, el("div", { class: "bhead" }, el("h2", {}, "Service visits and repairs per month"),
+      dlMenu("Trends by month", () => [["Month", "Service visits & repairs", "Billed ex GST"], ...months.map((k, i) => [monthLbl(k), visits[i][1], spend[i][1].toFixed(2)])])),
       months.length > 1 ? el("p", { class: "muted small" }, b > a ? `Up: ${b} in the second half of this period against ${a} in the first.` : b < a ? `Down: ${b} in the second half of this period against ${a} in the first.` : "Steady across this period.") : null,
       bars(visits, (n) => String(n))),
     el("div", { class: "card" }, el("h2", {}, "Billed per month (ex GST)"), bars(spend, (n) => "$" + Math.round(n).toLocaleString("en-AU"))),
-    el("div", { class: "card" }, el("h2", {}, "By customer"),
+    el("div", { class: "card" }, el("div", { class: "bhead" }, el("h2", {}, "By customer"),
+      dlMenu("Jobs by customer", () => [["Customer", "Jobs", "Billed ex GST"], ...[...byCust.entries()].sort((a, b) => b[1].s - a[1].s).map(([c, x]) => [c, x.n, x.s.toFixed(2)])])),
       el("table", { class: "tbl rtbl" }, el("thead", {}, el("tr", {}, el("th", {}, "Customer"), el("th", { class: "num" }, "Jobs"), el("th", { class: "num" }, "Billed ex GST"))),
         el("tbody", {}, ...[...byCust.entries()].sort((a, b) => b[1].s - a[1].s).map(([c, x]) => el("tr", {}, el("td", {}, c), el("td", { class: "num" }, x.n), el("td", { class: "num" }, money(x.s))))))),
     topCodes.length ? el("div", { class: "card" }, el("h2", {}, "Recurring error codes"), el("ul", { class: "links" }, ...topCodes.map(([c, n]) => el("li", {}, el("span", { class: "kind" }, n + "×"), c)))) : null);
@@ -1364,7 +1387,7 @@ function assetsReport(fleet, jobs) {
     r.m.firmware || "", [r.m.ink_type, r.m.ink_set].filter(Boolean).join(" "), r.m.pm_interval_months ? r.m.pm_interval_months + " months" : "", r.m.pm_next_due || "", r.pm.label, r.n, r.last];
   return el("div", { class: "card" },
     el("div", { class: "bhead" }, el("h2", {}, "Assets (" + rows.length + ")"),
-      el("button", { class: "btn small", type: "button", onclick: () => csvDownload("Assets.csv", [cols, ...rows.map(val)]) }, "Download CSV")),
+      dlMenu("Assets.csv", () => [cols, ...rows.map(val)])),
     rows.length ? el("div", { class: "tscroll" }, el("table", { class: "tbl rtbl" },
       el("thead", {}, el("tr", {}, ...["Machine", "Customer", "Location", "Installed", "Warranty", "Service plan", "Jobs", "Last job"].map((h) => el("th", { class: h === "Jobs" ? "num" : null }, h)))),
       el("tbody", {}, ...rows.map((r) => el("tr", { class: "rrow", tabindex: 0, onclick: () => (location.hash = "#machine/" + encodeURIComponent(r.m.id)) },
@@ -1389,7 +1412,7 @@ function deskReport(jobs, fleet) {
   const STN = { new: "New", scheduled: "Scheduled", "in-progress": "In progress", waiting: "Waiting on parts / customer", quote: "Quote", completed: "Completed", invoiced: "Invoiced" };
   const TYN = (j) => j.subtype === "installation" ? "Installation" : j.subtype === "pm" ? "PM service" : ({ incident: "Incident", request: "Request", problem: "Problem" }[j.type] || j.type);
   const mini = (title, rows, csvName, head) => el("div", { class: "card" },
-    el("div", { class: "bhead" }, el("h2", {}, title), csvName ? el("button", { class: "btn small", type: "button", onclick: () => csvDownload(csvName, [head, ...rows.map((r) => r.map((c) => (c && c.textContent != null ? c.textContent : c)))]) }, "Download CSV") : null),
+    el("div", { class: "bhead" }, el("h2", {}, title), csvName ? dlMenu(csvName, () => [head, ...rows.map((r) => r.map((c) => (c && c.textContent != null ? c.textContent : c)))]) : null),
     rows.length ? el("div", { class: "tscroll" }, el("table", { class: "tbl rtbl" }, el("thead", {}, el("tr", {}, ...head.map((h, i) => el("th", { class: i ? "num" : null }, h)))),
       el("tbody", {}, ...rows.map((r) => el("tr", {}, ...r.map((c, i) => el("td", { class: i ? "num" : null }, c))))))) : el("p", { class: "muted small" }, "Nothing in this period."));
   const fleetDue = fleet.filter((m) => ["over", "soon"].includes(pmStatus(m).cls)).sort((a, b) => String(a.pm_next_due || "").localeCompare(String(b.pm_next_due || "")));
@@ -1427,8 +1450,8 @@ function machineReport(jobs, fleet) {
   const unmatched = jobs.filter((j) => !j.machine_id).length;
   return el("div", { class: "card" },
     el("div", { class: "bhead" }, el("h2", {}, "Usage by machine (" + rows.length + ")"),
-      el("button", { class: "btn small", type: "button", onclick: () => csvDownload("Usage by machine.csv", [["Customer", "Machine", "Serial", "Installed", "Jobs", "Service visits", "Avg days between visits", "Parts fitted", "Billed ex GST", "Last job", "Next PM due", "PM status", "Firmware", "Parameter/log files", "Latest log"],
-        ...rows.map((r) => [cName(r.m.client_id), machineName(r.m), r.m.serial || "", r.m.install_date || "", r.n, r.visits, r.gap ?? "", r.parts, r.spend.toFixed(2), r.last, r.m.pm_next_due || "", r.pm.label, r.fw, r.files, r.lastLog])]) }, "Download CSV")),
+      dlMenu("Usage by machine.csv", () => [["Customer", "Machine", "Serial", "Installed", "Jobs", "Service visits", "Avg days between visits", "Parts fitted", "Billed ex GST", "Last job", "Next PM due", "PM status", "Firmware", "Parameter/log files", "Latest log"],
+        ...rows.map((r) => [cName(r.m.client_id), machineName(r.m), r.m.serial || "", r.m.install_date || "", r.n, r.visits, r.gap ?? "", r.parts, r.spend.toFixed(2), r.last, r.m.pm_next_due || "", r.pm.label, r.fw, r.files, r.lastLog])])),
     el("div", { class: "tscroll" }, el("table", { class: "tbl rtbl" },
       el("thead", {}, el("tr", {}, ...["Machine", "Customer", "Jobs", "Visits", "Avg gap", "Parts", "Billed", "Last job", "Service", "Firmware / logs"].map((h) => el("th", { class: ["Jobs", "Visits", "Avg gap", "Parts", "Billed"].includes(h) ? "num" : null }, h)))),
       el("tbody", {}, ...rows.map((r) => el("tr", { class: "rrow", tabindex: 0, onclick: () => (location.hash = "#machine/" + encodeURIComponent(r.m.id)) },
@@ -1621,6 +1644,12 @@ function machineExportRows() {
   return [head, rows];
 }
 async function jobExportRows() {
+  if (isSupervisor() && !state.staff && isVendorOnly()) {   // vendors: jobs billed to them, from the Reports data
+    const d = await loadReportData();
+    const head = ["Date", "Reference", "Customer", "Machine", "Type", "Status", "Job", "Notes", "Work detail", "Parts used", "Amount ex GST"];
+    return [head, d.jobs.map((j) => [j.date || "", j.ref, cName(j.client_id), mLabel(j.machine_id), KIND_NAMES[j.kind] || j.kind || "", j.status || "", j.title || "", j.notes || "",
+      String(j.detail || ""), j.lines.filter(isPart).map((l) => (Number(l.qty) || 1) + " x " + l.code).join("; "), (Number(j.amount) || 0).toFixed(2)])];
+  }
   const jobs = await loadJobs();
   const head = ["Date", "Reference", "Customer", "Machine", "Type", "Status", "Scheduled", "Problem / request", "Work done", "Parts used"];
   return [head, jobs.map((j) => [j.date || "", j.ref, clientName(j.client_id), machLabel(j.machine_id), j.type, j.status, j.scheduled || "", j.problem, j.work, j.parts])];
@@ -1630,8 +1659,9 @@ function exportMenu() {
   const go = (what, fmt) => async (e) => {
     e.preventDefault(); dd.open = false; msg.textContent = "Preparing…";
     try {
-      const [head, rows] = what === "jobs" ? await jobExportRows() : machineExportRows();
-      await exportTable(fmt, what === "jobs" ? "Highway Digital jobs" : "Highway Digital machines", what === "jobs" ? "Service jobs" : "Machines", head, rows);
+      const [head, rows] = what === "jobs" ? await jobExportRows() : what === "vinv" ? await vendorInvoiceRows() : machineExportRows();
+      const t = what === "jobs" ? ["Highway Digital jobs", "Service jobs"] : what === "vinv" ? ["Highway Digital invoices to " + supName(), "Invoices to " + supName()] : ["Highway Digital machines", "Machines"];
+      await exportTable(fmt, t[0], t[1], head, rows);
       msg.textContent = "";
     } catch (er) { msg.textContent = "Export failed: " + (er.message || er); }
   };
@@ -1639,7 +1669,8 @@ function exportMenu() {
   const dd = el("details", { class: "xmenu" }, el("summary", { class: "btn" }, "Export ▾"),
     el("div", { class: "xpanel" },
       el("div", { class: "xhd" }, "Machines (full asset details)"), item("machines", "xlsx", "Excel (.xlsx)"), item("machines", "csv", "CSV"), item("machines", "pdf", "PDF"),
-      el("div", { class: "xhd" }, "All jobs (problem and work done)"), item("jobs", "xlsx", "Excel (.xlsx)"), item("jobs", "csv", "CSV"), item("jobs", "pdf", "PDF")));
+      el("div", { class: "xhd" }, "All jobs (problem and work done)"), item("jobs", "xlsx", "Excel (.xlsx)"), item("jobs", "csv", "CSV"), item("jobs", "pdf", "PDF"),
+      ...(isSupervisor() && !state.staff ? [el("div", { class: "xhd" }, "Invoices to " + supName()), item("vinv", "xlsx", "Excel (.xlsx)"), item("vinv", "csv", "CSV"), item("vinv", "pdf", "PDF")] : [])));
   document.addEventListener("click", (e) => { if (dd.open && !dd.contains(e.target)) dd.open = false; });
   return el("span", { class: "xwrap" }, dd, msg);
 }
