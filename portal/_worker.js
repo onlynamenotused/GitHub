@@ -4,14 +4,14 @@
 // shared portal menu (nav.js + nav.css) added at the top, with their old cross-links removed.
 const SB_URL = "https://sfuuzcgwbbhdjqzrchvv.supabase.co";
 const SB_KEY = "sb_publishable_uu0N60ZMVjJ1kl14FW1NBA_v-cm_U3_"; // publishable key: safe, RLS protects data
-const V = "41";
+const V = "42";
 const GATED = {
   kb: { page: "/_p/kb/", flag: "kb", name: "Knowledge Base" },
   catalogue: { page: "/_p/catalogue/", flag: "cat", name: "Parts Catalogue" },
   vector: { page: "/_p/vector/", flag: "vector", name: "Vector Converter" },  // staff, supervisors, customers with vector_access
   flute: { page: "/_p/flute/", flag: "flute", name: "Flute Practice player" },   // staff, customers with flute_access (off by default)
   warehousing: { page: "/_p/warehousing/", flag: "intranet", name: "Warehousing" }, // purchase orders, parts & stock: hello@ only
-  radio: { page: "/_p/radio/", flag: null, name: "Radio" }   // free internet radio: every signed-in login
+  radio: { page: "/_p/radio/", flag: "radio", name: "Radio" }   // free internet radio: staff, and customers / vendors with radio_access (on by default)
 };
 // Files the Warehousing page loads next to itself (served only to the same signed-in hello@ account).
 const WH_FILES = new Set(["catalog-mimaki.json", "warranty-mimaki.json", "logo-bw.png"]);
@@ -49,7 +49,7 @@ function filterCatalogue(html, allow) {
 }
 const attr = (s) => String(s).replace(/&/g, "&amp;").replace(/'/g, "&#39;").replace(/</g, "&lt;");
 function navBlock(f, active) {
-  const flags = JSON.stringify({ signedIn: true, email: f.email, staff: !!f.staff, intranet: !!f.intranet, kb: !!f.kb, cat: !!f.cat, vector: !!f.vector, flute: !!f.flute, appsOnly: !!f.apps_only, supervisor: !!f.supervisor, reports: !!f.reports, active });
+  const flags = JSON.stringify({ signedIn: true, email: f.email, staff: !!f.staff, intranet: !!f.intranet, kb: !!f.kb, cat: !!f.cat, vector: !!f.vector, flute: !!f.flute, radio: !!f.radio, appsOnly: !!f.apps_only, supervisor: !!f.supervisor, reports: !!f.reports, active });
   return `<div id="hd-nav" class="hdn-static" data-flags='${attr(flags)}'></div><script src="/nav.js?v=${V}"></script>`;
 }
 function notAvailable(name) {
@@ -109,8 +109,12 @@ async function apiRoute(req, env, url, p) {
     return jres(r.ok ? r.j || { ok: true } : { ok: false, error: (r.j && (r.j.message || r.j.error)) || "Couldn't save that." });
   }
   // Radio: station directory (Radio Browser, a free community list) and "now playing" for one stream.
-  if (p === "/radio/api/stations") return radioStations(url);
-  if (p === "/radio/api/now") return radioNow(url);
+  if (p.startsWith("/radio/api/")) {
+    const f = await menuFlags(token).catch(() => null);
+    if (!f || !f.radio) return jres({ ok: false, error: "Radio isn't turned on for your account." }, 403);
+    if (p === "/radio/api/stations") return radioStations(url);
+    if (p === "/radio/api/now") return radioNow(url);
+  }
   if (p === "/vector/log" && req.method === "POST") {
     const b = await req.json().catch(() => ({}));
     await rpc("log_vector_export", { p_kind: String(b.kind || "file").slice(0, 40) }, token);

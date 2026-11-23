@@ -75,7 +75,7 @@ async function signOut() { await sb.auth.signOut(); setAccessCookie(null); histo
 const navHost = () => $("#hd-nav");
 function drawNav(active) {
   window.HDNav?.render(navHost(), state.user
-    ? { signedIn: true, email: state.user.email, staff: state.staff, intranet: state.intranet, kb: state.kbAccess || isSupervisor(), cat: state.catAccess, vector: state.vectorAccess, flute: state.fluteAccess, appsOnly: state.appsOnly, supervisor: isSupervisor(), reports: !!state.reportsAccess, active }
+    ? { signedIn: true, email: state.user.email, staff: state.staff, intranet: state.intranet, kb: state.kbAccess || isSupervisor(), cat: state.catAccess, vector: state.vectorAccess, flute: state.fluteAccess, appsOnly: state.appsOnly, supervisor: isSupervisor(), reports: !!state.reportsAccess, radio: !!state.radioAccess, active }
     : { signedIn: false });
 }
 
@@ -104,7 +104,7 @@ sb.auth.onAuthStateChange((evt, session) => {
 // ---------- data ----------
 async function loadCore() {
   const [c, m, k, s, g, it, ...rest] = await Promise.all([
-    sb.from("clients").select("id,name,kb_access,vector_access,flute_access,apps_only,reports_access,catalogue_access,catalogue_brands").order("name"),
+    sb.from("clients").select("id,name,kb_access,vector_access,flute_access,apps_only,reports_access,radio_access,catalogue_access,catalogue_brands").order("name"),
     sb.from("machines").select("*").eq("status", "active").order("brand").order("model"),
     sb.rpc("has_kb_access"),
     sb.rpc("is_staff"),
@@ -118,9 +118,11 @@ async function loadCore() {
     sb.rpc("has_flute_access"),
     sb.rpc("is_apps_only"),
     sb.rpc("has_reports_access"),
-    sb.rpc("my_hide_prices")
+    sb.rpc("my_hide_prices"),
+    sb.rpc("has_radio_access")
   ]);
-  const [mf, inv, est, sv, va, fa, ao, ra, hp] = rest;
+  const [mf, inv, est, sv, va, fa, ao, ra, hp, rda] = rest;
+  state.radioAccess = rda?.data === true;
   state.hidePrices = hp?.data === true;   // vendor login with "Hide prices" ticked
   state.reportsAccess = ra?.data === true;
   state.vectorAccess = va?.data === true;
@@ -512,10 +514,10 @@ async function renderCustomers() {
     showTab(k0 === "vendors" ? "vendors" : "list");
   }
   if (!state.access) {
-    body.replaceChildren(el("tr", {}, el("td", { colspan: "10", class: "muted" }, "Loading…")));
+    body.replaceChildren(el("tr", {}, el("td", { colspan: "11", class: "muted" }, "Loading…")));
     const [{ data, error }, vx] = await Promise.all([sb.from("portal_access").select("client_id,email"), sb.rpc("vector_export_counts")]);
     state.vexp = (vx && vx.data) || {};
-    if (error) { body.replaceChildren(el("tr", {}, el("td", { colspan: "10", class: "msg err" }, "Couldn't load customers."))); return; }
+    if (error) { body.replaceChildren(el("tr", {}, el("td", { colspan: "11", class: "msg err" }, "Couldn't load customers."))); return; }
     state.access = data;
   }
   const q = norm($("#custSearch").value);
@@ -551,10 +553,11 @@ async function renderCustomers() {
       tick("flute_access", "Flute Practice"),
       tick("apps_only", "Apps only"),
       tick("reports_access", "Reports"),
+      tick("radio_access", "Radio"),
       el("td", { class: "num", title: vexpTitle(c.id) }, String(((state.vexp || {})[c.id] || {}).n || 0)),
       el("td", {}, catPicker(c, "clients", c.name))));
     if (open) {
-      const cell = el("td", { colspan: "10", class: "panelcell" }, el("p", { class: "muted small" }, "Loading…"));
+      const cell = el("td", { colspan: "11", class: "panelcell" }, el("p", { class: "muted small" }, "Loading…"));
       rows.push(el("tr", { class: "panelrow" }, cell));
       renderManage(c, cell);
     }
@@ -715,7 +718,7 @@ $("#addCustForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const name = $("#newCustName").value.trim(); if (!name) return;
   const msg = $("#addCustMsg");
-  const { data, error } = await sb.from("clients").insert({ name }).select("id,name,kb_access,vector_access,flute_access,apps_only,reports_access,catalogue_access,catalogue_brands").single();
+  const { data, error } = await sb.from("clients").insert({ name }).select("id,name,kb_access,vector_access,flute_access,apps_only,reports_access,radio_access,catalogue_access,catalogue_brands").single();
   if (error) return flash(msg, "Customer not added", false);
   state.clients.push(data); state.clients.sort((x, y) => x.name.localeCompare(y.name));
   $("#newCustName").value = ""; $("#custSearch").value = name; state.openClient = data.id;
@@ -1647,6 +1650,10 @@ async function renderSupervisorsAdmin(host) {
         const on = e.target.checked; const { error } = await sb.from("supervisors").update({ reports_access: on }).eq("id", sup.id);
         if (error) { e.target.checked = !on; return flash(note, "Not changed", false); } flash(note, "Reports " + (on ? "on" : "off") + " for " + sup.name, true); } }),
         el("b", {}, "Reports"), el("span", { class: "muted" }, "assets, usage and service history for jobs billed to " + (sup.bill_to || sup.name) + ", exportable as CSV")),
+      el("label", { class: "small", style: "display:flex;gap:8px;align-items:center;margin:0 0 8px" }, el("input", { type: "checkbox", checked: sup.radio_access !== false, onchange: async (e) => {
+        const on = e.target.checked; const { error } = await sb.from("supervisors").update({ radio_access: on }).eq("id", sup.id);
+        if (error) { e.target.checked = !on; return flash(note, "Not changed", false); } flash(note, "Radio " + (on ? "on" : "off") + " for " + sup.name, true); } }),
+        el("b", {}, "Radio"), el("span", { class: "muted" }, "the Radio tab (free internet radio stations)")),
       inv
         ? el("p", { class: "muted small" }, "Vendor logins see every job invoiced to " + (sup.bill_to || sup.name) + ", for any customer: invoices from FreshBooks and service desk jobs with Bill to " + (sup.bill_to || sup.name) + ". They see only those jobs' customers and machines, and get Fleet reports. Adding a login sends nothing.")
         : el("p", { class: "muted small" }, "Supervisor logins see every machine, job and service record for these customers, can log jobs and add machines for them, and get Fleet reports. Adding a login sends nothing."),

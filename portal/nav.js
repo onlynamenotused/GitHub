@@ -11,7 +11,7 @@
     if (f.cat) out.push(["catalogue", "/catalogue/", "Parts Catalogue"]);
     if (f.vector) out.push(["vector", "/vector/", "Vector Converter"]);
     if (f.flute) out.push(["flute", "/flute/", "Flute Practice"]);
-    out.push(["radio", "/radio/", "Radio"]);
+    if (f.radio) out.push(["radio", "/radio/", "Radio"]);
     if (f.reports) out.push(["reports", "/#reports", "Reports"]);
     if (!(f.appsOnly && !f.staff)) out.push(["contact", "/#contact", "Contact & booking"]);
     if (f.staff) out.push(["customers", "/#customers", "Customers (staff)"]);
@@ -19,7 +19,7 @@
     if (f.intranet) out.push(["warehousing", "/warehousing/", "Warehousing"]);
     return out;
   }
-  // f: { signedIn, email, staff, intranet, kb, cat, vector, flute, appsOnly, active }
+  // f: { signedIn, email, staff, intranet, kb, cat, vector, flute, radio, appsOnly, active }
   function render(host, f) {
     if (!host) return;
     f = f || {};
