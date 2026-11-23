@@ -337,6 +337,8 @@ const TP=[
  {f:"https://netorgft6773677-my.sharepoint.com/:u:/g/personal/hello_highwaydigital_com_au/IQAl8guskeQNToExtzDIleoIAc8-OialsSvgiLshynOJAms?download=1",img:"car.jpg",t:"Four-layer car (UCJV300-160)",m:"Mimaki UCJV · white & clear",d:"Layered colour, white and clear varnish test for UV print & cut.",z:"EPS · 178 MB"},
  {f:"https://netorgft6773677-my.sharepoint.com/:b:/g/personal/hello_highwaydigital_com_au/IQBMeb7pgHk6TK6h07-rrGPVAXpe4opixQEnrvKY9zKrvp8?download=1",img:"coffeedog.jpg",t:"CJV/JV200 Coffee Dog",m:"Mimaki CJV200 / JV200",d:"Mimaki's sample image for the 200 series.",z:"A4 · Illustrator PDF · 38 MB"}
 ];
+if(KBO){ const BW=[[/mimaki/i,"mimaki"],[/mutoh/i,"mutoh"],[/epilog/i,"epilog"],[/\bgtx\b/i,"gtx"],[/brother/i,"gtx"],[/kyocera/i,"kyocera"]];
+  for(let i=TP.length-1;i>=0;i--){ const need=BW.filter(([re])=>re.test(TP[i].m+" "+TP[i].t)).map(([,k])=>k); if(need.length && !need.some(kbOk)) TP.splice(i,1); } }   // vendor logins: test files for their brands, plus the brand-neutral ones
 const TPB="testprints/";
 document.getElementById("g-tp").innerHTML=TP.map((x,i)=>`<div class="tp"><div class="thumb"><img src="${TPB}thumbs/${x.img}" alt="Preview of ${esc(x.t)}" loading="lazy" width="320" height="240"></div><div class="tb"><div class="for">${esc(x.m)}</div><h3>${esc(x.t)}</h3><p>${esc(x.d)}</p><div class="meta2">${esc(x.z)}</div><div class="acts">${x.f?(/^https?:/.test(x.f)?`<a class="dlbtn" href="${x.f}" target="_blank" rel="noopener">Download</a>`:`<a class="dlbtn" href="${TPB}${encodeURIComponent(x.f)}" download>Download</a>`):`<span class="reqtag">On request</span>`}</div></div></div>`).join("");
 </script>
