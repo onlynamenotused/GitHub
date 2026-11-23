@@ -407,6 +407,15 @@ async function renderMachine(id) {
 /* Machine page: open and recent service desk tickets for this machine, and its FreshBooks invoices.
    What each login sees is limited by the database (customers: theirs; vendors: billed to them; staff: all). */
 const T_STATUS = { new: ["New", "soon"], scheduled: ["Scheduled", "soon"], "in-progress": ["In progress", "soon"], waiting: ["Waiting", "soon"], quote: ["Quote", "soon"], completed: ["Completed", "ok"], invoiced: ["Invoiced", "ok"] };
+/* Open an invoice in FreshBooks: staff go straight to it; customers and vendors to their FreshBooks client area. */
+function fbInvLink(x) {
+  const fid = String(x.id || "").replace(/^fbinv-/, "");
+  const owing = !["paid", "draft"].includes(String(x.status || ""));
+  const href = state.staff && /^\d+$/.test(fid) ? "https://my.freshbooks.com/#/invoice/" + fid : (cfg.freshbooksPortal || "https://my.freshbooks.com/");
+  return el("a", { class: "btn small" + (owing && !state.staff ? " primary" : ""), href, target: "_blank", rel: "noopener",
+    title: state.staff ? "Open this invoice in FreshBooks" : "Opens your FreshBooks client area: sign in with this email address to see the full invoice" + (owing ? " and pay by card" : "") },
+    owing && !state.staff ? "Pay now" : "View");
+}
 function machineHistoryCard(m) {
   const tBox = el("div", { class: "stack" }, el("p", { class: "muted small" }, "Loading…"));
   const iBox = el("div", {}, el("p", { class: "muted small" }, "Loading…"));
@@ -427,7 +436,7 @@ function machineHistoryCard(m) {
     }
     if (r.error) iBox.replaceChildren(el("p", { class: "msg err" }, "Couldn't load invoices."));
     else iBox.replaceChildren(r.data.length ? el("div", { class: "tscroll" }, el("table", { class: "tbl rtbl" },
-      el("thead", {}, el("tr", {}, ...["Date", "Invoice", "Work", "Status", "Ex GST"].map((h) => el("th", { class: h === "Ex GST" ? "num" : null }, h)))),
+      el("thead", {}, el("tr", {}, ...["Date", "Invoice", "Work", "Status", "Ex GST", ""].map((h) => el("th", { class: h === "Ex GST" ? "num" : null }, h)))),
       el("tbody", {}, ...r.data.map((x) => { const lab = (x.lines || []).find((l) => /labou?r|day rate|hourly/i.test(l.code || ""));
         const ld = String((lab && lab.desc) || "");
         const issue = (ld.match(/reported issue:\s*([^\n]+)/i) || [])[1] || ld.split("\n").map((s) => s.trim()).filter((s) => s && !/^(date|model|job|serial|end user|install|work outstanding)/i.test(s))[0] || "";
@@ -436,13 +445,15 @@ function machineHistoryCard(m) {
         return el("tr", {}, el("td", { "data-l": "Date" }, fmtDate(x.issued)), el("td", { class: "mono", "data-l": "Invoice" }, x.number),
           el("td", { "data-l": "Work" }, work || "—", parts ? el("div", { class: "muted small" }, parts) : null),
           el("td", { "data-l": "Status" }, el("span", { class: "pill " + (x.status === "paid" ? "ok" : "soon") }, x.status || "")),
-          el("td", { class: "num", "data-l": "Ex GST" }, money(x.total_ex))); }))))
+          el("td", { class: "num", "data-l": "Ex GST" }, money(x.total_ex)),
+          el("td", { class: "act" }, fbInvLink(x))); }))))
       : el("p", { class: "muted small" }, "No FreshBooks invoices matched to this machine yet."));
   })();
   return el("div", { class: "card", style: "margin-top:14px" },
     el("h2", {}, "Tickets"), tBox,
     el("h2", { style: "margin-top:16px" }, "FreshBooks invoices"), iBox,
-    el("p", { class: "muted small" }, "Invoices are matched to a machine by its serial number or model on the invoice; some older invoices only show under the customer."));
+    el("p", { class: "muted small" }, (state.staff ? "" : "View and Pay now open your FreshBooks client area; sign in there with this email address to see the full invoice. ") +
+      "Invoices are matched to a machine by its serial number or model on the invoice; some older invoices only show under the customer."));
 }
 function mailtoFor(m) {
   const subj = `Service request: ${machineName(m)}${m.serial ? " SN " + m.serial : ""}`;
