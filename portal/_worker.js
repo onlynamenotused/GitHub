@@ -4,7 +4,7 @@
 // shared portal menu (nav.js + nav.css) added at the top, with their old cross-links removed.
 const SB_URL = "https://sfuuzcgwbbhdjqzrchvv.supabase.co";
 const SB_KEY = "sb_publishable_uu0N60ZMVjJ1kl14FW1NBA_v-cm_U3_"; // publishable key: safe, RLS protects data
-const V = "39";
+const V = "40";
 const GATED = {
   kb: { page: "/_p/kb/", flag: "kb", name: "Knowledge Base" },
   catalogue: { page: "/_p/catalogue/", flag: "cat", name: "Parts Catalogue" },
@@ -205,7 +205,8 @@ export default {
 
     const out = new HTMLRewriter()
       .on("head", { element(e) { e.append(`<link rel="stylesheet" href="/nav.css?v=${V}">`, { html: true }); } })
-      .on("body", { element(e) { e.prepend(navBlock(f, key), { html: true }); if (key === "catalogue" && page.ok) e.append(quoteBlock(f), { html: true }); } })
+      .on("body", { element(e) { e.prepend(navBlock(f, key) + (key === "kb" && Array.isArray(f.kb_only) && f.kb_only.length
+          ? `<script>window.KB_ONLY=${JSON.stringify(f.kb_only.map((b) => String(b).replace(/[^a-z]/g, "")))};</script>` : ""), { html: true }); if (key === "catalogue" && page.ok) e.append(quoteBlock(f), { html: true }); } })
       // the pages' own links back to the portal / to each other: the shared menu replaces them
       .on("header.band .meta > div:nth-child(2)", { element(e) { e.remove(); } })
       .on("header.band a.kblink", { element(e) { e.remove(); } })

@@ -261,6 +261,15 @@ for(const t of OFF_TAGS){
 }
 const natural=(a,b)=>a.n.localeCompare(b.n,"en",{numeric:true});
 OFFICE.sort(natural);
+/* Vendor logins (e.g. Mimaki) see only their own brands: the portal sets window.KB_ONLY to the brand keys allowed. */
+const KBO=Array.isArray(window.KB_ONLY)&&window.KB_ONLY.length?window.KB_ONLY:null;
+const kbOk=b=>!KBO||KBO.includes(b);
+if(KBO){
+  for(const arr of [M,OFFICE]) for(let i=arr.length-1;i>=0;i--) if(!kbOk(arr[i].b)) arr.splice(i,1);
+  const SEC={mimaki:["mimaki"],mutoh:["mutoh"],gtx:["gtx"],epilog:["epilog"],office:["brother","kyocera"]};
+  for(const [id,bs] of Object.entries(SEC)) if(!bs.some(kbOk)){ document.getElementById(id)?.remove(); document.querySelector('a.chipbtn[href="#'+id+'"]')?.remove(); }
+  const ph=document.getElementById("q"); if(ph) ph.placeholder="Type a model, e.g. "+[...M,...OFFICE].slice(0,3).map(m=>m.n).join(", ");
+}
 const ALL=[...M,...OFFICE];
 const BRAND={mimaki:"Mimaki",mutoh:"Mutoh",gtx:"Brother GTX",epilog:"Epilog",brother:"Brother",kyocera:"Kyocera"};
 
@@ -281,12 +290,12 @@ function showDetail(name){
   d.scrollIntoView({behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"start"});
 }
 function grid(id,list){document.getElementById(id).innerHTML=list.map(card).join("");}
-grid("g-mimaki",M.filter(m=>m.b==="mimaki"));
-grid("g-mutoh",M.filter(m=>m.b==="mutoh"));
-grid("g-gtx",M.filter(m=>m.b==="gtx"));
-grid("g-epilog",M.filter(m=>m.b==="epilog"));
+if(document.getElementById("g-mimaki")) grid("g-mimaki",M.filter(m=>m.b==="mimaki"));
+if(document.getElementById("g-mutoh")) grid("g-mutoh",M.filter(m=>m.b==="mutoh"));
+if(document.getElementById("g-gtx")) grid("g-gtx",M.filter(m=>m.b==="gtx"));
+if(document.getElementById("g-epilog")) grid("g-epilog",M.filter(m=>m.b==="epilog"));
 const offCard=(b,title,links)=>{const ms=OFFICE.filter(m=>m.b===b);return `<div class="card"><h3>${title}</h3><div class="sub">${ms.length} models</div>${linkList(links)}<div class="modelchips">${ms.map(m=>`<button type="button" data-m="${esc(m.n)}">${esc(m.n)}</button>`).join("")}</div></div>`};
-document.getElementById("g-office").innerHTML=offCard("brother","Brother",[["Brother Australia support (search your model)","https://www.brother.com.au/en/support","Drivers"]])+offCard("kyocera","Kyocera",[L.kyHelp,L.kyDc]);
+{ const go=document.getElementById("g-office"); if(go) go.innerHTML=(kbOk("brother")?offCard("brother","Brother",[["Brother Australia support (search your model)","https://www.brother.com.au/en/support","Drivers"]]):"")+(kbOk("kyocera")?offCard("kyocera","Kyocera",[L.kyHelp,L.kyDc]):""); }
 document.addEventListener("click",e=>{const b=e.target.closest("[data-m]");if(b)showDetail(b.dataset.m);});
 
 /* finder */
@@ -312,7 +321,9 @@ const CLEAN=[
  {h:"Office lasers",p:"Toner printers need very little user cleaning.",u:["Use a dry, lint-free cloth on the exterior and paper path only","Never use solvents or alcohol on drums or rollers","Clean up spilled toner with a toner vacuum, not a household vacuum"]},
  {h:"Personal protection",p:"Inks and washing liquids can irritate skin and eyes.",u:["Nitrile gloves for all ink and liquid handling","Safety glasses when flushing or refilling","Good ventilation for solvent and UV printers"]}
 ];
-document.getElementById("g-clean").innerHTML=CLEAN.map(x=>`<div class="card">${x.img?`<img class="cimg" src="${x.img}" alt="${esc(x.alt||x.h)}" loading="lazy">`:""}<h3>${esc(x.h)}</h3><p>${esc(x.p)}</p><ul>${x.u.map(u=>`<li>${esc(u)}</li>`).join("")}</ul></div>`).join("");
+document.getElementById("g-clean").innerHTML=CLEAN.filter(x=>{ if(!KBO) return true; const h=x.h.toLowerCase();
+  const need=/mimaki/.test(h)?["mimaki"]:/mutoh/.test(h)?["mutoh"]:/brother gtx/.test(h)?["gtx"]:/epilog|laser optics/.test(h)?["epilog"]:/office/.test(h)?["brother","kyocera"]:null;
+  return !need||need.some(kbOk); }).map(x=>`<div class="card">${x.img?`<img class="cimg" src="${x.img}" alt="${esc(x.alt||x.h)}" loading="lazy">`:""}<h3>${esc(x.h)}</h3><p>${esc(x.p)}</p><ul>${x.u.map(u=>`<li>${esc(u)}</li>`).join("")}</ul></div>`).join("");
 if(location.hash==="#find")q.focus();
 
 /* test prints */

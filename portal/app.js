@@ -1354,6 +1354,14 @@ async function renderSupervisorsAdmin(host) {
       flash(note, onBox.checked ? sup.name + " portal access is on" : sup.name + " portal access is off", true);
       if (onBox.checked && inv && !sup.last_sync) sync.click();
     } });
+    const KBB = [["mimaki", "Mimaki"], ["mutoh", "Mutoh"], ["gtx", "Brother GTX"], ["epilog", "Epilog"], ["brother", "Brother office"], ["kyocera", "Kyocera office"]];
+    const kbSel = new Set(sup.kb_brands || []);
+    const kbPick = el("span", { style: "display:inline-flex;flex-wrap:wrap;gap:10px" }, ...KBB.map(([k, l]) => el("label", { class: "small" }, el("input", { type: "checkbox", checked: kbSel.has(k), onchange: async (e) => {
+      e.target.checked ? kbSel.add(k) : kbSel.delete(k);
+      const { error } = await sb.from("supervisors").update({ kb_brands: [...kbSel] }).eq("id", sup.id);
+      if (error) { e.target.checked = !e.target.checked; return flash(note, "Not saved", false); }
+      flash(note, kbSel.size ? "Knowledge Base shows " + KBB.filter(([x]) => kbSel.has(x)).map(([, y]) => y).join(", ") : "Knowledge Base shows every brand", true);
+    } }), " " + l)));
     const dom = el("input", { class: "field", value: (sup.login_domains || []).join(", "), placeholder: "e.g. mimaki.com", style: "max-width:260px" });
     const domForm = el("form", { class: "inline", onsubmit: async (e) => { e.preventDefault();
       const list = [...new Set(dom.value.split(/[\s,;]+/).map((x) => x.trim().toLowerCase().replace(/^@/, "")).filter((x) => /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(x)))];
@@ -1370,6 +1378,8 @@ async function renderSupervisorsAdmin(host) {
       inv
         ? el("p", { class: "muted small" }, "Vendor logins see every job invoiced to " + (sup.bill_to || sup.name) + ", for any customer: invoices from FreshBooks and service desk jobs with Bill to " + (sup.bill_to || sup.name) + ". They see only those jobs' customers and machines, and get Fleet reports. Adding a login sends nothing.")
         : el("p", { class: "muted small" }, "Supervisor logins see every machine, job and service record for these customers, can log jobs and add machines for them, and get Fleet reports. Adding a login sends nothing."),
+      el("h3", {}, "Knowledge Base brands"),
+      el("p", { class: "muted small" }, "Brands " + sup.name + " logins see in the Knowledge Base. Untick them all to show every brand."), kbPick,
       el("h3", {}, "Parts Catalogue access"),
       el("p", { class: "muted small" }, "Brands every " + sup.name + " login can see in the Parts Catalogue. Untick them all to remove access."),
       catPicker(sup, "supervisors", sup.name),
