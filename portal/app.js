@@ -117,9 +117,11 @@ async function loadCore() {
     sb.rpc("has_vector_access"),
     sb.rpc("has_flute_access"),
     sb.rpc("is_apps_only"),
-    sb.rpc("has_reports_access")
+    sb.rpc("has_reports_access"),
+    sb.rpc("my_hide_prices")
   ]);
-  const [mf, inv, est, sv, va, fa, ao, ra] = rest;
+  const [mf, inv, est, sv, va, fa, ao, ra, hp] = rest;
+  state.hidePrices = hp?.data === true;   // vendor login with "Hide prices" ticked
   state.reportsAccess = ra?.data === true;
   state.vectorAccess = va?.data === true;
   state.fluteAccess = fa?.data === true;
@@ -308,7 +310,7 @@ function billingTable(rows, kind) {
 }
 async function vendorInvoiceRows() {
   const ids = (state.supervisors || []).map((x) => x.id);
-  const { data, error } = await allRows(() => sb.from("service_records").select("id,client_id,machine_id,number,issued,status,kind,po,total_ex,total_inc,lines").in("supervisor_id", ids).order("issued", { ascending: false }).order("id"));
+  const { data, error } = await allRows(() => sb.from(SR()).select("id,client_id,machine_id,number,issued,status,kind,po,total_ex,total_inc,lines").in("supervisor_id", ids).order("issued", { ascending: false }).order("id"));
   if (error) throw error;
   const head = ["Date", "Invoice", "Customer", "Machine", "Serial", "PO / reference", "Type", "Status", "Reported issue", "Parts", "Ex GST", "Inc GST"];
   return [head, (data || []).map((r) => { const m = state.machines.find((x) => x.id === r.machine_id); const lab = (r.lines || []).find((l) => /labou?r|day rate|hourly/i.test(l.code || ""));
@@ -324,7 +326,7 @@ function vendorInvoicesCard() {
   (async () => {
     if (!state.vendorInv) {
       const ids = (state.supervisors || []).map((x) => x.id);
-      const { data, error } = await sb.from("service_records").select("id,client_id,machine_id,number,issued,status,kind,po,total_ex,total_inc,lines")
+      const { data, error } = await sb.from(SR()).select("id,client_id,machine_id,number,issued,status,kind,po,total_ex,total_inc,lines")
         .in("supervisor_id", ids).order("issued", { ascending: false }).limit(15);
       if (error) { card.lastChild.replaceWith(el("p", { class: "msg err" }, "Couldn't load invoices.")); return; }
       state.vendorInv = data || [];
@@ -334,14 +336,14 @@ function vendorInvoicesCard() {
     const mOfId = (id) => state.machines.find((m) => m.id === id);
     const custOf = (id) => state.clients.find((c) => c.id === id)?.name || "Not matched to a customer";
     card.lastChild.replaceWith(rows.length ? el("div", { class: "tscroll" }, el("table", { class: "tbl rtbl" },
-      el("thead", {}, el("tr", {}, ...["Date", "Invoice", "Customer", "Machine", "PO / reference", "Status", "Ex GST"].map((h) => el("th", { class: h === "Ex GST" ? "num" : null }, h)))),
+      el("thead", {}, el("tr", {}, ...["Date", "Invoice", "Customer", "Machine", "PO / reference", "Status", ...(state.hidePrices ? [] : ["Ex GST"]), ""].map((h) => el("th", { class: h === "Ex GST" ? "num" : null }, h)))),
       el("tbody", {}, ...rows.map((r) => { const m = mOfId(r.machine_id); const lab = (r.lines || []).find((l) => /labou?r|day rate|hourly/i.test(l.code || ""));
         return el("tr", { class: "rrow", tabindex: 0, title: lab ? String(lab.desc || "").split("\n").slice(0, 4).join(" · ") : "", onclick: () => { rep.f.q = r.number; rep.f.tab = "jobs"; location.hash = "#reports"; } },
           el("td", { "data-l": "Date" }, fmtDate(r.issued)), el("td", { class: "mono", "data-l": "Invoice" }, r.number), el("td", { "data-l": "Customer" }, custOf(r.client_id)),
           el("td", { "data-l": "Machine" }, m ? machineName(m) + (m.serial ? " · SN " + m.serial : "") : "—"), el("td", { "data-l": "PO" }, r.po || "—"),
           el("td", { "data-l": "Status" }, el("span", { class: "pill " + (r.status === "paid" ? "ok" : "soon") }, r.status || "")),
-          el("td", { class: "num", "data-l": "Ex GST" }, money(r.total_ex))); }))),
-      el("p", { class: "muted small" }, rows.length + " most recent · " + money(total) + " ex GST. Click one to open it in Reports with its full job notes and parts."))
+          state.hidePrices ? null : el("td", { class: "num", "data-l": "Ex GST" }, money(r.total_ex)), el("td", { class: "act" }, pdfBtn(r.id, r.number))); }))),
+      el("p", { class: "muted small" }, rows.length + " most recent" + (state.hidePrices ? "" : " · " + money(total) + " ex GST") + ". PDF downloads the invoice from FreshBooks. Click a row to open it in Reports with its full job notes and parts."))
       : el("p", { class: "muted small" }, "No invoices to " + name + " yet."));
   })();
   return card;
@@ -432,7 +434,7 @@ function machineHistoryCard(m) {
   (async () => {
     const [t, r] = await Promise.all([
       sb.from("tickets").select("num,type,subtype,status,summary,created,sched_date,sched_time").eq("machine_id", m.id).eq("sample", false).order("num", { ascending: false }).limit(25),
-      sb.from("service_records").select("id,number,issued,status,kind,po,total_ex,lines").eq("machine_id", m.id).neq("status", "draft").order("issued", { ascending: false }).limit(25)]);
+      sb.from(SR()).select("id,number,issued,status,kind,po,total_ex,lines").eq("machine_id", m.id).neq("status", "draft").order("issued", { ascending: false }).limit(25)]);
     if (t.error) tBox.replaceChildren(el("p", { class: "msg err" }, "Couldn't load tickets."));
     else {
       const done = (x) => ["completed", "invoiced"].includes(x.status);
@@ -446,7 +448,7 @@ function machineHistoryCard(m) {
     }
     if (r.error) iBox.replaceChildren(el("p", { class: "msg err" }, "Couldn't load invoices."));
     else iBox.replaceChildren(r.data.length ? el("div", { class: "tscroll" }, el("table", { class: "tbl rtbl" },
-      el("thead", {}, el("tr", {}, ...["Date", "Invoice", "Work", "Status", "Ex GST", ""].map((h) => el("th", { class: h === "Ex GST" ? "num" : null }, h)))),
+      el("thead", {}, el("tr", {}, ...["Date", "Invoice", "Work", "Status", ...(state.hidePrices ? [] : ["Ex GST"]), ""].map((h) => el("th", { class: h === "Ex GST" ? "num" : null }, h)))),
       el("tbody", {}, ...r.data.map((x) => { const lab = (x.lines || []).find((l) => /labou?r|day rate|hourly/i.test(l.code || ""));
         const ld = String((lab && lab.desc) || "");
         const issue = (ld.match(/reported issue:\s*([^\n]+)/i) || [])[1] || ld.split("\n").map((s) => s.trim()).filter((s) => s && !/^(date|model|job|serial|end user|install|work outstanding)/i.test(s))[0] || "";
@@ -455,8 +457,8 @@ function machineHistoryCard(m) {
         return el("tr", {}, el("td", { "data-l": "Date" }, fmtDate(x.issued)), el("td", { class: "mono", "data-l": "Invoice" }, x.number),
           el("td", { "data-l": "Work" }, work || "—", parts ? el("div", { class: "muted small" }, parts) : null),
           el("td", { "data-l": "Status" }, el("span", { class: "pill " + (x.status === "paid" ? "ok" : "soon") }, x.status || "")),
-          el("td", { class: "num", "data-l": "Ex GST" }, money(x.total_ex)),
-          el("td", { class: "act" }, fbInvLink(x))); }))))
+          state.hidePrices ? null : el("td", { class: "num", "data-l": "Ex GST" }, money(x.total_ex)),
+          el("td", { class: "act" }, state.staff ? fbInvLink(x) : el("span", { style: "display:inline-flex;gap:6px" }, pdfBtn(x.id, x.number), isVendorOnly() ? null : fbInvLink(x)))); }))))
       : el("p", { class: "muted small" }, "No FreshBooks invoices matched to this machine yet."));
   })();
   return el("div", { class: "card", style: "margin-top:14px" },
@@ -1174,7 +1176,7 @@ const isSupervisor = () => !state.staff && (state.supervisors || []).length > 0;
 const supName = () => (state.supervisors || []).map((s) => s.name).join(", ");
 // A vendor login (scope "invoiced") sees only the jobs invoiced to it; a supervisor (scope "fleet") sees whole customer fleets.
 const isVendorOnly = () => isSupervisor() && state.supervisors.every((s) => s.scope === "invoiced");
-const money = (n) => "$" + (Number(n) || 0).toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const money = (n) => state.hidePrices ? "—" : "$" + (Number(n) || 0).toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const KIND_NAMES = { service: "Service visit", install: "Installation", parts: "Parts order", consumables: "Consumables order", fault: "Fault or repair", other: "Other" };
 const rep = { data: null, loading: null, f: { from: "", to: "", client: "", machine: "", q: "", tab: "jobs" } };
 
@@ -1193,7 +1195,7 @@ async function loadReportData(force) {
   if (rep.loading) return rep.loading;
   rep.loading = (async () => {
     const [sr, tj, pj] = await Promise.all([
-      allRows(() => sb.from("service_records").select("id,client_id,machine_id,number,issued,status,kind,po,notes,total_ex,total_inc,lines").order("issued", { ascending: false }).order("id")),
+      allRows(() => sb.from(SR()).select("id,client_id,machine_id,number,issued,status,kind,po,notes,total_ex,total_inc,lines").order("issued", { ascending: false }).order("id")),
       sb.rpc("report_jobs"),
       sb.from("portal_jobs").select("id,client_id,machine_id,kind,description,error_code,status,ticket_num,created_at").order("created_at", { ascending: false })
     ]);
@@ -1237,6 +1239,29 @@ function repFiltered() {
     (!f.client || String(j.client_id) === f.client) && (!f.machine || j.machine_id === f.machine) &&
     (!q || norm([j.ref, j.title, j.notes, j.detail, cName(j.client_id), mLabel(j.machine_id), ...j.lines.map((l) => l.code + " " + l.desc)].join(" ")).includes(q)));
 }
+const SR = () => (state.hidePrices ? "service_records_np" : "service_records");
+/* Price columns come out of every table export for logins with prices hidden. */
+const PRICE_COL = /amount|ex gst|inc gst|spend|billed|price|total|invoiced ex|lines ex/i;
+function noPrice(head, rows) {
+  if (!state.hidePrices) return [head, rows];
+  const keep = head.map((h, i) => (PRICE_COL.test(String(h)) ? -1 : i)).filter((i) => i >= 0);
+  return [keep.map((i) => head[i]), rows.map((r) => keep.map((i) => r[i]))];
+}
+/* The FreshBooks PDF of one invoice, for any login that can see it (prices hidden or not). */
+async function downloadInvoicePdf(id, number, btn) {
+  const was = btn && btn.textContent; if (btn) { btn.disabled = true; btn.textContent = "Downloading…"; }
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const r = await fetch(cfg.supabaseUrl + "/functions/v1/fb-invoice-pdf", { method: "POST",
+      headers: { "content-type": "application/json", apikey: cfg.supabaseAnonKey, authorization: "Bearer " + (session?.access_token || "") }, body: JSON.stringify({ id }) });
+    if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || "HTTP " + r.status); }
+    saveBlob("Highway Digital invoice " + number + ".pdf", await r.blob());
+    if (btn) btn.textContent = was;
+  } catch (e) { console.error(e); if (btn) { btn.textContent = "Couldn't download"; setTimeout(() => (btn.textContent = was), 3000); } }
+  finally { if (btn) btn.disabled = false; }
+}
+const pdfBtn = (id, number) => /^fbinv-\d+$/.test(String(id || "")) ? el("button", { class: "btn small", type: "button", title: "Download the FreshBooks invoice " + number + " as a PDF",
+  onclick: (e) => { e.stopPropagation(); downloadInvoicePdf(id, number, e.currentTarget); } }, "PDF") : null;
 /* Download menu for report tables: Excel, CSV or PDF (name may end in .csv; rows[0] is the header row). */
 let dlCollect = null;   // while set, report builders hand their tables here instead of drawing menus (full-report export)
 function dlMenu(name, getRows) {
@@ -1258,7 +1283,7 @@ function reportSections() {
   try {
     if (state.staff) deskReport(jobs, fleet);
     assetsReport(fleet, jobs); machineReport(jobs, fleet); jobsReport(jobs); partsReport(jobs); trendsReport(jobs);
-    return dlCollect.map((x) => { const r = x.getRows(); return { title: x.title, head: r[0], rows: r.slice(1) }; });
+    return dlCollect.map((x) => { const r = x.getRows(); const [head, rows] = noPrice(r[0], r.slice(1)); return { title: x.title, head, rows }; });
   } finally { dlCollect = null; }
 }
 function reportScope() {
@@ -1275,7 +1300,7 @@ async function exportReportBook(fmt) {
   if (fmt === "xlsx") {
     await loadScript("https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js", () => window.XLSX);
     const wb = XLSX.utils.book_new(), used = new Set();
-    const sum = [["Highway Digital report"], ["For", who], ["Filters", reportScope()], ["Exported", new Date().toLocaleString("en-AU")], ["Amounts", "ex GST"], [], ["Sheet", "Rows"], ...secs.map((x) => [x.title, x.rows.length])];
+    const sum = [["Highway Digital report"], ["For", who], ["Filters", reportScope()], ["Exported", new Date().toLocaleString("en-AU")], ["Amounts", state.hidePrices ? "prices hidden for this login" : "ex GST"], [], ["Sheet", "Rows"], ...secs.map((x) => [x.title, x.rows.length])];
     const s0 = XLSX.utils.aoa_to_sheet(sum); s0["!cols"] = [{ wch: 34 }, { wch: 60 }]; XLSX.utils.book_append_sheet(wb, s0, "Summary");
     for (const x of secs) {
       let n = x.title.replace(/[\[\]:*?\/\\]/g, " ").slice(0, 31).trim() || "Sheet"; let k = 2; while (used.has(n.toLowerCase())) n = n.slice(0, 28) + " " + k++; used.add(n.toLowerCase());
@@ -1362,7 +1387,7 @@ function drawReports() {
   const overdue = fleet.filter((m) => pmStatus(m).cls === "over").length;
   const kpis = el("div", { class: "stats" },
     ...[[jobs.length, "Jobs"], [cnt("service") + cnt("fault"), "Service visits & repairs"], [cnt("install"), "Installations"], [cnt("parts"), "Parts orders"],
-        [money(spend), "Billed ex GST"], [fleet.length, "Machines"], ...(state.hideSchedule ? [] : [[overdue, "PM overdue"]])]
+        ...(state.hidePrices ? [] : [[money(spend), "Billed ex GST"]]), [fleet.length, "Machines"], ...(state.hideSchedule ? [] : [[overdue, "PM overdue"]])]
       .map(([n, l]) => el("div", { class: "stat" }, el("div", { class: "n" }, n), el("div", { class: "l" }, l))));
 
   const tabs = [...(state.staff ? [["desk", "Service desk overview"]] : []), ["assets", "Assets"], ["machines", "Usage by machine"], ["jobs", "Service history"], ["parts", "Parts used"], ["trends", "Trends"]];
@@ -1381,6 +1406,7 @@ function drawReports() {
 function jobsReport(jobs) {
   const rows = jobs.map((j) => {
     const det = el("tr", { class: "rdet", hidden: true }, el("td", { colspan: 7 },
+      j.src === "invoice" ? el("p", {}, pdfBtn(j.key.slice(4), j.number), " ", el("span", { class: "muted small" }, "Invoice " + j.number + " from FreshBooks")) : null,
       j.notes ? el("p", {}, j.notes) : null, j.detail ? el("pre", { class: "rpre" }, j.detail) : null,
       j.lines.length ? el("table", { class: "tbl sub" }, el("thead", {}, el("tr", {}, el("th", {}, "Item"), el("th", {}, "Description"), el("th", { class: "num" }, "Qty"), el("th", { class: "num" }, "Amount"))),
         el("tbody", {}, ...j.lines.map((l) => el("tr", {}, el("td", { class: "mono" }, l.code), el("td", {}, String(l.desc || "").split("\n")[0]), el("td", { class: "num" }, l.qty), el("td", { class: "num" }, l.amount ? money(l.amount) : ""))))) : null));
@@ -1442,7 +1468,7 @@ function trendsReport(jobs) {
       dlMenu("Trends by month", () => [["Month", "Service visits & repairs", "Billed ex GST"], ...months.map((k, i) => [monthLbl(k), visits[i][1], spend[i][1].toFixed(2)])])),
       months.length > 1 ? el("p", { class: "muted small" }, b > a ? `Up: ${b} in the second half of this period against ${a} in the first.` : b < a ? `Down: ${b} in the second half of this period against ${a} in the first.` : "Steady across this period.") : null,
       bars(visits, (n) => String(n))),
-    el("div", { class: "card" }, el("h2", {}, "Billed per month (ex GST)"), bars(spend, (n) => "$" + Math.round(n).toLocaleString("en-AU"))),
+    state.hidePrices ? null : el("div", { class: "card" }, el("h2", {}, "Billed per month (ex GST)"), bars(spend, (n) => "$" + Math.round(n).toLocaleString("en-AU"))),
     el("div", { class: "card" }, el("div", { class: "bhead" }, el("h2", {}, "By customer"),
       dlMenu("Jobs by customer", () => [["Customer", "Jobs", "Billed ex GST"], ...[...byCust.entries()].sort((a, b) => b[1].s - a[1].s).map(([c, x]) => [c, x.n, x.s.toFixed(2)])])),
       el("table", { class: "tbl rtbl" }, el("thead", {}, el("tr", {}, el("th", {}, "Customer"), el("th", { class: "num" }, "Jobs"), el("th", { class: "num" }, "Billed ex GST"))),
@@ -1631,7 +1657,13 @@ async function renderSupervisorsAdmin(host) {
       catPicker(sup, "supervisors", sup.name),
       el("h3", {}, "Logins"),
       el("p", { class: "muted small" }, "Only the addresses listed here can sign in as " + sup.name + ". Pick them from " + sup.name + "'s Outlook contacts or type them in; add several at once."),
-      el("ul", { class: "links" }, ...logins.map((u) => el("li", {}, u.email + (u.full_name ? " (" + u.full_name + ")" : ""), " ",
+      el("ul", { class: "links" }, ...logins.map((u) => el("li", { style: "display:flex;flex-wrap:wrap;gap:10px;align-items:center" }, el("span", {}, u.email + (u.full_name ? " (" + u.full_name + ")" : "")),
+        el("label", { class: "small", title: "Hide prices on this login's dashboard, machine pages, reports and exports. They can still download the FreshBooks invoice PDFs." },
+          el("input", { type: "checkbox", checked: !!u.hide_prices, onchange: async (e) => {
+            const on = e.target.checked;
+            const { error } = await sb.from("supervisor_access").update({ hide_prices: on }).eq("supervisor_id", sup.id).eq("email", u.email);
+            if (error) { e.target.checked = !on; return flash(note, "Not changed", false); }
+            u.hide_prices = on; flash(note, (on ? "Prices hidden for " : "Prices shown for ") + u.email, true); } }), " Hide prices"),
         el("button", { class: "btn ghost small", type: "button", onclick: async () => { await sb.from("supervisor_access").delete().eq("supervisor_id", sup.id).eq("email", u.email); renderSupervisorsAdmin(host); } }, "Remove")))),
       addLogins,
       ...(inv ? [] : [el("h3", {}, "Customers (" + custs.length + ")"),
@@ -1719,6 +1751,7 @@ function saveBlob(name, blob) {
   const a = el("a", { href: url, download: name }); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 async function exportTable(fmt, base, title, head, rows) {
+  [head, rows] = noPrice(head, rows);
   const stamp = localIso(), name = `${base} ${stamp}`;
   if (fmt === "csv") {
     const csv = [head, ...rows].map((r) => r.map((c) => { c = String(c ?? ""); return /[",\n]/.test(c) ? '"' + c.replace(/"/g, '""') + '"' : c; }).join(",")).join("\r\n");
