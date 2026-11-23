@@ -38,7 +38,7 @@ language sql stable security definer set search_path = public as $function$
     'num', r.num, 'client_id', r.client_id, 'customer', r.customer_name, 'machine_id', r.machine_id, 'type', r.type, 'subtype', r.subtype,
     'status', r.status, 'summary', r.summary, 'model', r.model, 'created', r.created, 'sched_date', r.sched_date,
     'error_code', r.d->>'errorCode', 'description', r.d->>'description', 'notes', r.d->>'notes',
-    'completed', r.d->>'completedAt', 'bill_to', r.bill_to, 'channel', case when r.staff_view then r.d->>'channel' end,
+    'completed', coalesce(r.d->>'completedAt', case when r.status in ('completed','invoiced') then r.d->>'modified' end), 'bill_to', r.bill_to, 'channel', case when r.staff_view then r.d->>'channel' end,
     'warranty', coalesce(r.d->>'warranty','') in ('true','yes','1'),
     'lines', case when r.staff_view or r.vendor_view or r.bill_to = 'Customer'
       then coalesce((select jsonb_agg(jsonb_build_object('code', l->>'code', 'desc', l->>'desc', 'qty', l->'qty', 'unit', l->'unit'))

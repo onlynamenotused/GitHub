@@ -1057,12 +1057,22 @@ const money = (n) => "$" + (Number(n) || 0).toLocaleString("en-AU", { minimumFra
 const KIND_NAMES = { service: "Service visit", install: "Installation", parts: "Parts order", consumables: "Consumables order", fault: "Fault or repair", other: "Other" };
 const rep = { data: null, loading: null, f: { from: "", to: "", client: "", machine: "", q: "", tab: "jobs" } };
 
+/* Supabase returns at most 1000 rows per request: page through the rest. */
+async function allRows(q) {
+  const out = []; const N = 1000;
+  for (let i = 0; i < 50; i++) {
+    const { data, error } = await q().range(i * N, i * N + N - 1);
+    if (error) return { data: null, error };
+    out.push(...(data || [])); if (!data || data.length < N) break;
+  }
+  return { data: out, error: null };
+}
 async function loadReportData(force) {
   if (rep.data && !force) return rep.data;
   if (rep.loading) return rep.loading;
   rep.loading = (async () => {
     const [sr, tj, pj] = await Promise.all([
-      sb.from("service_records").select("id,client_id,machine_id,number,issued,status,kind,po,notes,total_ex,total_inc,lines").order("issued", { ascending: false }),
+      allRows(() => sb.from("service_records").select("id,client_id,machine_id,number,issued,status,kind,po,notes,total_ex,total_inc,lines").order("issued", { ascending: false }).order("id")),
       sb.rpc("report_jobs"),
       sb.from("portal_jobs").select("id,client_id,machine_id,kind,description,error_code,status,ticket_num,created_at").order("created_at", { ascending: false })
     ]);
@@ -1159,7 +1169,7 @@ function drawReports() {
       : isSupervisor()
         ? "Jobs billed to " + supName() + " (Bill to " + supName() + "), for any customer: invoices from our accounts and open service desk jobs, with the machines they were on. Every table downloads as a CSV. Amounts are ex GST."
         : "Your machines, their service history and usage, from our service desk and invoices. Every table downloads as a CSV. Amounts are ex GST."),
-    filters, kpis, tabBar, body);
+    ...[filters, f.tab === "desk" ? null : kpis, tabBar, body].filter(Boolean));
 }
 function jobsReport(jobs) {
   const rows = jobs.map((j) => {
