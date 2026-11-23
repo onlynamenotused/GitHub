@@ -15,7 +15,7 @@
 body{margin:0;background:#06090d;color:var(--ink);font:15px/1.5 Inter,system-ui,sans-serif}
 #bgmap{position:fixed;inset:0;z-index:0;background:#06090d}
 #hd-nav{position:relative;z-index:5}
-#bgmap .leaflet-tile-pane{filter:saturate(.8) brightness(.95)}
+#bgmap .leaflet-tile-pane{filter:saturate(.85) brightness(.6)}
 .veil{position:fixed;inset:0;z-index:1;pointer-events:none;background:linear-gradient(90deg,rgba(6,9,13,.15),rgba(6,9,13,.05) 40%,rgba(6,9,13,.15))}
 main{position:relative;z-index:2;max-width:1240px;margin:0 auto;padding:18px max(16px,env(safe-area-inset-right,0px)) 80px max(16px,env(safe-area-inset-left,0px));pointer-events:none}
 main>*{pointer-events:auto}
@@ -170,7 +170,7 @@ const tempCol = (t) => t >= 35 ? "#ef4444" : t >= 28 ? "#f97316" : t >= 22 ? "#f
 
 // ---------- background map ----------
 const bg = L.map("bgmap", { zoomControl: false, attributionControl: true, scrollWheelZoom: false, dragging: true, worldCopyJump: false, minZoom: 3, maxZoom: 8 });
-L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", { subdomains: "abcd", attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · © <a href="https://carto.com/">CARTO</a>' }).addTo(bg);
+L.tileLayer("https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/BlueMarble_ShadedRelief_Bathymetry/default/GoogleMapsCompatible_Level8/{z}/{y}/{x}.jpeg", { maxNativeZoom: 8, attribution: 'Blue Marble · NASA GIBS' }).addTo(bg);
 const fitBg = () => bg.fitBounds([[-47.5, 111], [-9.5, 179.5]], { paddingTopLeft: [0, window.innerHeight * 0.05] });
 fitBg(); addEventListener("resize", () => { clearTimeout(fitBg.t); fitBg.t = setTimeout(fitBg, 200); });
 const chips = new Map();
@@ -416,8 +416,9 @@ function drawMoon() {
 
 // ---------- satellite (Himawari-9 via NASA GIBS) ----------
 const sat = L.map("sat", { zoomControl: true, attributionControl: true, minZoom: 3, maxZoom: 7 });
-L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png", { subdomains: "abcd", attribution: "© OpenStreetMap · © CARTO" }).addTo(sat);
-const labels = L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png", { subdomains: "abcd", pane: "shadowPane" }).addTo(sat);
+L.tileLayer("https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}", { maxNativeZoom: 16, attribution: "Esri, HERE, Garmin, © OpenStreetMap" }).addTo(sat);
+sat.createPane("labels"); sat.getPane("labels").style.zIndex = 650; sat.getPane("labels").style.pointerEvents = "none";
+const labels = L.tileLayer("https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}", { pane: "labels" }).addTo(sat);
 const BANDS = { ir: { id: "Himawari_AHI_Band13_Clean_Infrared", lvl: 6, max: 6 }, vis: { id: "Himawari_AHI_Band3_Red_Visible_1km", lvl: 7, max: 7 } };
 const SAT = { band: "ir", frames: [], layers: [], i: 0, play: true, timer: 0, pin: null };
 const iso10 = (ms) => new Date(Math.floor(ms / 600000) * 600000).toISOString().slice(0, 19) + "Z";
@@ -432,7 +433,6 @@ async function buildSat() {
   SAT.frames = cands.filter((_, i) => ok[i]);
   if (!SAT.frames.length) { $("satTime").textContent = "No recent frames available right now"; return; }
   SAT.layers = SAT.frames.map((t) => L.tileLayer(gibsUrl(b, t), { maxNativeZoom: b.max, maxZoom: 8, opacity: 0, attribution: "Himawari-9 · JMA · NASA GIBS" }).addTo(sat));
-  labels.bringToFront();
   $("satSlide").max = String(SAT.frames.length - 1);
   show(SAT.frames.length - 1);
   if (SAT.play) SAT.timer = setInterval(() => show((SAT.i + 1) % SAT.frames.length), 700);
@@ -451,7 +451,7 @@ setInterval(() => { if (!document.hidden) buildSat(); }, 15 * 60000);   // new f
 // ---------- ISS ----------
 $("issVideo").src = "https://www.youtube.com/embed/live_stream?channel=UCLA_DiR1FfKNvjuUpBHmylQ&autoplay=1&mute=1";
 const iss = L.map("issmap", { zoomControl: false, attributionControl: true, worldCopyJump: true, minZoom: 1 }).setView([-25, 135], 1);
-L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", { subdomains: "abcd", attribution: "© OpenStreetMap · © CARTO" }).addTo(iss);
+L.tileLayer("https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/BlueMarble_ShadedRelief_Bathymetry/default/GoogleMapsCompatible_Level8/{z}/{y}/{x}.jpeg", { maxNativeZoom: 8, attribution: 'Blue Marble · NASA GIBS' }).addTo(iss);
 const issDot = L.marker([0, 0], { icon: L.divIcon({ html: '<span style="font-size:26px;display:inline-block;transform:translate(-50%,-50%)">🛰️</span>', className: "", iconSize: null }) }).addTo(iss);
 const trail = L.polyline([], { color: "#e8b923", weight: 2, opacity: .7 }).addTo(iss);
 async function issTick() {
