@@ -167,3 +167,9 @@ insert into public.supervisors (name, bill_to, fb_client_id, scope, enabled, log
   ('Mutoh Australia', 'Mutoh Australia', 280727, 'invoiced', false, array['mutoh-au.com']),
   ('ALFEX CNC Australia', 'ALFEX CNC Australia', 205841, 'invoiced', false, array['alfex.com.au','alfexlaser.com.au'])
 on conflict (name) do update set bill_to = excluded.bill_to, fb_client_id = excluded.fb_client_id, scope = excluded.scope, login_domains = excluded.login_domains;
+
+-- Invoices billed to an invoiced-scope vendor: every one (not drafts), for any customer or none matched yet.
+drop policy if exists sr_vendor on public.service_records;
+create policy sr_vendor on public.service_records for select to authenticated using (
+  coalesce(status,'') <> 'draft'
+  and supervisor_id in (select s.id from public.supervisors s where s.scope = 'invoiced' and s.id in (select public.my_supervisor_ids())));
