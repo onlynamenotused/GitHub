@@ -349,3 +349,9 @@ table.billing td.act{text-align:right;white-space:nowrap}
 .field.csearch{flex:1 1 320px;max-width:520px;min-width:0;font-size:16px;font-weight:500;padding:11px 14px;border:2px solid #e8b923;background:rgba(232,185,35,.10);border-radius:10px}
 .field.csearch:focus{outline:2px solid #e8b923;outline-offset:1px;background:rgba(232,185,35,.16)}
 .field.csearch::placeholder{color:inherit;opacity:.75}
+/* Confirmation dialog (Vendors and supervisors changes) */
+dialog.confirm-dlg{border:1px solid var(--line);border-radius:14px;padding:20px 22px;max-width:min(440px,calc(100vw - 32px));background:#141416;color:var(--fg);box-shadow:0 20px 50px rgba(0,0,0,.5)}
+dialog.confirm-dlg::backdrop{background:rgba(0,0,0,.55)}
+dialog.confirm-dlg h3{margin:0 0 8px}
+dialog.confirm-dlg p{margin:0 0 16px;overflow-wrap:anywhere}
+dialog.confirm-dlg .cf-btns{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}

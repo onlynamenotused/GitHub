@@ -2353,6 +2353,52 @@ $("#mfClear").addEventListener("click", () => { $("#machineSearch").value = ""; 
 $("#kbSearch").addEventListener("input", renderKb);
 $("#custSearch").addEventListener("input", renderCustomers);
 
+/* Vendors and supervisors: every change asks first. Clicks on action buttons and ticks of any box inside #supAdmin are held,
+   a confirmation shows what's about to change, and only a "Yes" lets the original action run. Buttons that only stage
+   something on screen (the × on a picked address, Cancel) are marked data-noconfirm. */
+function askConfirm(title, detail, yes = "Yes, change it") {
+  return new Promise((done) => {
+    const dlg = el("dialog", { class: "confirm-dlg", "aria-labelledby": "cfT" });
+    const close = (v) => { dlg.close(); dlg.remove(); done(v); };
+    dlg.append(el("h3", { id: "cfT" }, title), detail ? el("p", { class: "muted" }, detail) : null,
+      el("div", { class: "cf-btns" }, el("button", { class: "btn ghost", type: "button", onclick: () => close(false) }, "Cancel"),
+        el("button", { class: "btn primary", type: "button", onclick: () => close(true) }, yes)));
+    dlg.addEventListener("cancel", (e) => { e.preventDefault(); close(false); });
+    document.body.append(dlg); dlg.showModal(); dlg.querySelector(".btn.primary").focus();
+  });
+}
+(() => {
+  const host = $("#supAdmin"); if (!host) return;
+  const pass = new WeakSet();
+  const cardName = (n) => n.closest(".card")?.querySelector("h3")?.textContent || "this vendor";
+  const labelOf = (n) => (n.closest("label")?.textContent || n.getAttribute("aria-label") || "").replace(/\s+/g, " ").trim();
+  host.addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b || !host.contains(b) || b.disabled || b.hasAttribute("data-noconfirm") || pass.has(b)) { if (b) pass.delete(b); return; }
+    if (b.closest(".chips") || b.closest("dialog")) return;   // staging × on picked addresses
+    e.preventDefault(); e.stopImmediatePropagation();
+    const what = b.textContent.trim(), li = b.closest("li");
+    const detail = /^remove$/i.test(what) && li ? "Remove " + li.firstChild.textContent.trim() + " from " + cardName(b) + "?"
+      : what + " for " + cardName(b) + "?";
+    askConfirm("Confirm change", detail, /^remove$/i.test(what) ? "Yes, remove" : "Yes, go ahead").then((ok) => { if (ok) { pass.add(b); if (b.type === "submit" && b.form) pass.add(b.form); b.click(); } });
+  }, true);
+  host.addEventListener("change", (e) => {
+    const c = e.target;
+    if (!(c instanceof HTMLInputElement) || c.type !== "checkbox" || pass.has(c)) { if (c) pass.delete(c); return; }
+    e.stopImmediatePropagation();
+    const on = c.checked; c.checked = !on;   // put it back until confirmed
+    const lbl = labelOf(c) || "this setting";
+    askConfirm("Confirm change", (on ? "Turn on " : "Turn off ") + "“" + lbl.slice(0, 120) + "” for " + cardName(c) + "?").then((ok) => {
+      if (!ok) return; c.checked = on; pass.add(c); c.dispatchEvent(new Event("change", { bubbles: true })); });
+  }, true);
+  // Pressing Enter in a form submits without a click: hold that too.
+  host.addEventListener("submit", (e) => {
+    const f = e.target; if (pass.has(f)) { pass.delete(f); return; }
+    e.preventDefault(); e.stopImmediatePropagation();
+    askConfirm("Confirm change", "Save this change for " + cardName(f) + "?", "Yes, save").then((ok) => { if (ok) { pass.add(f); f.requestSubmit(); } });
+  }, true);
+})();
+
 // ---------- view counter (one per page load, shown in the footer) ----------
 sb.rpc("count_view", { p: "home" }).then(({ data }) => {
   if (typeof data !== "number" && typeof data !== "string") return;
