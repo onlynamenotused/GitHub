@@ -73,7 +73,8 @@ async function docDiscount(d: any) {
   return { ok: true, id: String(id), pct, total: x.amount?.amount ?? null };
 }
 
-/* Invoice number = the service desk ticket number (HSD-1001052), and the customer's PO in Reference.
+/* Invoice number = the service desk ticket number (HSD-1001052), the customer's PO in Reference, and the due date
+   from the client's payment terms (public.invoice_terms; 7 days for a new client; Avery: last day of next month).
    Called right after the desk creates a draft invoice. If FreshBooks already has that number, the next free
    "-2", "-3"… is used. Never sends anything. */
 async function docNumber(d: any) {
@@ -84,26 +85,34 @@ async function docNumber(d: any) {
   const path = kind === "invoice" ? "invoices/invoices" : "estimates/estimates";
   const field = kind === "invoice" ? "invoice_number" : "estimate_number";
   const start = Math.max(1, parseInt(d.start, 10) || 1);
-  let last = "";
-  for (let n = start; n < start + 6; n++) {
-    const num = n === 1 ? base : `${base}-${n}`;
-    const body: Record<string, unknown> = { [field]: num };
-    if (d.po != null && String(d.po).trim()) body.po_number = String(d.po).trim().slice(0, 30);
+  const extra: Record<string, unknown> = {};
+  if (d.po != null && String(d.po).trim()) extra.po_number = String(d.po).trim().slice(0, 30);
+  const cid = parseInt(d.clientId, 10);
+  if (kind === "invoice" && cid) { const [t] = await sql`select public.invoice_due_days(${cid}) as n`; if (t && t.n != null) extra.due_offset_days = Number(t.n); }
+  const put = async (body: Record<string, unknown>) => {
     const r = await fetch(`${FB_API}/accounting/account/${c.account_id}/${path}/${id}`, {
       method: "PUT", headers: { "content-type": "application/json", "Api-Version": "alpha", authorization: "Bearer " + c.access_token },
       body: JSON.stringify({ [kind]: body }),
     });
     const j = await r.json().catch(() => ({}));
-    if (r.ok) {
-      const x = j?.response?.result?.[kind] || {};
-      const got = String(x[field] ?? num);
-      await sql`insert into fbw.log(op,ref,ok,fb_id,fb_number,detail) values ('doc_number',${d.ref || null},true,${String(id)},${got},${sql.json({ kind, po: x.po_number ?? null })})`;
-      return { ok: true, id: String(id), number: got, po: x.po_number ?? null };
-    }
     const errs = j?.response?.errors || j?.errors;
-    last = `FreshBooks ${r.status}: ` + (Array.isArray(errs) ? errs.map((e: any) => e.message || e.errno).join("; ") : (j.message || r.statusText));
+    return { ok: r.ok, x: j?.response?.result?.[kind] || {}, err: r.ok ? "" : `FreshBooks ${r.status}: ` + (Array.isArray(errs) ? errs.map((e: any) => e.message || e.errno).join("; ") : (j.message || r.statusText)) };
+  };
+  const done = async (x: any, numErr: string) => {
+    const got = String(x[field] ?? "");
+    await sql`insert into fbw.log(op,ref,ok,fb_id,fb_number,detail) values ('doc_number',${d.ref || null},${!numErr},${String(id)},${got},${sql.json({ kind, po: x.po_number ?? null, due: x.due_date ?? null, due_days: x.due_offset_days ?? null, numErr: numErr || null })})`;
+    return { ok: true, id: String(id), number: got, po: x.po_number ?? null, due: x.due_date ?? null, dueDays: x.due_offset_days ?? extra.due_offset_days ?? null, numberError: numErr || undefined };
+  };
+  let last = "";
+  for (let n = start; n < start + 6; n++) {
+    const num = n === 1 ? base : `${base}-${n}`;
+    const r = await put({ ...extra, [field]: num });
+    if (r.ok) return await done(r.x, "");
+    last = r.err;
     if (!/number|exist|unique|taken|duplicate/i.test(last)) break;   // only retry when the number is the problem
   }
+  // The number wasn't taken: still set the PO and due date.
+  if (Object.keys(extra).length) { const r = await put(extra); if (r.ok) return await done(r.x, last || "number not accepted"); }
   throw new Error(last || "FreshBooks didn't take the number");
 }
 
