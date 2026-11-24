@@ -73,13 +73,47 @@ async function docDiscount(d: any) {
   return { ok: true, id: String(id), pct, total: x.amount?.amount ?? null };
 }
 
+/* Invoice number = the service desk ticket number (HSD-1001052), and the customer's PO in Reference.
+   Called right after the desk creates a draft invoice. If FreshBooks already has that number, the next free
+   "-2", "-3"… is used. Never sends anything. */
+async function docNumber(d: any) {
+  const kind = d.kind === "estimate" ? "estimate" : "invoice";
+  const id = parseInt(d.id, 10); if (!id) throw new Error("No draft to number");
+  const base = String(d.number || "").trim().slice(0, 22); if (!base) throw new Error("No ticket number");
+  const c = await token();
+  const path = kind === "invoice" ? "invoices/invoices" : "estimates/estimates";
+  const field = kind === "invoice" ? "invoice_number" : "estimate_number";
+  const start = Math.max(1, parseInt(d.start, 10) || 1);
+  let last = "";
+  for (let n = start; n < start + 6; n++) {
+    const num = n === 1 ? base : `${base}-${n}`;
+    const body: Record<string, unknown> = { [field]: num };
+    if (d.po != null && String(d.po).trim()) body.po_number = String(d.po).trim().slice(0, 30);
+    const r = await fetch(`${FB_API}/accounting/account/${c.account_id}/${path}/${id}`, {
+      method: "PUT", headers: { "content-type": "application/json", "Api-Version": "alpha", authorization: "Bearer " + c.access_token },
+      body: JSON.stringify({ [kind]: body }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok) {
+      const x = j?.response?.result?.[kind] || {};
+      const got = String(x[field] ?? num);
+      await sql`insert into fbw.log(op,ref,ok,fb_id,fb_number,detail) values ('doc_number',${d.ref || null},true,${String(id)},${got},${sql.json({ kind, po: x.po_number ?? null })})`;
+      return { ok: true, id: String(id), number: got, po: x.po_number ?? null };
+    }
+    const errs = j?.response?.errors || j?.errors;
+    last = `FreshBooks ${r.status}: ` + (Array.isArray(errs) ? errs.map((e: any) => e.message || e.errno).join("; ") : (j.message || r.statusText));
+    if (!/number|exist|unique|taken|duplicate/i.test(last)) break;   // only retry when the number is the problem
+  }
+  throw new Error(last || "FreshBooks didn't take the number");
+}
+
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ ok: false, error: "POST only" }, 405);
   const [k] = await sql`select v from fbw.settings where k='bridge_key'`;
   if (!k || req.headers.get("x-hsd-key") !== k.v) return json({ ok: false, error: "forbidden" }, 403);
   const b = await req.json().catch(() => ({}));
-  if (b.op !== "estimate_send" && b.op !== "doc_discount") return json({ ok: false, error: "unknown op" }, 400);
-  try { return json(b.op === "doc_discount" ? await docDiscount(b) : await sendEstimate(b)); }
+  if (b.op !== "estimate_send" && b.op !== "doc_discount" && b.op !== "doc_number") return json({ ok: false, error: "unknown op" }, 400);
+  try { return json(b.op === "doc_discount" ? await docDiscount(b) : b.op === "doc_number" ? await docNumber(b) : await sendEstimate(b)); }
   catch (e) {
     const msg = (e as Error).message || String(e);
     await sql`insert into fbw.log(op,ref,ok,detail) values (${b.op},${b.ref || null},false,${sql.json({ error: msg })})`.catch(() => {});
