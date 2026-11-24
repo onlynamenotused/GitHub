@@ -213,7 +213,7 @@ function renderMachines() {
   const filtered = !!(q || fc || fb || fm);
   $("#mfClear").hidden = !filtered;
   $("#mfCount").textContent = filtered ? list.length + " of " + state.machines.length + " machines" : state.machines.length + " machines";
-  $("#clientTitle").textContent = state.staff ? "Customer Assets" : isSupervisor() ? supName() + (isVendorOnly() ? " jobs" : " fleet") : state.clients.length === 1 ? state.clients[0].name : "My machines";
+  $("#clientTitle").textContent = state.staff ? "Assets" : isSupervisor() ? supName() + (isVendorOnly() ? " jobs" : " fleet") : state.clients.length === 1 ? state.clients[0].name : "My machines";
 
   const counts = { over: 0, soon: 0, ok: 0 };
   for (const m of state.machines) { const s = pmStatus(m).cls; if (s in counts) counts[s]++; }
@@ -1939,7 +1939,7 @@ async function exportTable(fmt, base, title, head, rows) {
   await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js", () => window.jspdf);
   await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js", () => window.jspdf && window.jspdf.jsPDF.API.autoTable);
   const doc = new window.jspdf.jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-  const who = state.staff ? "Customer Assets" : isSupervisor() ? supName() + (isVendorOnly() ? " jobs" : " fleet") : state.clients.map((c) => c.name).join(", ");
+  const who = state.staff ? "Assets" : isSupervisor() ? supName() + (isVendorOnly() ? " jobs" : " fleet") : state.clients.map((c) => c.name).join(", ");
   doc.setFont("helvetica", "bold"); doc.setFontSize(15); doc.text("Highway Digital · " + title, 12, 14);
   doc.setFont("helvetica", "normal"); doc.setFontSize(9.5); doc.setTextColor(90);
   doc.text(`${who}  ·  ${rows.length} rows  ·  exported ${new Date().toLocaleString("en-AU")}  ·  portal.highwaydigital.com.au`, 12, 20);
@@ -2130,13 +2130,13 @@ async function sendServiceQuote(btn, msg) {
 async function renderKits() {
   const v = $("#view-kits");
   if (!state.staff) { v.replaceChildren(); return; }
-  v.replaceChildren(el("div", { class: "head" }, el("h1", {}, "Service kits")), el("p", { class: "muted" }, "Loading…"));
+  v.replaceChildren(el("div", { class: "head" }, el("h1", {}, "PM Kits")), el("p", { class: "muted" }, "Loading…"));
   const [{ data, error }, cov] = await Promise.all([sb.from("service_kits").select("*").order("priority").order("id"), sb.rpc("service_kit_coverage")]);
   if (error) { v.replaceChildren(el("p", { class: "msg err" }, "Couldn't load the kits: " + error.message)); return; }
   const kits = data || [], c = cov?.data || {}, used = c.kits || {};
   const unc = (c.uncovered || []).filter((u) => /^(mim|mut|bro|epi|rol)/i.test(u.brand || ""));
   v.replaceChildren(...[
-    el("div", { class: "head" }, el("h1", {}, "Service kits"),
+    el("div", { class: "head" }, el("h1", {}, "PM Kits"),
       el("button", { class: "btn", type: "button", onclick: async () => {
         const { error: e } = await sb.from("service_kits").insert({ name: "New kit", brand: "Mimaki", models: [], priority: 100 });
         if (e) alert(e.message); else renderKits(); } }, "+ New kit")),
