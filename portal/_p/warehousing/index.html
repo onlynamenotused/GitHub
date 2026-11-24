@@ -1461,7 +1461,7 @@ var poSig=null;
 async function loadReqs(){
   if(MODE==="portal"){try{const{data,error}=await sbc.rpc("wh_requests",{p:{}});if(error)throw new Error(error.message);wReqs=data||[];wReqErr=""}catch(e){wReqErr="Couldn't load warranty requests: "+(e.message||e)}renderInbox();try{renderHistory()}catch(e){}return}
   if(!mcp)return;
-  try{wReqs=await sb(`select coalesce(json_agg(json_build_object('id',id,'ticket',ticket_num,'vendor',vendor,'status',status,'payload',payload,'created',created_at) order by id desc),'[]')::text as r from fbw.po_requests where kind='warranty' and status='pending';`)||[];wReqErr=""}
+  try{wReqs=await sb(`select coalesce(json_agg(json_build_object('id',id,'kind',kind,'ticket',ticket_num,'vendor',vendor,'status',status,'payload',payload,'created',created_at) order by id desc),'[]')::text as r from fbw.po_requests where kind in ('warranty','order') and status='pending';`)||[];wReqErr=""}
   catch(e){wReqErr=mcpErr(e,"Supabase")}
   renderInbox();try{renderHistory()}catch(e){}
 }
@@ -1469,18 +1469,33 @@ function renderInbox(){
   const box=$("#wInbox");
   if(!wReqs.length&&!wReqErr){box.style.display="none";return}
   box.style.display="block";
-  box.innerHTML=`<h2 style="display:flex;justify-content:space-between;align-items:center;gap:8px">Warranty requests from the Service Desk <button class="btn sm" id="wReload">Refresh</button></h2>
+  box.innerHTML=`<h2 style="display:flex;justify-content:space-between;align-items:center;gap:8px">PO requests from the Service Desk <button class="btn sm" id="wReload">Refresh</button></h2>
    ${wReqErr?`<div class="note">${esc(wReqErr)}</div>`:""}
    ${wReqs.map(r=>{const p=r.payload||{};return`<div class="fbjob" style="grid-template-columns:120px 1fr 1fr auto;cursor:default"><b class="mono">${esc(r.ticket||p.ticket||"")}</b>
      <div>${esc(p.customer||"")}<div class="muted" style="font-size:12px">${esc([p.brand,p.model].filter(Boolean).join(" "))}${p.serial?" · S/N "+esc(p.serial):""}</div></div>
      <div class="muted" style="font-size:12.5px">${(p.parts||[]).map(x=>`<span class="mono">${esc(x.qty)}× ${esc(x.code)}</span>`).join(", ")}<div>${esc(r.vendor||p.vendor||"")} · ${auDate(String(r.created||"").slice(0,10))}</div></div>
-     <div style="display:flex;gap:6px"><button class="btn sm primary" data-wopen="${esc(r.id)}">Open as warranty PO</button><button class="btn sm" data-wdis="${esc(r.id)}" title="Remove from this list">Dismiss</button></div></div>`}).join("")}`;
+     <div style="display:flex;gap:6px"><button class="btn sm primary" data-wopen="${esc(r.id)}">${r.kind==="order"?"Open as PO":"Open as warranty PO"}</button><button class="btn sm" data-wdis="${esc(r.id)}" title="Remove from this list">Dismiss</button></div></div>`}).join("")}`;
   $("#wReload").onclick=loadReqs;
   $$("[data-wopen]").forEach(b=>b.onclick=()=>openReq(wReqs.find(r=>String(r.id)===b.dataset.wopen)));
   $$("[data-wdis]").forEach(b=>b.onclick=async()=>{b.disabled=true;try{if(MODE==="portal"){const{error}=await sbc.rpc("wh_requests",{p:{op:"update",id:+b.dataset.wdis,status:"cancelled",note:"Dismissed in Warehousing"}});if(error)throw new Error(error.message)}else await sb(`update fbw.po_requests set status='cancelled', note='Dismissed in Warehousing', updated_at=now() where id=${+b.dataset.wdis} returning id;`);wReqs=wReqs.filter(r=>String(r.id)!==b.dataset.wdis);renderInbox();toast("Request dismissed")}catch(e){toast(esc(mcpErr(e,"Supabase")));b.disabled=false}});
 }
+/* A normal parts order from a Service Desk ticket: vendor from the parts' maker, prices from the parts list. */
+function openOrderReq(r){
+  const p=r.payload||{};
+  cur=blankPO();cur.type="normal";
+  const v=brandToVendor(p.brand)||vendors.find(x=>(x.name||"").toLowerCase()===String(r.vendor||p.vendor||"").toLowerCase());
+  if(v){cur.vendorId=v._id;cur.vendorAddr=vendorAddr(v)}
+  const tk=String(p.ticket||r.ticket||"").trim()||("Request "+r.id);
+  let num=tk,n=1;while(pos.some(x=>String(x.number).toLowerCase()===num.toLowerCase())){n++;num=tk+"-"+n}
+  cur.number=num;
+  cur.notes=`Parts for job ${p.ticket||r.ticket||""} · Customer: ${p.customer||""}${p.model?" · "+[p.brand,p.model].filter(Boolean).join(" "):""}${p.serial?" S/N "+p.serial:""}`;
+  cur.ref={kind:"ticket",reqId:r.id,number:p.ticket||r.ticket||"",client:p.customer||"",po:p.customerPo||""};
+  cur.lines=(p.parts||[]).map(x=>{const q=lookup(idOf(x.code||""));return{code:x.code||"",desc:(q&&q.desc)||x.desc||"",qty:Number(x.qty)||1,price:(q&&q.cost)||Number(x.cost)||0,disc:0}});
+  loadPOtoForm();show("po");window.scrollTo(0,0);
+  toast(`Request #${esc(r.id)} loaded as PO ${esc(cur.number)}${v?" to "+esc(v.name):""}. Check the vendor and prices, then Save.`,5000);
+}
 function openReq(r){
-  if(!r)return;const p=r.payload||{};
+  if(!r)return;if(r.kind==="order")return openOrderReq(r);const p=r.payload||{};
   cur=blankPO();cur.type="warranty";
   const v=vendors.find(x=>(x.name||"").toLowerCase()===String(r.vendor||p.vendor||"").toLowerCase())||brandToVendor(p.brand);
   if(v){cur.vendorId=v._id;cur.vendorAddr=vendorAddr(v)}
