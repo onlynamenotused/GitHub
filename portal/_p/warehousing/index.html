@@ -138,9 +138,9 @@ th.num .sorth{flex-direction:row-reverse}
   <a class="backlink" href="index.html" title="Back to the Service Desk">← Service Desk</a>
   <div class="brand">HIGHWAYDIGITAL<small>Warehousing</small></div>
   <nav>
-    <button data-v="po" class="on">New PO <span class="badge" id="lineBadge" style="display:none">0</span></button>
+    <button data-v="po">New PO <span class="badge" id="lineBadge" style="display:none">0</span></button>
     <button data-v="parts">Parts &amp; stock</button>
-    <button data-v="history">PO history</button>
+    <button data-v="history" class="on">PO history</button>
     <button data-v="vendors">Vendors</button>
   </nav>
   <div class="status" id="dbStatus">Connecting…</div>
@@ -148,7 +148,7 @@ th.num .sorth{flex-direction:row-reverse}
 
 <main>
 <!-- ============ NEW PO ============ -->
-<section class="view on" id="v-po">
+<section class="view" id="v-po">
   <div class="card" id="wInbox" style="display:none"></div>
   <div class="card">
     <h2 id="poTitle">New purchase order</h2>
@@ -285,7 +285,7 @@ th.num .sorth{flex-direction:row-reverse}
 </section>
 
 <!-- ============ HISTORY ============ -->
-<section class="view" id="v-history">
+<section class="view on" id="v-history">
   <div class="card">
     <div class="toolbar">
       <div class="grow"><label>Search</label><input id="hSearch" placeholder="PO number, part code, note…"></div>
@@ -1564,7 +1564,7 @@ cur=blankPO();
 try{const s=localStorage.getItem("hd-po-draft");if(s){const o=JSON.parse(s);if(o&&o.lines)cur=Object.assign(blankPO(),o)}}catch(e){}
 fillVendorSelects();
 loadPOtoForm();
-const h=(location.hash||"").slice(1);if(["po","parts","history","vendors"].includes(h))show(h);
+const h=(location.hash||"").slice(1);show(["po","parts","history","vendors"].includes(h)?h:"history");   // opens on PO history
 init();
 })();
 </script>
