@@ -54,6 +54,10 @@ const cleanName = (s: string, n = 120) => String(s || "").replace(/[\\/:*?"<>|#%
 const pathEnc = (p: string) => p.split("/").map(encodeURIComponent).join("/");
 const norm = (s: string) => String(s || "").toLowerCase().replace(/\b(pty|ltd|limited|the|t\/as|t\/a|co|inc|group|of|companies|company|and)\b/g, " ").replace(/[^a-z0-9]+/g, "");
 const words = (s: string) => String(s || "").toLowerCase().replace(/[^a-z0-9 ]+/g, " ").split(/\s+/).filter((w) => w.length > 2 && !["pty", "ltd", "the", "and", "group", "limited", "company", "companies"].includes(w));
+// Words that many customers share: they never make two names "the same customer" on their own
+// (e.g. "Piara Waters Senior High School" is not "Newman Senior High School").
+const GENERIC = new Set(["school","senior","high","primary","college","college","university","academy","signs","sign","signage","print","printing","prints","graphics","graphic","design","designs","media","services","service","solutions","australia","australian","perth","wa","west","western","north","south","east","city","shire","council","department","dept","trust","centre","center","club","church","hospital","health","group","industries","enterprises","holdings","trading","studio","studios","shop","store","workshop","office","the","and"]);
+const keyWords = (s: string) => words(s).filter((w) => !GENERIC.has(w));
 
 async function children(id: string) {
   const out: any[] = [];
@@ -86,9 +90,10 @@ async function customerFolder(customer: string) {
   let hit = list.find((f) => names.some((n) => norm(f.name) === norm(n)));
   if (!hit) hit = list.find((f) => names.some((n) => { const a = norm(f.name), b = norm(n); return a.length >= 5 && b.length >= 5 && (a.includes(b) || b.includes(a)); }));
   if (!hit) {
-    const cw = new Set(names.flatMap(words));
-    const scored = list.map((f) => { const fw = words(f.name); const k = fw.filter((w) => cw.has(w)).length; return { f, s: fw.length ? k / Math.max(fw.length, 1) : 0, k }; })
-      .filter((x) => x.k >= 2 || (x.k === 1 && x.s === 1 && words(customer).length === 1)).sort((a, b) => b.s - a.s || b.k - a.k);
+    // Only distinctive words count, and every distinctive word of the folder name must be in the customer's name.
+    const cw = new Set(names.flatMap(keyWords));
+    const scored = list.map((f) => { const fw = keyWords(f.name); const k = fw.filter((w) => cw.has(w)).length; return { f, s: fw.length ? k / fw.length : 0, k }; })
+      .filter((x) => x.k >= 1 && x.s === 1 && (x.k >= 2 || keyWords(customer).length === 1)).sort((a, b) => b.k - a.k);
     if (scored.length && (scored.length === 1 || scored[0].s > scored[1].s)) hit = scored[0].f;
   }
   if (!hit) hit = await mkdir(root.id, cleanName(customer, 100) || "Unknown customer");
