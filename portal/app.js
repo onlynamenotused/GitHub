@@ -243,7 +243,7 @@ function renderMachines() {
     const s = pmStatus(m);
     return el("button", { class: "mcard", onclick: () => (location.hash = "#machine/" + encodeURIComponent(m.id)) },
       el("span", { class: "model" }, machineName(m)),
-      el("span", { class: "muted small" }, [m.sub_category || m.category, m.serial && "SN " + m.serial].filter(Boolean).join(" · ")),
+      el("span", { class: "muted small" }, [m.cust_ref && "Ref " + m.cust_ref, m.sub_category || m.category, m.serial && "SN " + m.serial].filter(Boolean).join(" · ")),
       (state.clients.length > 1 || state.staff) ? el("span", { class: "small cust" }, clientName(m.client_id)) : null,
       el("span", { class: "muted small" }, m.location || m.site || ""),
       s.label ? el("span", { class: "pill " + s.cls }, s.label + (m.pm_next_due ? " · " + fmtDate(m.pm_next_due) : "")) : null,
@@ -447,6 +447,32 @@ function renderBilling() {
   box.replaceChildren(...parts);
 }
 
+/* The customer's own name or tag for a machine ("Printer 2", "HD-0042"). Customers and fleet supervisors can edit it;
+   the service desk picks the change up on its next sync. */
+function custRefCell(m) {
+  const dd = el("dd", {});
+  const canEdit = !state.staff && !isVendorOnly();
+  const show = () => dd.replaceChildren(
+    m.cust_ref ? el("span", {}, m.cust_ref) : el("span", { class: "muted" }, canEdit ? "None yet" : "—"),
+    canEdit ? el("button", { class: "btn ghost small", type: "button", style: "margin-left:8px", title: "Give this machine your own name or asset tag", onclick: edit }, m.cust_ref ? "Edit" : "Add") : "");
+  const edit = () => {
+    const inp = el("input", { class: "field", maxlength: "60", value: m.cust_ref || "", placeholder: "e.g. Printer 2, HD-0042", "aria-label": "Your reference for this machine", style: "max-width:240px" });
+    const msg = el("span", { class: "small", role: "status" });
+    const save = el("button", { class: "btn primary small", type: "submit" }, "Save");
+    const f = el("form", { style: "display:flex;gap:6px;flex-wrap:wrap;align-items:center", onsubmit: async (e) => {
+      e.preventDefault(); save.disabled = true; msg.textContent = "";
+      const { data, error } = await sb.rpc("portal_set_cust_ref", { p_machine: m.id, p_ref: inp.value });
+      save.disabled = false;
+      if (error) { msg.className = "small msg err"; msg.textContent = error.message; return; }
+      m.cust_ref = data || null; const sm = state.machines.find((x) => x.id === m.id); if (sm) sm.cust_ref = m.cust_ref;
+      show(); dd.append(el("span", { class: "small muted", style: "margin-left:8px" }, "Saved"));
+    } }, inp, save, el("button", { class: "btn ghost small", type: "button", onclick: show }, "Cancel"), msg);
+    dd.replaceChildren(f); inp.focus(); inp.select();
+  };
+  show();
+  return dd;
+}
+
 async function renderMachine(id) {
   const m = state.machines.find((x) => x.id === id);
   const v = $("#view-machine");
@@ -467,6 +493,7 @@ async function renderMachine(id) {
         el("dl", { class: "kv" },
           el("dt", {}, "Customer"), el("dd", {}, client?.name || "—"),
           el("dt", {}, "Serial"), el("dd", {}, m.serial || "—"),
+          el("dt", {}, "Your reference"), custRefCell(m),
           el("dt", {}, "Type"), el("dd", {}, [m.category, m.sub_category].filter(Boolean).join(" · ") || "—"),
           m.ink_set && el("dt", {}, "Ink set"), m.ink_set && el("dd", {}, m.ink_set),
           el("dt", {}, "Location"), el("dd", {}, m.location || m.site || "—"),
