@@ -6,7 +6,7 @@ const sb = createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, {
 });
 
 const $ = (s) => document.querySelector(s);
-const views = ["loading", "login", "view-machines", "view-machine", "view-add", "view-reports", "view-kb", "view-contact", "view-customers", "view-book", "view-kits"];
+const views = ["loading", "login", "view-machines", "view-machine", "view-add", "view-reports", "view-kb", "view-tickets", "view-contact", "view-customers", "view-book", "view-kits"];
 const state = { user: null, clients: [], machines: [], kb: null, resources: null, kbAccess: false, intranet: false, staff: false, access: null };
 
 // ---------- helpers ----------
@@ -589,6 +589,92 @@ function kbItem(a) {
     el("p", {}, a.resolution),
     (a.parts || []).length ? el("div", { class: "parts" }, "Parts: " + a.parts.map((p) => `${p.desc} (${p.code})`).join("; ")) : null
   );
+}
+
+/* ---------- Tickets (intranet account only): every service desk ticket, as synced from the desk. Read-only. ---------- */
+let tkCache = null, tkAt = 0;
+async function loadTickets(force) {
+  if (tkCache && !force && Date.now() - tkAt < 60e3) return tkCache;
+  const [t, p] = await Promise.all([
+    sb.from("tickets").select("num,client_id,customer_name,machine_id,type,subtype,status,summary,model,created,sched_date,sched_time,sched_hours,sample,updated_at").eq("sample", false).order("num", { ascending: false }).limit(5000),
+    sb.from("ticket_private").select("num,data").limit(5000)]);
+  if (t.error) throw new Error(t.error.message);
+  const priv = new Map(((p && p.data) || []).map((x) => [x.num, x.data || {}]));
+  tkCache = (t.data || []).map((x) => Object.assign(x, { d: priv.get(x.num) || {} }));
+  tkAt = Date.now();
+  return tkCache;
+}
+const TK_SUB = { pm: "PM service", installation: "Installation", repair: "Repair", software: "Software", "it-hardware": "I.T hardware" };
+const tkType = (t) => (t.type === "incident" ? "Incident" : "Request") + (t.subtype ? " · " + (TK_SUB[t.subtype] || t.subtype) : "");
+const tkOpen = (t) => !["completed", "invoiced"].includes(t.status);
+const tkMoney = (n) => "$" + (Number(n) || 0).toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+async function renderTickets(openNum) {
+  const box = $("#tkList");
+  if (!tkCache) box.replaceChildren(el("p", { class: "muted" }, "Loading tickets…"));
+  let all;
+  try { all = await loadTickets(); } catch (e) { box.replaceChildren(el("p", { class: "msg err" }, "Couldn't load tickets: " + e.message)); return; }
+  const bar = document.querySelector("#view-tickets .tkbar"), head = document.querySelector("#view-tickets .head");
+  if (openNum) { const t = all.find((x) => String(x.num) === String(openNum).replace(/\D/g, "")); if (t) { bar.hidden = true; head.hidden = true; renderTicket(t); return; } }
+  bar.hidden = false; head.hidden = false;
+  const q = norm($("#tkSearch").value), st = $("#tkStatus").value, ty = $("#tkType").value, so = $("#tkSort").value;
+  const mById = new Map(state.machines.map((m) => [m.id, m]));
+  let list = all.filter((t) => (st === "all" || (st === "open" ? tkOpen(t) : t.status === st)) && (!ty || t.type === ty));
+  if (q) list = list.filter((t) => { const m = mById.get(t.machine_id) || {}; return norm(["HSD-" + t.num, t.num, t.customer_name, t.summary, t.model, m.serial, m.brand, t.d.description, t.d.errorCode, t.d.notes].join(" ")).includes(q); });
+  const ts = (t) => Date.parse(t.created || 0) || 0;
+  const cmp = { created: (a, b) => ts(b) - ts(a) || b.num - a.num, old: (a, b) => ts(a) - ts(b) || a.num - b.num, num: (a, b) => b.num - a.num,
+    sched: (a, b) => (a.sched_date ? Date.parse(a.sched_date + "T" + (a.sched_time || "00:00")) : 9e15) - (b.sched_date ? Date.parse(b.sched_date + "T" + (b.sched_time || "00:00")) : 9e15) }[so];
+  list.sort(cmp);
+  $("#tkCount").textContent = list.length + " ticket" + (list.length === 1 ? "" : "s");
+  box.replaceChildren(list.length ? el("div", { class: "card", style: "padding:0" }, el("div", { class: "tscroll" }, el("table", { class: "tbl rtbl tktbl" },
+    el("thead", {}, el("tr", {}, ...["Ticket", "Logged", "Customer", "Job", "Type", "Booked", "Status"].map((h) => el("th", {}, h)))),
+    el("tbody", {}, ...list.slice(0, 400).map((t) => { const [lab, cls] = T_STATUS[t.status] || [t.status, "none"]; const m = mById.get(t.machine_id);
+      return el("tr", { class: "tkrow", tabindex: 0, onclick: () => (location.hash = "#tickets/" + t.num), onkeydown: (e) => { if (e.key === "Enter") location.hash = "#tickets/" + t.num; } },
+        el("td", { class: "mono", "data-l": "Ticket" }, "HSD-" + t.num),
+        el("td", { "data-l": "Logged" }, fmtDate(t.created)),
+        el("td", { "data-l": "Customer" }, t.customer_name || "—"),
+        el("td", { "data-l": "Job" }, String(t.summary || "").replace(/^[^/]*\/\s*/, "") || "—", m && m.serial ? el("div", { class: "muted small mono" }, "SN " + m.serial) : null),
+        el("td", { "data-l": "Type" }, tkType(t)),
+        el("td", { "data-l": "Booked" }, t.sched_date ? fmtDate(t.sched_date) + (t.sched_time ? " " + t.sched_time : "") : "—"),
+        el("td", { "data-l": "Status" }, el("span", { class: "pill " + cls }, lab))); }))))) : el("div", { class: "card empty" }, q ? "No tickets match that search." : "No tickets here."),
+    list.length > 400 ? el("p", { class: "muted small" }, "Showing the first 400. Search or filter to narrow it down.") : "");
+}
+function renderTicket(t) {
+  const d = t.d || {}, m = state.machines.find((x) => x.id === t.machine_id), [lab, cls] = T_STATUS[t.status] || [t.status, "none"];
+  const lines = (d.lines || []).filter((l) => l.code || l.desc);
+  const tot = lines.reduce((s, l) => s + (Number(l.qty) || 0) * (Number(l.unit) || 0), 0);
+  const kv = (k, v) => (v ? [el("dt", {}, k), el("dd", {}, v)] : []);
+  const c = d.contactInfo || {};
+  const od = d.odFolder && (d.odFolder.url || d.odFolder.shareUrl);
+  $("#tkList").replaceChildren(
+    el("button", { class: "btn back", onclick: () => (location.hash = "#tickets") }, "← All tickets"),
+    el("div", { class: "detail" },
+      el("div", { class: "card" },
+        el("h1", {}, "HSD-" + t.num),
+        el("p", {}, el("span", { class: "pill " + cls }, lab), " ", el("span", { class: "muted small" }, tkType(t))),
+        el("h2", { style: "margin-top:4px" }, t.summary || ""),
+        el("dl", { class: "kv" },
+          ...kv("Customer", t.customer_name), ...kv("Bill to", d.billTo && d.billTo !== "Customer" ? d.billTo : ""),
+          ...kv("Machine", m ? [m.brand, m.model].filter(Boolean).join(" ") + (m.serial ? " · SN " + m.serial : "") : [d.brand, t.model].filter(Boolean).join(" ")),
+          ...kv("PO / reference", d.customerPo), ...kv("Logged", fmtDate(t.created) + (d.channel ? " · " + d.channel : "")),
+          ...kv("Booked", t.sched_date ? fmtDate(t.sched_date) + (t.sched_time ? " at " + t.sched_time : "") + (t.sched_hours ? " · " + t.sched_hours + " h" : "") : ""),
+          ...kv("Contact", [c.contact, c.phone, c.email].filter(Boolean).join(" · ")), ...kv("Error code", d.errorCode),
+          ...kv("Site", d.dist && d.dist.addr)),
+        el("p", { style: "display:flex;gap:8px;flex-wrap:wrap" },
+          m ? el("a", { class: "btn", href: "#machine/" + encodeURIComponent(m.id) }, "Machine record") : null,
+          od ? el("a", { class: "btn", href: od, target: "_blank", rel: "noopener" }, "OneDrive folder ↗") : null,
+          d.calLink ? el("a", { class: "btn", href: d.calLink, target: "_blank", rel: "noopener" }, "Outlook booking ↗") : null)),
+      el("div", { class: "card" },
+        el("h2", {}, "Details"), el("p", { style: "white-space:pre-wrap" }, d.description || "No details."),
+        el("h2", {}, "Work notes"), el("p", { style: "white-space:pre-wrap" }, d.notes || "No work notes yet."))),
+    el("div", { class: "card", style: "margin-top:14px" }, el("h2", {}, (["completed", "invoiced"].includes(t.status) ? "Invoice" : "Estimate") + " lines"),
+      lines.length ? el("div", { class: "tscroll" }, el("table", { class: "tbl sub" },
+        el("thead", {}, el("tr", {}, el("th", {}, "Item"), el("th", {}, "Description"), el("th", { class: "num" }, "Qty"), el("th", { class: "num" }, "Rate"), el("th", { class: "num" }, "Amount"))),
+        el("tbody", {}, ...lines.map((l) => el("tr", {}, el("td", { class: "mono" }, l.code || ""), el("td", {}, l.desc || ""), el("td", { class: "num" }, String(l.qty ?? "")), el("td", { class: "num" }, tkMoney(l.unit)), el("td", { class: "num" }, tkMoney((Number(l.qty) || 0) * (Number(l.unit) || 0)))))),
+        el("tfoot", {}, el("tr", {}, el("td", { colspan: 4 }, "Total ex GST"), el("td", { class: "num" }, tkMoney(tot))))))
+        : el("p", { class: "muted small" }, "No lines yet."),
+      (d.fbDrafts || []).length ? el("p", { class: "muted small" }, "FreshBooks: " + d.fbDrafts.map((x) => x.kind + " " + (x.number || x.id)).join(", ")) : ""),
+    el("p", { class: "muted small", style: "margin-top:10px" }, "Read-only copy from the service desk, updated each time the desk syncs. Make changes in the Highway Service Desk."));
+  window.scrollTo(0, 0);
 }
 
 async function renderKb() {
@@ -2370,12 +2456,13 @@ function route() {
   // App-only logins have no machines or booking: send them to their first app.
   if (state.appsOnly && !state.staff && (state.fluteAccess || state.vectorAccess)) { location.replace(state.fluteAccess ? "/flute/" : "/vector/"); return; }
   const top = h.split("/")[0];
-  window.HDNav?.setActive(navHost(), top === "machine" || top === "add-machine" ? "machines" : top === "reports" ? "reports" : top === "kb" ? "intranet" : top === "book" ? "contact" : top);
+  window.HDNav?.setActive(navHost(), top === "machine" || top === "add-machine" ? "machines" : top === "reports" ? "reports" : top === "kb" ? "intranet" : top === "tickets" ? "tickets" : top === "book" ? "contact" : top);
   if (h === "book" || h.startsWith("book/")) { show("view-book"); renderBook(decodeURIComponent(h.slice(5))); }
   else if (h.startsWith("machine/")) { show("view-machine"); renderMachine(decodeURIComponent(h.slice(8))); }
   else if (h === "add-machine") { show("view-add"); renderAddMachine(); }
   else if (h === "reports") { show("view-reports"); renderReports(); }
   else if (h === "kb" && state.intranet) { show("view-kb"); renderKb(); }
+  else if ((h === "tickets" || h.startsWith("tickets/")) && state.intranet) { show("view-tickets"); renderTickets(decodeURIComponent(h.slice(8))); }
   else if (h === "customers" && state.staff) { show("view-customers"); renderCustomers(); }
   else if (h === "service-kits" && state.staff) { show("view-kits"); renderKits(); }
   else if (h === "contact") { show("view-contact"); renderContact(); }
@@ -2390,6 +2477,9 @@ $("#mfClear").addEventListener("click", () => { $("#machineSearch").value = ""; 
 { const setNavH = () => { const n = document.getElementById("hd-nav"); document.documentElement.style.setProperty("--navh", (n && getComputedStyle(n).position === "sticky" ? n.offsetHeight : 0) + "px"); };
   addEventListener("resize", setNavH); setTimeout(setNavH, 300); setInterval(setNavH, 3000); }
 $("#kbSearch").addEventListener("input", renderKb);
+$("#tkSearch").addEventListener("input", () => renderTickets());
+["#tkStatus", "#tkType", "#tkSort"].forEach((id) => $(id).addEventListener("change", () => renderTickets()));
+$("#tkReload").addEventListener("click", async () => { tkCache = null; await renderTickets(); });
 $("#custSearch").addEventListener("input", renderCustomers);
 
 /* Vendors and supervisors: every change asks first. Clicks on action buttons and ticks of any box inside #supAdmin are held,

@@ -355,3 +355,10 @@ dialog.confirm-dlg::backdrop{background:rgba(0,0,0,.55)}
 dialog.confirm-dlg h3{margin:0 0 8px}
 dialog.confirm-dlg p{margin:0 0 16px;overflow-wrap:anywhere}
 dialog.confirm-dlg .cf-btns{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
+
+/* Tickets tab */
+.tkbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 12px}
+.tkbar .field{flex:0 1 190px;width:auto}
+.tktbl .tkrow{cursor:pointer}
+.tktbl .tkrow:hover td,.tktbl .tkrow:focus td{background:rgba(127,127,127,.08)}
+.tktbl td{vertical-align:top}

@@ -6,6 +6,7 @@
   function items(f) {
     // appsOnly: a login that only has apps (Flute Practice, Vector Converter): no machines, no booking.
     const out = f.appsOnly && !f.staff ? [] : [["machines", "/#machines", f.staff ? "Assets" : "My machines"]];
+    if (f.intranet) out.push(["tickets", "/#tickets", "Tickets"]);
     if (f.intranet) out.push(["intranet", "/#kb", "Intranet"]);
     if (f.kb) out.push(["kb", "/kb/", "Knowledge"]);
     if (f.cat) out.push(["catalogue", "/catalogue/", "Parts Catalogue"]);

@@ -8,12 +8,12 @@
 <meta name="theme-color" content="#000000">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="styles.css?v=44">
+<link rel="stylesheet" href="styles.css?v=45">
 <link rel="stylesheet" href="nav.css?v=38">
 <link rel="icon" href="favicon.ico">
 <script src="config.js?v=35"></script>
-<script src="nav.js?v=46"></script>
-<script type="module" src="app.js?v=61"></script>
+<script src="nav.js?v=47"></script>
+<script type="module" src="app.js?v=62"></script>
 </head>
 <body>
 <div id="hd-nav"></div>
@@ -87,6 +87,21 @@
   <section id="view-add" hidden></section>
 
   <section id="view-reports" hidden></section>
+
+  <section id="view-tickets" hidden>
+    <div class="head">
+      <h1>Tickets</h1>
+      <input id="tkSearch" class="field" type="search" placeholder="Search ticket number, customer, model, serial or fault" aria-label="Search tickets">
+    </div>
+    <div class="tkbar" role="group" aria-label="Filter tickets">
+      <select id="tkStatus" class="field" aria-label="Status"><option value="open">Open tickets</option><option value="all">All tickets</option><option value="new">New</option><option value="scheduled">Scheduled</option><option value="in-progress">In progress</option><option value="waiting">Waiting</option><option value="quote">Quote</option><option value="completed">Completed</option><option value="invoiced">Invoiced</option></select>
+      <select id="tkType" class="field" aria-label="Type"><option value="">All types</option><option value="incident">Incidents</option><option value="request">Requests</option></select>
+      <select id="tkSort" class="field" aria-label="Sort"><option value="created">Newest first</option><option value="old">Oldest first</option><option value="sched">Next booking first</option><option value="num">Ticket number</option></select>
+      <button id="tkReload" class="btn ghost small" type="button">Refresh</button>
+      <span id="tkCount" class="muted small"></span>
+    </div>
+    <div id="tkList"></div>
+  </section>
 
   <section id="view-kb" hidden>
     <div class="head">
