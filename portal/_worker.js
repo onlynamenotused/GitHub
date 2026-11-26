@@ -259,69 +259,10 @@ function quoteBlock(f) {
   return `<script>window.HDQ=${q.replace(/</g, "\\u003c")};</script><link rel="stylesheet" href="/quote.css?v=${V}"><script src="/quote.js?v=${V}" defer></script>`;
 }
 
-/* Weather page: what Hubble is observing. STScI publishes each week's planned observations as a plain-text
-   "HST Observing Timeline Report" (stsci.edu/ftp/observing/weekly_timeline/timeline_MM_DD_YY). This reads the
-   current and next week, keeps real targets (not darks, biases and other calibrations) and groups the exposures
-   into visits: one row per target block, with begin/end time (UTC), instrument and investigator. Cached 30 min. */
-const HST_TL = "https://www.stsci.edu/ftp/observing/weekly_timeline/";
-const HST_CAL = /^(DARK|BIAS|DARK-NM|DARK-EARTH-CALIB|WAVEHITM|WAVELINE|WAVE|TUNGSTEN|INTFLAT|KSPOTS|DEUTERIUM|EARTH-CALIB|ANY|NONE|FLAT|LAMP|CCDFLAT|ORBIT-POLE|BIAS-\S*|DARK-\S*)$/i;
-function hstParse(txt) {
-  // Fixed-width report: the dashed line under the headings gives each column's start.
-  const L = String(txt).split("\n");
-  const dl = L.find((l) => /^-{8} -{8} -{8}\s+-+\s+-+/.test(l)); if (!dl) return [];
-  const st = [...dl.matchAll(/-+/g)].map((m) => m.index);
-  const col = (l, i, j = i + 1) => l.slice(st[i], j < st.length ? st[j] : undefined).trim();
-  const out = [];
-  for (const l of L) {
-    if (!/^\d{4}\.\d{3} \d\d:\d\d:\d\d \d\d:\d\d:\d\d/.test(l)) continue;
-    const su = col(l, 3), pi = col(l, 4), inst = col(l, 7);
-    const target = col(l, 5, 7).split(/\s+/).slice(1).join(" ");   // "Exp #" then the target name
-    if (!target || HST_CAL.test(target) || /^S\/C/.test(inst)) continue;
-    const t = (s) => { const [a, b, c] = s.split(":").map(Number); return ((a * 60 + b) * 60 + c) * 1e3; };
-    const base = Date.UTC(+l.slice(0, 4), 0, 1) + (+l.slice(5, 8) - 1) * 864e5;
-    const b = base + t(l.slice(9, 17)); let e = base + t(l.slice(18, 26)); if (e < b) e += 864e5;
-    out.push({ su, pi, target, inst: inst.split("/")[0], b, e });
-  }
-  // group exposures of one visit (same SU and target, gaps under 2 h)
-  out.sort((a, c) => a.b - c.b);
-  const visits = [];
-  for (const x of out) {
-    const v = [...visits].reverse().find((w) => w.su === x.su && w.target === x.target && x.b - w.e < 2 * 3600e3);
-    if (v) { v.e = Math.max(v.e, x.e); if (!v.inst.includes(x.inst)) v.inst.push(x.inst); }
-    else visits.push({ su: x.su, pi: x.pi, target: x.target, inst: [x.inst], b: x.b, e: x.e });
-  }
-  return visits;
-}
-async function hubbleFeed() {
-  const cache = caches.default, ck = new Request("https://portal.highwaydigital.com.au/_cache/hubble-v1");
-  const hit = await cache.match(ck); if (hit) return hit;
-  let files = [];
-  try {
-    const idx = await (await fetch(HST_TL, { headers: { "user-agent": "HighwayServiceDesk/1.0 (weather page)" } })).text();
-    files = [...new Set([...idx.matchAll(/href="(timeline_(\d\d)_(\d\d)_(\d\d))"/g)].map((m) => ({ f: m[1], t: Date.UTC(2000 + +m[4], +m[2] - 1, +m[3]) })).map((x) => JSON.stringify(x)))].map((s) => JSON.parse(s));
-  } catch (e) { return jres({ ok: false, error: "Couldn't reach STScI" }, 502); }
-  const now = Date.now();
-  const pick = files.filter((x) => x.t <= now + 864e5).sort((a, b) => b.t - a.t).slice(0, 2);
-  const next = files.filter((x) => x.t > now + 864e5).sort((a, b) => a.t - b.t).slice(0, 1);
-  let visits = [];
-  for (const x of [...pick, ...next]) {
-    try { const t = await (await fetch(HST_TL + x.f, { headers: { "user-agent": "HighwayServiceDesk/1.0 (weather page)" } })).text(); visits.push(...hstParse(t)); } catch (e) { /* skip a week */ }
-  }
-  const seen = new Set();
-  visits = visits.filter((v) => { const k = v.su + v.target + v.b; if (seen.has(k)) return false; seen.add(k); return v.e > now - 6 * 3600e3 && v.b < now + 4 * 864e5; }).sort((a, b) => a.b - b.b);
-  const r = jres({ ok: true, source: "STScI HST Observing Timeline Report", at: new Date(now).toISOString(),
-    visits: visits.slice(0, 120).map((v) => ({ target: v.target, inst: v.inst.join(" + "), pi: v.pi, prop: String(v.su).slice(0, 5), begin: new Date(v.b).toISOString(), end: new Date(v.e).toISOString() })) });
-  const h = new Headers(r.headers); h.set("Cache-Control", "public, max-age=1800");
-  const out = new Response(r.body, { status: 200, headers: h });
-  await cache.put(ck, out.clone());
-  return out;
-}
-
 export default {
   async fetch(req, env) {
     const url = new URL(req.url);
     const p = url.pathname;
-    if (p === "/weather/api/hubble") return hubbleFeed();
     if (p === "/_src/catalogue" || p === "/vector/log" || p.startsWith("/flute/api/") || p.startsWith("/radio/api/") || p.startsWith("/logreview/api/") || p.startsWith("/catalogue/quote") || p.startsWith("/service/")) {
       const r = await apiRoute(req, env, url, p);
       if (r) return r;
