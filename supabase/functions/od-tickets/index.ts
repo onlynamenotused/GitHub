@@ -8,6 +8,8 @@
 //   media_start   {ticket, name, size, folderId?}    -> {upload, folderId, folderUrl}
 //   media_folder_link {ticket, folderId?}            -> view-only share link of the folder
 //   media_delete  {itemId}                           -> recycle bin (only items in Client Folders or the old media folder)
+//   estimate_file {estimateId, number, folderId? | ref+customer+label} -> PDF of the FreshBooks estimate saved in the
+//                 ticket folder as "Estimate <number>.pdf", plus a view-only share link to it (for Mimaki PO requests)
 // Deployed with verify_jwt=false (the x-hsd-key check below is the auth).
 import postgres from "npm:postgres@3.4.4";
 
@@ -19,6 +21,9 @@ const MS_SCOPE = "offline_access User.Read Files.ReadWrite";
 const GRAPH = "https://graph.microsoft.com/v1.0";
 const CLIENT_ROOT = "Client Folders";
 const OLD_MEDIA_ROOT = "Highway Service Desk/Ticket media";
+const FB_ID = env("FRESHBOOKS_CLIENT_ID"), FB_SECRET = env("FRESHBOOKS_CLIENT_SECRET");
+const FB_REDIRECT = "https://sfuuzcgwbbhdjqzrchvv.supabase.co/functions/v1/freshbooks/callback";
+const FB_API = "https://api.freshbooks.com";
 const json = (o: unknown, status = 200) => new Response(JSON.stringify(o), { status, headers: { "content-type": "application/json" } });
 
 async function msToken(rt: string) {
@@ -168,6 +173,40 @@ async function mediaDelete(d: any) {
   return { ok: true };
 }
 
+/* FreshBooks connection (shared with the freshbooks bridge; refreshed the same way). Read-only use here. */
+async function fbToken() {
+  return await sql.begin(async (tx) => {
+    const [c] = await tx`select * from fbw.conn where provider='freshbooks' for update`;
+    if (!c || !c.refresh_token) throw new Error("FreshBooks isn't connected");
+    if (c.access_token && c.expires_at && new Date(c.expires_at).getTime() - Date.now() > 120000) return c;
+    const r = await fetch(FB_API + "/auth/oauth/token", { method: "POST", headers: { "content-type": "application/json", "Api-Version": "alpha" },
+      body: JSON.stringify({ client_id: FB_ID, client_secret: FB_SECRET, redirect_uri: FB_REDIRECT, grant_type: "refresh_token", refresh_token: c.refresh_token }) });
+    const t = await r.json().catch(() => ({}));
+    if (!r.ok || !t.access_token) throw new Error("FreshBooks token error: " + (t.error_description || t.error || r.status));
+    const [n] = await tx`update fbw.conn set access_token=${t.access_token}, refresh_token=${t.refresh_token || c.refresh_token},
+      expires_at=${new Date(Date.now() + (t.expires_in || 3600) * 1000)}, last_error=null where provider='freshbooks' returning *`;
+    return n;
+  });
+}
+async function estimateFile(d: any) {
+  const id = parseInt(d.estimateId, 10); if (!id) throw new Error("No FreshBooks estimate on this ticket");
+  const f = await folderFor({ folderId: d.folderId, ticket: d.ref, customer: d.customer, label: d.label });
+  const fb = await fbToken();
+  const r = await fetch(`${FB_API}/accounting/account/${fb.account_id}/estimates/estimates/${id}/pdf`,
+    { headers: { authorization: "Bearer " + fb.access_token, accept: "application/pdf", "Api-Version": "alpha" } });
+  if (!r.ok) throw new Error("FreshBooks estimate PDF " + r.status);
+  const pdf = new Uint8Array(await r.arrayBuffer());
+  const name = cleanName(`Estimate ${d.number || id}.pdf`, 80);
+  const c = await token();
+  const u = await fetch(`${GRAPH}/me/drive/items/${f.id}:/${encodeURIComponent(name)}:/content?@microsoft.graph.conflictBehavior=replace`,
+    { method: "PUT", headers: { authorization: "Bearer " + c.access_token, "content-type": "application/pdf" }, body: pdf });
+  const j = await u.json().catch(() => ({}));
+  if (!u.ok) throw new Error(`OneDrive ${u.status}: ${j?.error?.message || u.statusText}`);
+  const link = await shareLink(j.id);
+  await sql`insert into fbw.log(op,ref,ok,fb_id,fb_number,detail) values ('estimate_file',${d.ref || null},true,${String(id)},${String(d.number || "")},${sql.json({ item: j.id, scope: link.scope })})`.catch(() => {});
+  return { ok: true, itemId: j.id, name: j.name, webUrl: j.webUrl, shareUrl: link.url, shareScope: link.scope, folderId: f.id, folderUrl: f.webUrl };
+}
+
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ ok: false, error: "POST only" }, 405);
   const [k] = await sql`select v from fbw.settings where k='bridge_key'`;
@@ -180,6 +219,7 @@ Deno.serve(async (req) => {
       case "media_start": return json(await mediaStart(b));
       case "media_folder_link": return json(await mediaFolderLink(b));
       case "media_delete": return json(await mediaDelete(b));
+      case "estimate_file": return json(await estimateFile(b));
       default: return json({ ok: false, error: "unknown op" }, 400);
     }
   } catch (e) {
