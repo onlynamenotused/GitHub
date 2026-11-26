@@ -208,6 +208,9 @@ th.num .sorth{flex-direction:row-reverse}
     </div>
     <div id="wPanel" style="display:none;margin-top:12px">
       <h3>Warranty claim details</h3>
+      <div style="margin-bottom:10px"><label for="wTk">Fill from a service desk ticket</label>
+        <div style="display:flex;gap:6px;flex-wrap:wrap"><input id="wTk" placeholder="Ticket number, e.g. HSD-1001058" autocomplete="off" style="flex:1;min-width:200px"><button class="btn" type="button" id="wTkGo">Fill from ticket</button></div>
+        <div class="muted" id="wTkInfo" style="font-size:12px;margin-top:2px">Pulls the machine (end user, model, serial, install date, ink, firmware) and the troubleshooting from that job: problem, work notes, cause and machine status. Blank fields only, unless you choose Replace.</div></div>
       <div class="suggest" style="margin-bottom:10px"><label>Fill from the machine register</label>
         <input id="wMach" placeholder="Type a serial number, customer or model…" autocomplete="off">
         <div class="suggest-list" id="wMachList"></div>
@@ -1433,6 +1436,39 @@ async function machSearch(){
   L.style.display="block";
   L.querySelectorAll("[data-mi]").forEach(d=>d.onmousedown=e=>{e.preventDefault();L.style.display="none";$("#wMach").value="";machFill(hits[+d.dataset.mi])});
 }
+/* Fill the claim from a service desk ticket: its machine, and the problem / work notes / warranty card on the job. */
+async function wTicketFill(replace,ref){
+  ref=String(ref||$("#wTk").value||"").trim();const info=$("#wTkInfo");
+  if(!/\d{4,}/.test(ref)){info.innerHTML=`<span style="color:var(--bad,#b42318)">Type the ticket number, e.g. HSD-1001058</span>`;$("#wTk").focus();return}
+  info.textContent="Looking up the ticket…";$("#wTkGo").disabled=true;
+  let x;
+  try{
+    if(MODE==="portal"){const{data,error}=await sbc.rpc("wh_ticket",{p_ref:ref});if(error)throw new Error(error.message);x=data}
+    else x=await sb(`select public.wh_ticket(${sqlStr(ref)})::text as r;`);
+    if(typeof x==="string")x=JSON.parse(x);if(!x||!x.num)throw new Error("Ticket not found");
+  }catch(e){info.innerHTML=`<span style="color:var(--bad,#b42318)">${esc((e&&e.message)||mcpErr(e,"Supabase"))}</span>`;$("#wTkGo").disabled=false;return}
+  $("#wTkGo").disabled=false;
+  if(!cur.warranty)cur.warranty=wBlank();
+  if(!cur.vendorId){const v=brandToVendor(x.brand||(x.machine&&x.machine.brand));if(v)setVendor(v._id)}
+  const mr=x.mimakiReport||{},dw=x.warranty||{};
+  if(x.machine)machFill(Object.assign({},x.machine,{inkType:mr.inkType||"",firmware:dw.firmware||mr.fwAfter||mr.fwBefore||x.machine.firmware||""}),replace);
+  const w=cur.warranty;
+  const problem=dw.problem||[x.description,x.errorCode?"Error "+x.errorCode:""].filter(Boolean).join("\n")||mr.problem||x.summary||"";
+  const vals={problem,troubleshoot:dw.troubleshoot||x.notes||"",cause:dw.cause||"",machineStatus:dw.machineStatus||"",comments:dw.comments||"",inkLot:dw.inkLot||"",issueDate:dw.issueDate||String(x.created||"").slice(0,10),
+    firmware:dw.firmware||"",ink:dw.ink||"",installDate:dw.installDate||"",serial:dw.serial||"",dealer:dw.dealer||""};
+  if(!x.machine)Object.assign(vals,{endUser:x.customer||"",model:[x.brand&&!/mimaki/i.test(x.brand)?x.brand:"",x.model].filter(Boolean).join(" ")});
+  let n=0;Object.entries(vals).forEach(([k,v])=>{v=String(v||"").trim();if(!v)return;if(k==="dealer"&&w.dealer==="Highway Digital"&&!replace){w.dealer=v;n++;return}if(replace||!String(w[k]||"").trim()){w[k]=v;n++}});
+  if(wNoInk(w)){w.ink="";w.inkLot=""}
+  w.ticket=x.ref;w.brand=w.brand||x.brand||"";
+  if(!cur.ref)cur.ref={kind:"ticket",number:x.ref,client:x.customer||"",po:""};
+  if(!cur.notes||/^Warranty claim( · Customer: [^·]*)?$/.test(cur.notes)){cur.notes=`Warranty claim · Customer: ${x.customer||""} · Job ${x.ref}`;$("#poNotes").value=cur.notes}
+  try{localStorage.setItem("hd-po-draft",JSON.stringify(cur))}catch(e){}
+  renderWarranty();
+  info.innerHTML=`${n?`Filled ${n} job field${n>1?"s":""}`:"No blank job fields to fill"} from <b>${esc(x.ref)}</b> · ${esc(x.customer||"")}${x.machine?` · ${esc([x.machine.brand,x.machine.model].filter(Boolean).join(" "))}${x.machine.serial?" S/N "+esc(x.machine.serial):""}`:" · no machine linked on the ticket, so only the job details"}. <a href="#" id="wTkRep">Replace all with the ticket's details</a>`;
+  $("#wTkRep").onclick=e=>{e.preventDefault();wTicketFill(true,x.ref)};
+}
+$("#wTkGo").onclick=()=>wTicketFill(false);
+$("#wTk").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();wTicketFill(false)}};
 $("#wMach").oninput=()=>machSearch();
 $("#wMach").onfocus=()=>{loadMachines().catch(()=>{});machSearch()};
 $("#wMach").onblur=()=>setTimeout(()=>{$("#wMachList").style.display="none"},150);
