@@ -67,6 +67,18 @@ select.field{max-width:260px}
 .leaflet-div-icon{background:none;border:0}
 .leaflet-container{font:inherit}
 .note{font-size:12.5px;color:var(--soft);margin-top:8px}
+.hsthead{display:flex;gap:10px;align-items:baseline;justify-content:space-between;flex-wrap:wrap;margin-bottom:10px}
+.hstnow{display:flex;gap:14px;align-items:center;flex-wrap:wrap;padding:12px 14px;border:1px solid var(--line);border-radius:12px;margin-bottom:10px}
+.hstnow .big{font-size:22px;font-weight:700;word-break:break-word}
+.hstnow .lbl{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--soft)}
+.hstbar{height:6px;border-radius:3px;background:rgba(127,127,127,.25);overflow:hidden;margin-top:6px;min-width:160px}
+.hstbar i{display:block;height:100%;background:#e8b923}
+.hstrows{display:grid;gap:2px}
+.hstrow{display:grid;grid-template-columns:minmax(110px,auto) 1fr auto;gap:10px;align-items:baseline;padding:6px 2px;border-bottom:1px solid var(--line);font-size:14px}
+.hstrow:last-child{border-bottom:0}
+.hstrow .t{min-width:0;word-break:break-word}
+.hstrow a{color:inherit}
+.hstinst{font-size:11.5px;padding:1px 8px;border-radius:10px;border:1px solid var(--line);white-space:nowrap}
 .err{color:#fca5a5}
 .loading{color:var(--soft);padding:10px 0}
 @media (max-width:640px){.now{grid-template-columns:1fr}.search input{width:100%}.pick{width:100%}.spacer{height:24vh}}
@@ -90,6 +102,12 @@ select.field{max-width:260px}
     <div class="video"><iframe id="issVideo" title="NASA live stream" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen loading="lazy"></iframe></div>
     <div id="issmap"></div>
     <p class="note" id="issTxt">Finding the ISS…</p>
+  </section>
+  <section class="card" id="hstCard" style="margin-top:14px">
+    <div class="hsthead"><h2 style="margin:0">What Hubble is looking at</h2><span class="muted small" id="hstWhen"></span></div>
+    <div id="hstNow"><p class="muted small">Loading Hubble's schedule…</p></div>
+    <div id="hstList"></div>
+    <p class="note">From STScI's weekly Hubble Observing Timeline (planned, so times can shift or a target can be swapped for a Target of Opportunity). Calibration exposures are left out. Times shown in <span id="hstTz">your local time</span>. See it live on the sky map at <a href="https://spacetelescopelive.org/hubble" target="_blank" rel="noopener">Space Telescope Live ↗</a>.</p>
   </section>
   <div class="spacer"></div>
 
@@ -253,7 +271,7 @@ async function loadCity() {
   try {
     const [f, m] = await Promise.all([fetch("https://api.open-meteo.com/v1/forecast?" + q).then((r) => r.json()), fetch("https://marine-api.open-meteo.com/v1/marine?" + mq).then((r) => r.ok ? r.json() : null).catch(() => null)]);
     if (S.city !== c) return;
-    S.fc = f; S.marine = m;
+    S.fc = f; S.marine = m; try { hstDraw(); } catch (e) {}
     drawNow(); drawDays(); drawHours(); drawWind(); drawTides(); drawSwell();
   } catch (e) { $("nowCard").innerHTML = `<p class="err">Couldn't load the forecast. Check your connection and try again.</p>`; }
 }
@@ -469,6 +487,43 @@ async function issTick() {
   } catch (e) { $("issTxt").textContent = "Couldn't reach the ISS tracker just now."; }
 }
 issTick(); setInterval(issTick, 5000);
+
+// ---------- Hubble: planned targets from STScI's weekly timeline (via the portal, which reads and caches it) ----------
+const HST_INST = { WFC3: "Wide Field Camera 3", ACS: "Advanced Camera for Surveys", STIS: "Imaging Spectrograph", COS: "Cosmic Origins Spectrograph", FGS: "Fine Guidance Sensors" };
+const HST_NICE = (n) => { const t = String(n || ""); if (/^CLUTCH-TARGET-/i.test(t)) return { name: t, kind: "Deep field galaxies (COSMOS field)" };
+  if (/^EUROPA|^IO\b|^GANYMEDE|^CALLISTO|^JUPITER|^SATURN|^URANUS|^NEPTUNE|^MARS|^VENUS|^TITAN|^ENCELADUS/i.test(t)) return { name: t.replace(/-/g, " "), kind: "Solar System" };
+  if (/^SN\d{4}/i.test(t)) return { name: t, kind: "Supernova" };
+  if (/^PQSJ|^QSO|^SDSSJ|^PKS/i.test(t)) return { name: t, kind: "Quasar" };
+  if (/^HD\d|^HR\d|^HIP\d|^GJ|^KEPLER|^TOI|^WASP|^HAT-P|^K2-|^TRAPPIST|^LHS|^2MASS/i.test(t)) return { name: t, kind: "Star / exoplanet host" };
+  if (/^NGC|^M\d|^IC\d|^UGC|^ESO/i.test(t)) return { name: t, kind: "Galaxy / nebula" };
+  return { name: t, kind: "" }; };
+const hstLink = (t) => /^CLUTCH-TARGET-/i.test(t) ? "https://spacetelescopelive.org/hubble" : "https://simbad.cds.unistra.fr/simbad/sim-id?Ident=" + encodeURIComponent(String(t).replace(/-/g, " "));
+let HST = null;
+async function hstLoad() {
+  try { const r = await fetch("/weather/api/hubble"); const j = await r.json(); if (!j.ok) throw new Error(j.error || "no data"); HST = j.visits.map((v) => ({ ...v, b: Date.parse(v.begin), e: Date.parse(v.end) })); }
+  catch (e) { $("hstNow").innerHTML = `<p class="muted small">Couldn't load Hubble's schedule just now. <a href="https://spacetelescopelive.org/hubble" target="_blank" rel="noopener">Space Telescope Live ↗</a> shows it live.</p>`; return; }
+  hstDraw();
+}
+function hstDraw() {
+  if (!HST) return;
+  const tz = (S.fc && S.fc.timezone) || Intl.DateTimeFormat().resolvedOptions().timeZone, now = Date.now();
+  const f = (ms, o) => new Date(ms).toLocaleString("en-AU", { timeZone: tz, ...o });
+  const tm = (ms) => f(ms, { hour: "numeric", minute: "2-digit" }), dy = (ms) => f(ms, { weekday: "short", day: "numeric", month: "short" });
+  $("hstTz").textContent = (S.city ? S.city.name + " time" : "your local time") + " (" + tz.replace(/_/g, " ") + ")";
+  const cur = HST.find((v) => v.b <= now && v.e > now), next = HST.filter((v) => v.b > now);
+  const card = (v, live) => { const n = HST_NICE(v.target), pct = live ? Math.round(((now - v.b) / (v.e - v.b)) * 100) : 0;
+    return `<div class="hstnow"><div style="flex:1;min-width:200px"><div class="lbl">${live ? "Observing now" : "Between targets · next up " + esc(dy(v.b)) + " " + esc(tm(v.b))}</div>
+      <div class="big"><a href="${esc(hstLink(v.target))}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${esc(n.name)}</a></div>
+      <div class="muted small">${n.kind ? esc(n.kind) + " · " : ""}${esc(v.inst.split(" + ").map((i) => HST_INST[i] || i).join(" + "))} · investigator ${esc(v.pi)} · program ${esc(v.prop)}</div>
+      ${live ? `<div class="hstbar" title="${pct}% through this visit"><i style="width:${pct}%"></i></div><div class="muted small" style="margin-top:4px">${esc(tm(v.b))} to ${esc(tm(v.e))} · ${pct}% done</div>` : `<div class="muted small">${esc(tm(v.b))} to ${esc(tm(v.e))}</div>`}</div></div>`; };
+  $("hstNow").innerHTML = cur ? card(cur, true) : next[0] ? card(next[0], false) : `<p class="muted small">Nothing scheduled in the published timeline right now.</p>`;
+  const up = next.filter((v) => v !== (cur ? null : next[0])).slice(0, 14);
+  let lastDay = "";
+  $("hstList").innerHTML = up.length ? `<div class="lbl muted small" style="text-transform:uppercase;letter-spacing:.12em;margin:4px 0 2px">Coming up</div><div class="hstrows">${up.map((v) => { const d = dy(v.b), n = HST_NICE(v.target); const dd = d !== lastDay ? d : ""; lastDay = d;
+    return `<div class="hstrow"><span class="muted">${dd ? `<b style="color:var(--fg,inherit)">${esc(dd)}</b> ` : ""}${esc(tm(v.b))}</span><span class="t"><a href="${esc(hstLink(v.target))}" target="_blank" rel="noopener">${esc(n.name)}</a>${n.kind ? ` <span class="muted small">· ${esc(n.kind)}</span>` : ""}</span><span class="hstinst" title="${esc(v.inst.split(" + ").map((i) => HST_INST[i] || i).join(" + "))}">${esc(v.inst)}</span></div>`; }).join("")}</div>` : "";
+  $("hstWhen").textContent = "Updated " + tm(now);
+}
+hstLoad(); setInterval(() => { if (!document.hidden) hstDraw(); }, 60e3); setInterval(() => { if (!document.hidden) hstLoad(); }, 30 * 60e3);
 
 // ---------- start ----------
 fillSelect();
