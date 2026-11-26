@@ -191,6 +191,8 @@ th.num .sorth{flex-direction:row-reverse}
       </div>
       <div>
         <label>Ship to <a href="#" id="shipRefresh" style="float:right;font-weight:400" title="Reload the customer list from FreshBooks">refresh customers</a></label>
+        <label style="display:flex;gap:6px;align-items:center;font-weight:600;margin:2px 0 6px;cursor:pointer"><input type="checkbox" id="shipDrop" style="width:auto;margin:0"> Drop ship to customer</label>
+        <select id="shipSel" style="margin-bottom:6px;display:none" aria-label="Customer to drop ship to"><option value="">Choose the customer…</option></select>
         <input id="shipPick" list="shipList" placeholder="Type to search FreshBooks customers…" autocomplete="off" style="margin-bottom:6px">
         <datalist id="shipList"></datalist>
         <textarea id="poShip" rows="3"></textarea>
@@ -862,7 +864,12 @@ const MBE_LABEL="HIGHWAYDIGITAL c/o MBE (default)";
 let clients=[],clientsAt="";
 function clientAddr(c){const a=c.primary_mailing_address||c.a||{};const name=c.organization||c.display_name||[c.first_name,c.last_name].filter(Boolean).join(" ");const att=[c.first_name,c.last_name].filter(Boolean).join(" ");
   return[name,att&&att!==name&&!/^accounts?$/i.test(att)?"Attn: "+att:"",a.street,a.street2,[a.city,a.province,a.postal_code].filter(Boolean).join(" "),c.phone||c.business_phone||c.mobile_phone||c.home_phone||""].filter(x=>x&&String(x).trim()).join("\n")}
-function fillShipList(){$("#shipList").innerHTML=`<option value="${esc(MBE_LABEL)}">`+clients.map(c=>`<option value="${esc(c.n)}">`).join("");$("#shipInfo").textContent=clients.length?`${clients.length} FreshBooks customers${clientsAt?" · updated "+auDate(clientsAt):""}`:"Customer list not loaded yet"}
+/* Drop ship: the parts go straight to the customer. Ticking it lists every FreshBooks customer; picking one fills the address. */
+const isDrop=()=>!!(cur&&cur.shipName&&cur.shipName!==MBE_LABEL&&cur.shipTo!==MBE);
+function fillShipSel(){const sel=$("#shipSel");if(!sel)return;const v=cur&&isDrop()?cur.shipName:"";
+  sel.innerHTML=`<option value="">${clients.length?"Choose the customer…":"Loading customers…"}</option>`+clients.map(c=>`<option value="${esc(c.n)}" ${c.n===v?"selected":""}>${esc(c.n)}${c.a&&c.a.city?" · "+esc(c.a.city):""}</option>`).join("")+(v&&!clients.some(c=>c.n===v)?`<option value="${esc(v)}" selected>${esc(v)}</option>`:"")}
+function renderDrop(){const on=$("#shipDrop").checked;$("#shipSel").style.display=on?"block":"none";$("#shipPick").style.display=on?"none":"block";if(on)fillShipSel()}
+function fillShipList(){fillShipSel();$("#shipList").innerHTML=`<option value="${esc(MBE_LABEL)}">`+clients.map(c=>`<option value="${esc(c.n)}">`).join("");$("#shipInfo").textContent=clients.length?`${clients.length} FreshBooks customers${clientsAt?" · updated "+auDate(clientsAt):""}`:"Customer list not loaded yet"}
 async function loadClients(force){
   if(!force){try{const s=await db.doc("cache/clients").get();if(s.exists){const d=s.data();clients=d.list||[];clientsAt=d.at;fillShipList();if(d.at===today())return}}catch(e){}}
   if(!mcp&&MODE!=="portal"){fillShipList();return}
@@ -877,12 +884,14 @@ function setShip(label){
   if(!label||label===MBE_LABEL){cur.shipTo=MBE;cur.shipName=MBE_LABEL}else{const c=clients.find(x=>x.n===label);if(!c)return;cur.shipTo=clientAddr(c);cur.shipName=c.n}
   $("#poShip").value=cur.shipTo;$("#shipPick").value=cur.shipName;
 }
-$("#shipPick").onchange=e=>setShip(e.target.value.trim());
+$("#shipPick").onchange=e=>{setShip(e.target.value.trim());$("#shipDrop").checked=isDrop();renderDrop()};
+$("#shipDrop").onchange=e=>{if(e.target.checked){if(!clients.length)loadClients().catch(()=>{});renderDrop();$("#shipSel").focus()}else{setShip(MBE_LABEL);renderDrop()}try{localStorage.setItem("hd-po-draft",JSON.stringify(cur))}catch(_){}};
+$("#shipSel").onchange=e=>{const v=e.target.value;if(!v)return;setShip(v);try{localStorage.setItem("hd-po-draft",JSON.stringify(cur))}catch(_){}};
 $("#shipPick").onfocus=e=>{e.target.select();if(!clients.length)loadClients()};
 $("#shipRefresh").onclick=e=>{e.preventDefault();loadClients(true)};
 function loadPOtoForm(){
   $("#poVendor").value=cur.vendorId||"";$("#poNumber").value=cur.number||"";$("#poDate").value=cur.date||today();
-  $("#poVendorAddr").value=cur.vendorAddr||vendorAddr(vById(cur.vendorId));$("#poShip").value=cur.shipTo||"";$("#shipPick").value=cur.shipName||(cur.shipTo===MBE||!cur.shipTo?"HIGHWAYDIGITAL c/o MBE (default)":"");$("#poNotes").value=cur.notes||"";$("#poDelivery").value=cur.delivery||"standard";$("#poDelivery").dataset.u=$("#poDelivery").value;
+  $("#poVendorAddr").value=cur.vendorAddr||vendorAddr(vById(cur.vendorId));$("#poShip").value=cur.shipTo||"";$("#shipPick").value=cur.shipName||(cur.shipTo===MBE||!cur.shipTo?"HIGHWAYDIGITAL c/o MBE (default)":"");$("#shipDrop").checked=isDrop();renderDrop();$("#poNotes").value=cur.notes||"";$("#poDelivery").value=cur.delivery||"standard";$("#poDelivery").dataset.u=$("#poDelivery").value;
   renderWarranty();renderLines();
 }
 function lineTotal(l){return(Number(l.qty)||0)*(Number(l.price)||0)*(1-(Number(l.disc)||0)/100)}
@@ -1030,7 +1039,7 @@ function buildPDF(){
   d.setFont("helvetica","normal");d.text("www.highwaydigital.com.au · 1300 880 815 · ABN 85 387 583 538",M,38);
   const y0=46;
   d.setFillColor(22,32,44);d.rect(M,y0,85,6,"F");d.rect(W-M-85,y0,85,6,"F");
-  d.setTextColor(255,255,255);d.setFont("helvetica","bold");d.setFontSize(9);d.text("VENDOR",M+2,y0+4.2);d.text("SHIP TO",W-M-83,y0+4.2);
+  d.setTextColor(255,255,255);d.setFont("helvetica","bold");d.setFontSize(9);d.text("VENDOR",M+2,y0+4.2);d.text(isDrop()?"SHIP TO (DROP SHIP TO OUR CUSTOMER)":"SHIP TO",W-M-83,y0+4.2);
   d.setTextColor(22,32,44);d.setFont("helvetica","normal");d.setFontSize(10);
   const va=(cur.vendorAddr||"").split("\n"),sa=(cur.shipTo||"").split("\n");
   va.forEach((t,i)=>{d.setFont("helvetica",i===0?"bold":"normal");d.text(t,M+2,y0+12+i*5)});
@@ -1101,11 +1110,11 @@ function poEmailHtml(v,t,rows){
   const sig=(poSig&&poSig.html)?poSig.html:`<p>Thank you,<br>Sean Hannan | Proprietor<br>Highway Digital<br>1300 880 815 · hello@highwaydigital.com.au</p>`;
   if(isW())return`<p>Hi ${esc(v.attention||"team")},</p><p>Please find warranty claim PO <b>${esc(cur.number)}</b> attached as a PDF${wm?", together with the completed Mimaki warranty form":""}. Details below.<br><b>Delivery: ${esc(delLabel(cur.delivery))}</b></p>${wInfo}<p><b>Parts required</b></p>
    <table><tr><th>Qty</th><th>Item #</th><th>Description</th></tr>${cur.lines.map(l=>`<tr><td>${Number(l.qty)||0}</td><td>${esc(l.code)}</td><td>${esc(l.desc)}</td></tr>`).join("")}</table>
-   ${emFilesHtml()}<p><b>Ship to:</b><br>${esc(cur.shipTo).replace(/\n/g,"<br>")}</p><p>Please confirm approval and shipping.</p>${sig}`;
+   ${emFilesHtml()}<p><b>${isDrop()?"Drop ship direct to our customer:":"Ship to:"}</b><br>${esc(cur.shipTo).replace(/\n/g,"<br>")}</p><p>Please confirm approval and shipping.</p>${sig}`;
   return`<p>Hi ${esc(v.attention||"team")},</p><p>Please find purchase order <b>${esc(cur.number)}</b> below.<br><b>Delivery: ${esc(delLabel(cur.delivery))}</b>${cur.notes?"<br>"+esc(cur.notes):""}</p>
    <table><tr><th>Qty</th><th>Item #</th><th>Description</th><th>Unit price</th><th>Line total</th></tr>${rows}
    <tr><td></td><td></td><td></td><td><b>Subtotal</b></td><td>${money(t.sub)}</td></tr><tr><td></td><td></td><td></td><td>GST</td><td>${money(t.gst)}</td></tr><tr><td></td><td></td><td></td><td><b>Total</b></td><td><b>${money(t.tot)}</b></td></tr></table>
-   <p><b>Ship to:</b><br>${esc(cur.shipTo).replace(/\n/g,"<br>")}</p><p>Please confirm pricing and availability.</p>${sig}`;
+   <p><b>${isDrop()?"Drop ship direct to our customer:":"Ship to:"}</b><br>${esc(cur.shipTo).replace(/\n/g,"<br>")}</p><p>Please confirm pricing and availability.</p>${sig}`;
 }
 /* The machine's most recent Mimaki log file and parameter file (OneDrive Client Folders), shared as download links
    in the warranty email. Found with the Microsoft 365 connector; links made by the bridge (share_items). */
