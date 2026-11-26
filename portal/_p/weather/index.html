@@ -83,6 +83,14 @@ select.field{max-width:260px}
       <button class="btn" id="locBtn" type="button" title="Use where I am now">📍 Near me</button>
     </div>
   </div>
+  <section class="card" id="spaceCard" style="margin-top:14px">
+    <h2>Live from space</h2>
+    <p class="muted small" style="margin:0 0 10px">The Space Shuttle retired in 2011, so here's the next best thing: live 4K cameras on the International Space Station, and where the ISS is right now. The picture goes dark while the station is on Earth's night side.</p>
+    <div class="satbar"><button class="btn on" type="button" data-feed="sen">ISS 4K cameras (Sen, 24/7)</button><button class="btn" type="button" data-feed="nasa">NASA live (when NASA is broadcasting)</button></div>
+    <div class="video"><iframe id="issVideo" title="NASA live stream" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen loading="lazy"></iframe></div>
+    <div id="issmap"></div>
+    <p class="note" id="issTxt">Finding the ISS…</p>
+  </section>
   <div class="spacer"></div>
 
   <section class="card" id="nowCard"><p class="loading">Loading the forecast…</p></section>
@@ -114,14 +122,6 @@ select.field{max-width:260px}
     <p class="note">Himawari-9 geostationary satellite (Japan Meteorological Agency, via NASA GIBS), the last 3 hours in 10–20 minute steps. Infrared shows cloud-top temperature, so it works at night: the whiter the cloud, the colder and higher it is.</p>
   </section>
 
-  <section class="card" style="margin-top:14px">
-    <h2>Live from space</h2>
-    <p class="muted small" style="margin:0 0 10px">The Space Shuttle retired in 2011, so here's the next best thing: live 4K cameras on the International Space Station, and where the ISS is right now. The picture goes dark while the station is on Earth's night side.</p>
-    <div class="satbar"><button class="btn on" type="button" data-feed="sen">ISS 4K cameras (Sen, 24/7)</button><button class="btn" type="button" data-feed="nasa">NASA live (when NASA is broadcasting)</button></div>
-    <div class="video"><iframe id="issVideo" title="NASA live stream" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen loading="lazy"></iframe></div>
-    <div id="issmap"></div>
-    <p class="note" id="issTxt">Finding the ISS…</p>
-  </section>
 
   <p class="note">Forecasts, tides and swell from Open-Meteo (Bureau of Meteorology, MetService and ECMWF models). Tides are modelled for the nearest open-sea point: a guide only, not for navigation. Moon times are calculated.</p>
 </main>
