@@ -89,6 +89,8 @@ async function docNumber(d: any) {
   if (d.po != null && String(d.po).trim()) extra.po_number = String(d.po).trim().slice(0, 30);
   const cid = parseInt(d.clientId, 10);
   if (kind === "invoice" && cid) { const [t] = await sql`select public.invoice_due_days(${cid}) as n`; if (t && t.n != null) extra.due_offset_days = Number(t.n); }
+  // Standard payment terms and bank details on every invoice (FreshBooks "Terms"); text kept in fbw.settings.invoice_terms.
+  if (kind === "invoice") { const [w] = await sql`select v from fbw.settings where k='invoice_terms'`; if (w && String(w.v || "").trim()) extra.terms = String(w.v).slice(0, 4000); }
   const put = async (body: Record<string, unknown>) => {
     const r = await fetch(`${FB_API}/accounting/account/${c.account_id}/${path}/${id}`, {
       method: "PUT", headers: { "content-type": "application/json", "Api-Version": "alpha", authorization: "Bearer " + c.access_token },
